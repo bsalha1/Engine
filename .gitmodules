@@ -4,9 +4,11 @@
 [submodule "glew"]
 	path = glew
 	url = https://github.com/nigels-com/glew.git
+	ignore = dirty
 [submodule "glu"]
 	path = glu
 	url = https://gitlab.freedesktop.org/mesa/glu.git
 [submodule "libglvnd"]
 	path = libglvnd
 	url = https://gitlab.freedesktop.org/glvnd/libglvnd.git
+	ignore = dirty

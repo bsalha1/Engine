@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 base_dir=$(pwd)
 
 # Build GLFW library and headers.
