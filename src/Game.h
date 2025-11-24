@@ -23,6 +23,6 @@ namespace Engine
 
         bool init();
 
-        GLFWwindow* window;
+        GLFWwindow *window;
     };
 }

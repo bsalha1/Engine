@@ -1,5 +1,5 @@
-#include "assert_util.h"
 #include "Game.h"
+#include "assert_util.h"
 #include "log.h"
 
 int main()

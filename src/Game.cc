@@ -1,12 +1,12 @@
 #include "Game.h"
 
-#include <array>
-#include <string>
-#include <fstream>
-#include <sstream>
-
 #include "assert_util.h"
 #include "log.h"
+
+#include <array>
+#include <fstream>
+#include <sstream>
+#include <string>
 
 namespace Engine
 {
@@ -16,7 +16,7 @@ namespace Engine
         float y;
     };
 
-    static bool get_shader_src(const std::string& file_path, std::string &shader_src)
+    static bool get_shader_src(const std::string &file_path, std::string &shader_src)
     {
         const std::ifstream file(file_path);
         ASSERT_RET_IF_NOT(file, false);
@@ -28,12 +28,13 @@ namespace Engine
         return true;
     }
 
-    static bool compile_shader(GLuint& shader_id, const GLuint type, const std::string& src)
+    static bool
+    compile_shader(GLuint &shader_id, const GLuint type, const std::string &src)
     {
         shader_id = glCreateShader(type);
         ASSERT_RET_IF(shader_id == 0, false);
 
-        const char* _src = src.c_str();
+        const char *_src = src.c_str();
         glShaderSource(shader_id, 1, &_src, nullptr);
         glCompileShader(shader_id);
 
@@ -58,15 +59,21 @@ namespace Engine
         return true;
     }
 
-    static bool create_shader(GLuint& program_id, const std::string& vertex_shader_src, const std::string& fragment_shader_src)
+    static bool create_shader(GLuint &program_id,
+                              const std::string &vertex_shader_src,
+                              const std::string &fragment_shader_src)
     {
         program_id = glCreateProgram();
 
         GLuint vertex_shader_id;
-        ASSERT_RET_IF_NOT(compile_shader(vertex_shader_id, GL_VERTEX_SHADER, vertex_shader_src), false);
+        ASSERT_RET_IF_NOT(
+            compile_shader(vertex_shader_id, GL_VERTEX_SHADER, vertex_shader_src),
+            false);
 
         GLuint fragment_shader_id;
-        ASSERT_RET_IF_NOT(compile_shader(fragment_shader_id, GL_FRAGMENT_SHADER, fragment_shader_src), false);
+        ASSERT_RET_IF_NOT(
+            compile_shader(fragment_shader_id, GL_FRAGMENT_SHADER, fragment_shader_src),
+            false);
 
         glAttachShader(program_id, vertex_shader_id);
         glAttachShader(program_id, fragment_shader_id);
@@ -82,10 +89,8 @@ namespace Engine
     /**
      * Constructor.
      */
-    Game::Game() : window(nullptr)
-    {
-
-    }
+    Game::Game(): window(nullptr)
+    {}
 
     /**
      * Create and initialize instance of a Game.
@@ -120,25 +125,29 @@ namespace Engine
 
         const std::array<Vertex2d, 3> positions = {{
             {-0.5f, -0.5f},
-            { 0.0f,  0.5f},
-            { 0.5f, -0.5f},
+            {0.0f, 0.5f},
+            {0.5f, -0.5f},
         }};
         GLuint buffer;
         glGenBuffers(1, &buffer);
         glBindBuffer(GL_ARRAY_BUFFER, buffer);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(positions), positions.data(), GL_STATIC_DRAW);
+        glBufferData(
+            GL_ARRAY_BUFFER, sizeof(positions), positions.data(), GL_STATIC_DRAW);
         glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(Vertex2d), 0);
         glEnableVertexAttribArray(0);
 
         LOG("Compiling shaders\n");
 
         std::string vertex_shader_src;
-        ASSERT_RET_IF_NOT(get_shader_src("shaders/basic.vert", vertex_shader_src), false);
+        ASSERT_RET_IF_NOT(get_shader_src("shaders/basic.vert", vertex_shader_src),
+                          false);
         std::string fragment_shader_src;
-        ASSERT_RET_IF_NOT(get_shader_src("shaders/basic.frag", fragment_shader_src), false);
+        ASSERT_RET_IF_NOT(get_shader_src("shaders/basic.frag", fragment_shader_src),
+                          false);
 
         GLuint program_id;
-        ASSERT_RET_IF_NOT(create_shader(program_id, vertex_shader_src, fragment_shader_src), false);
+        ASSERT_RET_IF_NOT(
+            create_shader(program_id, vertex_shader_src, fragment_shader_src), false);
         glUseProgram(program_id);
 
         return true;
@@ -196,7 +205,7 @@ namespace Engine
      */
     void Game::end()
     {
-        //glDeleteProgram(program_id)
+        // glDeleteProgram(program_id)
         glfwTerminate();
     }
 }
