@@ -17,8 +17,6 @@ BUILD_OBJS = $(addprefix $(BUILD_DIR)/,$(OBJS))
 BUILD_DEPS = $(patsubst %.o,%.d,$(BUILD_OBJS))
 -include $(BUILD_DEPS)
 
-LINKER_SCRIPT = $(PROGRAM_NAME).ld
-
 # Version info.
 GIT_COMMIT := $(shell git describe --dirty --always)
 CXXFLAGS += -DGIT_COMMIT=\"$(GIT_COMMIT)\"
@@ -27,26 +25,27 @@ CXXFLAGS += -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 $(BUILD_DIR)/$(PROGRAM_NAME).s: $(BUILD_DIR)/$(PROGRAM_NAME)
 	@mkdir -p $(dir $@)
 	@echo "OBJDUMP $@"
-	#@$(OBJDUMP) -drS $< > $@
+	@objdump -drS $< > $@
 
 # ELF-formatted program.
 $(BUILD_DIR)/$(PROGRAM_NAME): $(BUILD_OBJS)
 	@mkdir -p $(dir $@)
 	@echo "CXXLD   $@"
-	@$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
+	@g++ $(CXXFLAGS) $^ $(LDFLAGS) -s -o $@
 
 # Make a .o from a .cc
 $(BUILD_DIR)/%.o: src/%.cc
 	@mkdir -p $(dir $@)
 	@echo "CXX     $@"
-	@$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $@
+	@g++ $(CXXFLAGS) -MMD -MP -c $< -o $@
 
 # Default target - build the program and assembly.
 all: $(BUILD_DIR)/$(PROGRAM_NAME) $(BUILD_DIR)/$(PROGRAM_NAME).s
 
+# Format all .cpp and .h files in the src directory.
 format:
-	find src -name "*.cc" -exec clang-format-14 -i {} +;
-	find src -name "*.h" -exec clang-format-14 -i {} +;
+	find src -name "*.cc" -exec clang-format -i {} +;
+	find src -name "*.h" -exec clang-format -i {} +;
 
 # Remove built artifacts.
 clean:

@@ -2,7 +2,7 @@
 
 set -e
 
-base_dir=$(pwd)
+sudo pacman -Sy clang-format
 
 # Build GLFW library and headers.
 cd glfw
