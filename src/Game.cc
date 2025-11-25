@@ -124,18 +124,41 @@ namespace Engine
 
         LOG("Allocating buffers\n");
 
-        const std::array<Vertex2d, 3> positions = {{
-            {-0.5f, -0.5f},
-            {0.0f, 0.5f},
-            {0.5f, -0.5f},
-        }};
-        GLuint buffer;
-        glGenBuffers(1, &buffer);
-        glBindBuffer(GL_ARRAY_BUFFER, buffer);
-        glBufferData(
-            GL_ARRAY_BUFFER, sizeof(positions), positions.data(), GL_STATIC_DRAW);
-        glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(Vertex2d), 0);
-        glEnableVertexAttribArray(0);
+        /*
+         * Create vertex buffer.
+         */
+        {
+            const std::array<Vertex2d, 6> positions = {{
+                {-0.5f, -0.5f}, /* 0 */
+                {0.5f, -0.5f},  /* 1 */
+                {0.5f, 0.5f},   /* 2 */
+                {-0.5f, 0.5f},  /* 3 */
+            }};
+
+            GLuint buffer;
+            glGenBuffers(1, &buffer);
+            glBindBuffer(GL_ARRAY_BUFFER, buffer);
+            glBufferData(
+                GL_ARRAY_BUFFER, sizeof(positions), positions.data(), GL_STATIC_DRAW);
+
+            glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(Vertex2d), 0);
+            glEnableVertexAttribArray(0);
+        }
+
+        /*
+         * Create index buffer.
+         */
+        {
+            const std::array<unsigned int, 6> indices = {0, 1, 2, 2, 3, 0};
+
+            GLuint buffer;
+            glGenBuffers(1, &buffer);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                         sizeof(indices),
+                         indices.data(),
+                         GL_STATIC_DRAW);
+        }
 
         LOG("Compiling shaders\n");
 
@@ -187,7 +210,7 @@ namespace Engine
         {
             glClear(GL_COLOR_BUFFER_BIT);
 
-            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
 
             /*
              * Swap front and back buffers.
