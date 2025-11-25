@@ -12,7 +12,7 @@ namespace Engine
     public:
         static std::unique_ptr<Game> create();
 
-        void run();
+        bool run();
 
         void end();
 
@@ -24,5 +24,7 @@ namespace Engine
         bool init();
 
         GLFWwindow *window;
+
+        GLuint program_id;
     };
 }

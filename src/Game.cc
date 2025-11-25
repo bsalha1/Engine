@@ -1,10 +1,13 @@
 #include "Game.h"
 
+#include "GLFW/glfw3.h"
 #include "assert_util.h"
 #include "log.h"
 
 #include <array>
+#include <chrono>
 #include <fstream>
+#include <ratio>
 #include <sstream>
 #include <string>
 
@@ -90,7 +93,7 @@ namespace Engine
     /**
      * Constructor.
      */
-    Game::Game(): window(nullptr)
+    Game::Game(): window(nullptr), program_id(0)
     {}
 
     /**
@@ -116,6 +119,8 @@ namespace Engine
             return false;
         }
         glfwMakeContextCurrent(window);
+
+        // glfwSwapInterval(1);
 
         LOG("Initializing GLEW\n");
         ASSERT_RET_IF_GLEW_NOT_OK(glewInit(), false);
@@ -162,17 +167,19 @@ namespace Engine
 
         LOG("Compiling shaders\n");
 
-        std::string vertex_shader_src;
-        ASSERT_RET_IF_NOT(get_shader_src("shaders/basic.vert", vertex_shader_src),
-                          false);
-        std::string fragment_shader_src;
-        ASSERT_RET_IF_NOT(get_shader_src("shaders/basic.frag", fragment_shader_src),
-                          false);
+        {
+            std::string vertex_shader_src;
+            ASSERT_RET_IF_NOT(get_shader_src("shaders/basic.vert", vertex_shader_src),
+                              false);
+            std::string fragment_shader_src;
+            ASSERT_RET_IF_NOT(get_shader_src("shaders/basic.frag", fragment_shader_src),
+                              false);
 
-        GLuint program_id;
-        ASSERT_RET_IF_NOT(
-            create_shader(program_id, vertex_shader_src, fragment_shader_src), false);
-        glUseProgram(program_id);
+            ASSERT_RET_IF_NOT(
+                create_shader(program_id, vertex_shader_src, fragment_shader_src),
+                false);
+            glUseProgram(program_id);
+        }
 
         return true;
     }
@@ -199,18 +206,45 @@ namespace Engine
     /**
      * Run the game.
      */
-    void Game::run()
+    bool Game::run()
     {
         LOG("Entering main loop\n");
+
+        const GLint u_Color = glGetUniformLocation(program_id, "u_Color");
+        ASSERT_RET_IF(u_Color == -1, false);
+
+        float r = 0.f;
+        float dr = 0.005f;
 
         /*
          * Loop until the user closes the window.
          */
+        using namespace std::chrono_literals;
+        static constexpr std::chrono::seconds stats_period = 1s;
+        std::chrono::steady_clock::time_point last_stats_time =
+            std::chrono::steady_clock::now();
+        const std::chrono::steady_clock::time_point game_start_time =
+            std::chrono::steady_clock::now();
         while (!glfwWindowShouldClose(window))
         {
+            const std::chrono::steady_clock::time_point frame_start_time =
+                std::chrono::steady_clock::now();
+
             glClear(GL_COLOR_BUFFER_BIT);
 
+            glUniform4f(u_Color, r, 0.f, 1.f - r, 1.f);
+
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
+
+            if (r > 1.f)
+            {
+                dr = -0.005f;
+            }
+            else if (r < 0.f)
+            {
+                dr = 0.005f;
+            }
+            r += dr;
 
             /*
              * Swap front and back buffers.
@@ -221,7 +255,23 @@ namespace Engine
              * Poll for and process events.
              */
             glfwPollEvents();
+
+            /*
+             * Display stats.
+             */
+            const std::chrono::steady_clock::time_point now_time =
+                std::chrono::steady_clock::now();
+            if (now_time - last_stats_time > stats_period)
+            {
+                last_stats_time = now_time;
+                const std::chrono::nanoseconds frame_duration_ns =
+                    now_time - frame_start_time;
+                const float frames_per_second = 1e9f / frame_duration_ns.count();
+                LOG("%.2f fps\n", frames_per_second);
+            }
         }
+
+        return true;
     }
 
     /**
