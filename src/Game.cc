@@ -64,6 +64,7 @@ namespace Engine
                               const std::string &fragment_shader_src)
     {
         program_id = glCreateProgram();
+        ASSERT_RET_IF(program_id == 0, false);
 
         GLuint vertex_shader_id;
         ASSERT_RET_IF_NOT(

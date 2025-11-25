@@ -42,6 +42,10 @@ $(BUILD_DIR)/%.o: src/%.cc
 # Default target - build the program and assembly.
 all: $(BUILD_DIR)/$(PROGRAM_NAME) $(BUILD_DIR)/$(PROGRAM_NAME).s
 
+# Play game.
+play: $(BUILD_DIR)/$(PROGRAM_NAME)
+	__GLX_VENDOR_LIBRARY_NAME=nvidia __NV_PRIME_RENDER_OFFLOAD=1 $(BUILD_DIR)/$(PROGRAM_NAME)
+
 # Format all .cpp and .h files in the src directory.
 format:
 	find src -name "*.cc" -exec clang-format -i {} +;
@@ -51,4 +55,4 @@ format:
 clean:
 	rm -rf $(BUILD_DIR)
 
-.PHONY: all format clean
+.PHONY: all play format clean
