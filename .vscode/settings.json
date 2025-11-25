@@ -1,0 +1,7 @@
+{
+    "clangd.fallbackFlags": [
+        "-I${workspaceFolder}/glfw/include",
+        "-I${workspaceFolder}/glew/include",
+        "-I${workspaceFolder}/glu/include"
+    ]
+}
