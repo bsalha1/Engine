@@ -1,21 +1,27 @@
 #include "Game.h"
 
 #include "assert_util.h"
-#include "glm/ext/vector_float3.hpp"
 #include "log.h"
 
+#include <GLFW/glfw3.h>
 #include <array>
 #include <chrono>
 #include <execinfo.h>
 #include <fstream>
+#include <glm/ext/scalar_constants.hpp>
+#include <glm/ext/vector_float3.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <sstream>
 #include <string>
+
+using namespace std::chrono_literals;
 
 namespace Engine
 {
     static constexpr unsigned int window_width = 640;
     static constexpr unsigned int window_height = 480;
+    static constexpr unsigned int window_center_x = window_width / 2;
+    static constexpr unsigned int window_center_y = window_height / 2;
 
     struct Vertex3d
     {
@@ -105,19 +111,33 @@ namespace Engine
     {
         if (type == GL_DEBUG_TYPE_ERROR)
         {
-            // Capture stack
-            void *bt[128];
-            int bt_size = backtrace(bt, 128);
-            char **bt_syms = backtrace_symbols(bt, bt_size);
-
-            fprintf(stderr, "Stack trace:\n");
-            for (int i = 0; i < bt_size; i++)
-                fprintf(stderr, "  %s\n", bt_syms[i]);
-
-            free(bt_syms);
-
-            Game *game = reinterpret_cast<Game *>(const_cast<void *>(user_param));
             LOG_ERROR("OpenGL error: %s\n", message);
+
+            /*
+             * Dump stack trace so we can trace back where the error occurred.
+             */
+            void *bt[128];
+            const int bt_size = backtrace(bt, 128);
+            char **bt_syms = backtrace_symbols(bt, bt_size);
+            if (bt_syms == nullptr)
+            {
+                LOG_ERROR("Failed to get stack trace symbols\n");
+            }
+            else
+            {
+                LOG_ERROR("Stack trace:\n");
+                for (int i = 0; i < bt_size; i++)
+                {
+                    LOG_ERROR("  %s\n", bt_syms[i]);
+                }
+
+                free(bt_syms);
+            }
+
+            /*
+             * Stop the run loop.
+             */
+            Game *game = reinterpret_cast<Game *>(const_cast<void *>(user_param));
             game->stop_run();
         }
         else
@@ -254,14 +274,6 @@ namespace Engine
                 7,
                 4,
 
-                /* +Y face */
-                0,
-                1,
-                5,
-                5,
-                4,
-                0,
-
                 /* -Y face */
                 3,
                 2,
@@ -269,6 +281,14 @@ namespace Engine
                 6,
                 7,
                 3,
+
+                /* +Y face */
+                0,
+                1,
+                5,
+                5,
+                4,
+                0,
             };
 
             GLuint buffer_obj;
@@ -282,19 +302,16 @@ namespace Engine
 
         LOG("Compiling shaders\n");
 
-        {
-            std::string vertex_shader_src;
-            ASSERT_RET_IF_NOT(get_shader_src("shaders/basic.vert", vertex_shader_src),
-                              false);
-            std::string fragment_shader_src;
-            ASSERT_RET_IF_NOT(get_shader_src("shaders/basic.frag", fragment_shader_src),
-                              false);
+        std::string vertex_shader_src;
+        ASSERT_RET_IF_NOT(get_shader_src("shaders/basic.vert", vertex_shader_src),
+                          false);
+        std::string fragment_shader_src;
+        ASSERT_RET_IF_NOT(get_shader_src("shaders/basic.frag", fragment_shader_src),
+                          false);
 
-            ASSERT_RET_IF_NOT(
-                create_shader(program_id, vertex_shader_src, fragment_shader_src),
-                false);
-            glUseProgram(program_id);
-        }
+        ASSERT_RET_IF_NOT(
+            create_shader(program_id, vertex_shader_src, fragment_shader_src), false);
+        glUseProgram(program_id);
 
         return true;
     }
@@ -325,33 +342,13 @@ namespace Engine
     {
         LOG("Entering main loop\n");
 
-        /*
-         * Camera view.
-         */
-        glm::mat4 camera_view = glm::lookAt(glm::vec3(3, 3, 3), /* eye */
-                                            glm::vec3(0, 0, 0), /* center */
-                                            glm::vec3(0, 1, 0)  /* up */
-        );
+        const glm::mat4 perspective =
+            glm::perspective(glm::pi<float>() / 4, 4.f / 3.f, 0.1f, 100.f);
 
         /*
          * Place model at origin.
          */
         const glm::mat4 model = glm::mat4(1.0f);
-
-        /*
-         * Rotate about the Y axis.
-         */
-        const glm::vec3 rotation_axis = glm::vec3(0, 1, 0);
-
-        /*
-         * Perspective.
-         */
-        const glm::mat4 perspective =
-            glm::perspective(glm::radians(45.0f),
-                             static_cast<float>(window_width) /
-                                 static_cast<float>(window_height),
-                             0.1f,
-                             100.0f);
 
         /*
          * Get reference to the model view projection.
@@ -360,16 +357,23 @@ namespace Engine
             glGetUniformLocation(program_id, "model_view_projection");
 
         /*
-         * Loop until the user closes the window.
+         * Set initial position and viewing angles.
          */
-        using namespace std::chrono_literals;
-        static constexpr std::chrono::seconds stats_period = 1s;
+        float horizontal_angle = 0.f;
+        float vertical_angle = 0.f;
+        glm::vec3 position = glm::vec3(0.f, 3.f, -5.f);
+
         std::chrono::steady_clock::time_point last_stats_time =
             std::chrono::steady_clock::now();
         const std::chrono::steady_clock::time_point game_start_time =
             std::chrono::steady_clock::now();
         std::chrono::steady_clock::time_point frame_start_time =
             std::chrono::steady_clock::now();
+
+        /*
+         * Loop until the user closes the window or should_run gets set to false by the
+         * program.
+         */
         while (should_run && !glfwWindowShouldClose(window))
         {
             /*
@@ -388,9 +392,105 @@ namespace Engine
             frame_start_time = std::chrono::steady_clock::now();
 
             /*
-             * Rotate the camera view by dt radians.
+             * Get mouse position relative to top-left pixel of the window.
              */
-            camera_view = glm::rotate(camera_view, dt, rotation_axis);
+            double mouse_x, mouse_y;
+            glfwGetCursorPos(window, &mouse_x, &mouse_y);
+
+            /*
+             * If mouse is inside the window, update the viewing angles.
+             */
+            const bool mouse_inside_window = mouse_x > 0.0 && mouse_y > 0.0;
+            if (mouse_inside_window)
+            {
+                static constexpr float mouse_speed = 0.005f;
+
+                horizontal_angle += mouse_speed * dt * (window_center_x - mouse_x);
+
+                /*
+                 * Clamp the vertical angle on the max angle since we have a neck.
+                 */
+                static constexpr float max_vertical_angle = glm::pi<float>() / 3;
+                static constexpr float min_vertical_angle = -max_vertical_angle;
+
+                /*
+                 * If we are looking down at the highest angle, do not allow looking
+                 * down more, but allow looking back up. Note that the Y is 0 at top and
+                 * window_height at bottom.
+                 */
+                bool update_vertical_angle = true;
+                if (vertical_angle < min_vertical_angle)
+                {
+                    if (mouse_y > window_center_y)
+                    {
+                        update_vertical_angle = false;
+                    }
+                }
+                else if (vertical_angle > max_vertical_angle)
+                {
+                    if (mouse_y < window_center_y)
+                    {
+                        update_vertical_angle = false;
+                    }
+                }
+
+                if (update_vertical_angle)
+                {
+                    vertical_angle += mouse_speed * dt * (window_center_y - mouse_y);
+                }
+            }
+
+            /*
+             * Create vector pointing at target.
+             */
+            const glm::vec3 direction(cos(vertical_angle) * sin(horizontal_angle),
+                                      sin(vertical_angle),
+                                      cos(vertical_angle) * cos(horizontal_angle));
+
+            /*
+             * Get vector pointing to the right as up and down are dynamic about the X
+             * and Z plane.
+             */
+            const glm::vec3 right =
+                glm::vec3(-cos(horizontal_angle), 0, sin(horizontal_angle));
+
+            /*
+             * Get vector pointing forwards, 90deg counter-clockwise from the vector
+             * pointing right on the X-Z plane.
+             */
+            const glm::vec3 forwards = glm::vec3(right.z, 0, -right.x);
+
+            /*
+             * Get vector pointing up, perpendicular to right and where we are looking.
+             */
+            const glm::vec3 up = glm::cross(right, direction);
+
+            /*
+             * Translate keyboard inputs into position.
+             */
+            static constexpr float move_speed = 3.f;
+            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+            {
+                position += forwards * dt * move_speed;
+            }
+            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+            {
+                position -= forwards * dt * move_speed;
+            }
+            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+            {
+                position += right * dt * move_speed;
+            }
+            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+            {
+                position -= right * dt * move_speed;
+            }
+
+            /*
+             * Compute view looking at the direction our mouse is pointing.
+             */
+            const glm::mat4 camera_view =
+                glm::lookAt(position, position + direction, up);
 
             /*
              * Update model view projection.
@@ -426,6 +526,7 @@ namespace Engine
              */
             const std::chrono::steady_clock::time_point now_time =
                 std::chrono::steady_clock::now();
+            static constexpr std::chrono::seconds stats_period = 1s;
             if (now_time - last_stats_time > stats_period)
             {
                 last_stats_time = now_time;
