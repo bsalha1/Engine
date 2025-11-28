@@ -1,22 +1,27 @@
 #include "Game.h"
 
-#include "GLFW/glfw3.h"
 #include "assert_util.h"
+#include "glm/ext/vector_float3.hpp"
 #include "log.h"
 
 #include <array>
 #include <chrono>
+#include <execinfo.h>
 #include <fstream>
-#include <ratio>
+#include <glm/gtc/matrix_transform.hpp>
 #include <sstream>
 #include <string>
 
 namespace Engine
 {
-    struct Vertex2d
+    static constexpr unsigned int window_width = 640;
+    static constexpr unsigned int window_height = 480;
+
+    struct Vertex3d
     {
         float x;
         float y;
+        float z;
     };
 
     static bool get_shader_src(const std::string &file_path, std::string &shader_src)
@@ -24,9 +29,9 @@ namespace Engine
         const std::ifstream file(file_path);
         ASSERT_RET_IF_NOT(file, false);
 
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        shader_src = buffer.str();
+        std::stringstream buffer_obj;
+        buffer_obj << file.rdbuf();
+        shader_src = buffer_obj.str();
 
         return true;
     }
@@ -90,10 +95,41 @@ namespace Engine
         return true;
     }
 
+    static void gl_debug_message_callback(GLenum source,
+                                          GLenum type,
+                                          GLuint id,
+                                          GLenum severity,
+                                          GLsizei length,
+                                          const GLchar *message,
+                                          const void *user_param)
+    {
+        if (type == GL_DEBUG_TYPE_ERROR)
+        {
+            // Capture stack
+            void *bt[128];
+            int bt_size = backtrace(bt, 128);
+            char **bt_syms = backtrace_symbols(bt, bt_size);
+
+            fprintf(stderr, "Stack trace:\n");
+            for (int i = 0; i < bt_size; i++)
+                fprintf(stderr, "  %s\n", bt_syms[i]);
+
+            free(bt_syms);
+
+            Game *game = reinterpret_cast<Game *>(const_cast<void *>(user_param));
+            LOG_ERROR("OpenGL error: %s\n", message);
+            game->stop_run();
+        }
+        else
+        {
+            LOG("OpenGL debug: %s\n", message);
+        }
+    }
+
     /**
      * Constructor.
      */
-    Game::Game(): window(nullptr), program_id(0)
+    Game::Game(): window(nullptr), program_id(0), should_run(true)
     {}
 
     /**
@@ -111,21 +147,33 @@ namespace Engine
     bool Game::_init()
     {
         LOG("Creating window\n");
-        window = glfwCreateWindow(640, 480, "Game", nullptr, nullptr);
-        if (window == nullptr)
-        {
-            ASSERT_PRINT("Failed to initialize window");
-            end();
-            return false;
-        }
-        glfwMakeContextCurrent(window);
 
-        // glfwSwapInterval(1);
+        glfwWindowHint(GLFW_SAMPLES, 4);               /* 4x antialiasing */
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4); /* OpenGL 4.6 */
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+        window =
+            glfwCreateWindow(window_width, window_height, "Game", nullptr, nullptr);
+        ASSERT_RET_IF(window == nullptr, false);
+        glfwMakeContextCurrent(window);
 
         LOG("Initializing GLEW\n");
         ASSERT_RET_IF_GLEW_NOT_OK(glewInit(), false);
 
         LOG("OpenGL version: %s\n", glGetString(GL_VERSION));
+
+        /*
+         * Enable debug message callback.
+         */
+        glEnable(GL_DEBUG_OUTPUT);
+        glDebugMessageCallback(gl_debug_message_callback, this);
+
+        /*
+         * Draw fragments closer to camera over the fragments behind.
+         */
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LESS);
 
         LOG("Allocating buffers\n");
 
@@ -133,20 +181,39 @@ namespace Engine
          * Create vertex buffer.
          */
         {
-            const std::array<Vertex2d, 6> positions = {{
-                {-0.5f, -0.5f}, /* 0 */
-                {0.5f, -0.5f},  /* 1 */
-                {0.5f, 0.5f},   /* 2 */
-                {-0.5f, 0.5f},  /* 3 */
+            /*
+             *     |
+             *  3  -  2
+             *     |
+             * -|-----|-
+             *     |
+             *  0  -  1
+             *     |
+             */
+
+            const std::array<Vertex3d, 8> positions = {{
+                {-1, -1, 1}, /* 0 */
+                {1, -1, 1},  /* 1 */
+                {1, 1, 1},   /* 2 */
+                {-1, 1, 1},  /* 3 */
+
+                {-1, -1, -1}, /* 4 */
+                {1, -1, -1},  /* 5 */
+                {1, 1, -1},   /* 6 */
+                {-1, 1, -1},  /* 7 */
             }};
 
-            GLuint buffer;
-            glGenBuffers(1, &buffer);
-            glBindBuffer(GL_ARRAY_BUFFER, buffer);
+            GLuint vertex_array_obj;
+            glGenVertexArrays(1, &vertex_array_obj);
+            glBindVertexArray(vertex_array_obj);
+
+            GLuint buffer_obj;
+            glGenBuffers(1, &buffer_obj);
+            glBindBuffer(GL_ARRAY_BUFFER, buffer_obj);
             glBufferData(
                 GL_ARRAY_BUFFER, sizeof(positions), positions.data(), GL_STATIC_DRAW);
 
-            glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(Vertex2d), 0);
+            glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(Vertex3d), 0);
             glEnableVertexAttribArray(0);
         }
 
@@ -154,11 +221,59 @@ namespace Engine
          * Create index buffer.
          */
         {
-            const std::array<unsigned int, 6> indices = {0, 1, 2, 2, 3, 0};
+            const std::array<unsigned int, 36> indices = {
+                /* +Z face */
+                0,
+                1,
+                2,
+                2,
+                3,
+                0,
 
-            GLuint buffer;
-            glGenBuffers(1, &buffer);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer);
+                /* -Z face */
+                4,
+                5,
+                6,
+                6,
+                7,
+                4,
+
+                /* +X face */
+                1,
+                5,
+                6,
+                6,
+                2,
+                1,
+
+                /* -X face */
+                4,
+                0,
+                3,
+                3,
+                7,
+                4,
+
+                /* +Y face */
+                0,
+                1,
+                5,
+                5,
+                4,
+                0,
+
+                /* -Y face */
+                3,
+                2,
+                6,
+                6,
+                7,
+                3,
+            };
+
+            GLuint buffer_obj;
+            glGenBuffers(1, &buffer_obj);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer_obj);
             glBufferData(GL_ELEMENT_ARRAY_BUFFER,
                          sizeof(indices),
                          indices.data(),
@@ -196,7 +311,7 @@ namespace Engine
 
         if (!_init())
         {
-            end();
+            glfwTerminate();
             return false;
         }
 
@@ -210,11 +325,39 @@ namespace Engine
     {
         LOG("Entering main loop\n");
 
-        const GLint u_Color = glGetUniformLocation(program_id, "u_Color");
-        ASSERT_RET_IF(u_Color == -1, false);
+        /*
+         * Camera view.
+         */
+        glm::mat4 camera_view = glm::lookAt(glm::vec3(3, 3, 3), /* eye */
+                                            glm::vec3(0, 0, 0), /* center */
+                                            glm::vec3(0, 1, 0)  /* up */
+        );
 
-        float r = 0.f;
-        float dr = 0.005f;
+        /*
+         * Place model at origin.
+         */
+        const glm::mat4 model = glm::mat4(1.0f);
+
+        /*
+         * Rotate about the Y axis.
+         */
+        const glm::vec3 rotation_axis = glm::vec3(0, 1, 0);
+
+        /*
+         * Perspective.
+         */
+        const glm::mat4 perspective =
+            glm::perspective(glm::radians(45.0f),
+                             static_cast<float>(window_width) /
+                                 static_cast<float>(window_height),
+                             0.1f,
+                             100.0f);
+
+        /*
+         * Get reference to the model view projection.
+         */
+        const GLuint model_view_projection_object =
+            glGetUniformLocation(program_id, "model_view_projection");
 
         /*
          * Loop until the user closes the window.
@@ -225,26 +368,48 @@ namespace Engine
             std::chrono::steady_clock::now();
         const std::chrono::steady_clock::time_point game_start_time =
             std::chrono::steady_clock::now();
-        while (!glfwWindowShouldClose(window))
+        std::chrono::steady_clock::time_point frame_start_time =
+            std::chrono::steady_clock::now();
+        while (should_run && !glfwWindowShouldClose(window))
         {
-            const std::chrono::steady_clock::time_point frame_start_time =
-                std::chrono::steady_clock::now();
+            /*
+             * Compute how much time has passed.
+             */
+            const std::chrono::steady_clock::duration total_time =
+                std::chrono::steady_clock::now() - game_start_time;
 
-            glClear(GL_COLOR_BUFFER_BIT);
+            /*
+             * Compute how much time has passed since the last frame.
+             */
+            const uint64_t dt_ns =
+                (std::chrono::steady_clock::now() - frame_start_time).count();
+            const float dt = dt_ns / 1e9f;
 
-            glUniform4f(u_Color, r, 0.f, 1.f - r, 1.f);
+            frame_start_time = std::chrono::steady_clock::now();
 
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
+            /*
+             * Rotate the camera view by dt radians.
+             */
+            camera_view = glm::rotate(camera_view, dt, rotation_axis);
 
-            if (r > 1.f)
-            {
-                dr = -0.005f;
-            }
-            else if (r < 0.f)
-            {
-                dr = 0.005f;
-            }
-            r += dr;
+            /*
+             * Update model view projection.
+             */
+            const glm::mat4 model_view_projection = perspective * camera_view * model;
+            glUniformMatrix4fv(model_view_projection_object,
+                               1,
+                               GL_FALSE,
+                               &model_view_projection[0][0]);
+
+            /*
+             * Clear both the color and depth buffers.
+             */
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            /*
+             * Draw the scene.
+             */
+            glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, nullptr);
 
             /*
              * Swap front and back buffers.
@@ -271,15 +436,16 @@ namespace Engine
             }
         }
 
+        glfwTerminate();
+
         return true;
     }
 
     /**
-     * End the game.
+     * Stop running the game.
      */
-    void Game::end()
+    void Game::stop_run()
     {
-        // glDeleteProgram(program_id)
-        glfwTerminate();
+        should_run = false;
     }
 }

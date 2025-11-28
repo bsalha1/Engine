@@ -1,10 +1,10 @@
-#version 330 core
+#version 460 core
 
-layout(location = 0) out vec4 color;
+layout(location = 0) out vec3 color;
 
-uniform vec4 u_Color;
+in vec3 fragment_color;
 
 void main()
 {
-    color = u_Color;
+    color = fragment_color;
 }

@@ -17,7 +17,5 @@ int main()
 
     game->run();
 
-    game->end();
-
     return 0;
 }

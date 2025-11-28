@@ -12,3 +12,6 @@
 	path = libglvnd
 	url = https://gitlab.freedesktop.org/glvnd/libglvnd.git
 	ignore = dirty
+[submodule "glm"]
+	path = glm
+	url = git@github.com:g-truc/glm.git

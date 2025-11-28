@@ -25,3 +25,11 @@ cd libglvnd
 ./configure
 sudo make install
 cd "$base_dir"
+
+# Build glm library and headers.
+cd glm
+cmake \
+    -DGLM_BUILD_TESTS=OFF \
+    -DBUILD_SHARED_LIBS=OFF \
+    -B build .
+cmake --build build -- all

@@ -14,7 +14,7 @@ namespace Engine
 
         bool run();
 
-        void end();
+        void stop_run();
 
     private:
         Game();
@@ -26,5 +26,7 @@ namespace Engine
         GLFWwindow *window;
 
         GLuint program_id;
+
+        bool should_run;
     };
 }

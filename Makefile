@@ -1,10 +1,10 @@
 # Libraries.
-STATIC_LIBS = glfw/build/src/libglfw3.a glew/lib/libGLEW.a
+STATIC_LIBS = glfw/build/src/libglfw3.a glew/lib/libGLEW.a glm/build/glm/libglm.a
 LDFLAGS += $(STATIC_LIBS)
 LDFLAGS += -lGL -lGLX
 
 # Include directories.
-INCLUDE_DIRS = glfw/include glew/include glu/include
+INCLUDE_DIRS = glfw/include glew/include glu/include glm/
 CXXFLAGS += $(addprefix -I,$(INCLUDE_DIRS))
 
 # Object files.
@@ -21,6 +21,14 @@ BUILD_DEPS = $(patsubst %.o,%.d,$(BUILD_OBJS))
 GIT_COMMIT := $(shell git describe --dirty --always)
 CXXFLAGS += -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
+DEBUG=0
+
+ifdef DEBUG
+CXXFLAGS += -O0 -g
+else
+LDFLAGS += -s
+endif
+
 # Disassembled program.
 $(BUILD_DIR)/$(PROGRAM_NAME).s: $(BUILD_DIR)/$(PROGRAM_NAME)
 	@mkdir -p $(dir $@)
@@ -31,7 +39,7 @@ $(BUILD_DIR)/$(PROGRAM_NAME).s: $(BUILD_DIR)/$(PROGRAM_NAME)
 $(BUILD_DIR)/$(PROGRAM_NAME): $(BUILD_OBJS)
 	@mkdir -p $(dir $@)
 	@echo "CXXLD   $@"
-	@g++ $(CXXFLAGS) $^ $(LDFLAGS) -s -o $@
+	@g++ $(CXXFLAGS) $^ $(LDFLAGS) -o $@
 
 # Make a .o from a .cc
 $(BUILD_DIR)/%.o: src/%.cc
