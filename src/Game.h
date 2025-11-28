@@ -28,5 +28,9 @@ namespace Engine
         GLuint program_id;
 
         bool should_run;
+
+        int window_width;
+
+        int window_height;
     };
 }

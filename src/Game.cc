@@ -18,11 +18,6 @@ using namespace std::chrono_literals;
 
 namespace Engine
 {
-    static constexpr unsigned int window_width = 640;
-    static constexpr unsigned int window_height = 480;
-    static constexpr unsigned int window_center_x = window_width / 2;
-    static constexpr unsigned int window_center_y = window_height / 2;
-
     struct Vertex3d
     {
         float x;
@@ -173,10 +168,22 @@ namespace Engine
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-        window =
-            glfwCreateWindow(window_width, window_height, "Game", nullptr, nullptr);
+        /*
+         * Create window.
+         */
+        window = glfwCreateWindow(960, 720, "Game", nullptr, nullptr);
         ASSERT_RET_IF(window == nullptr, false);
         glfwMakeContextCurrent(window);
+
+        /*
+         * Get the actual window's size. Window managers can disobey our request.
+         */
+        glfwGetFramebufferSize(window, &window_width, &window_height);
+
+        /*
+         * Hide the cursor.
+         */
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
         LOG("Initializing GLEW\n");
         ASSERT_RET_IF_GLEW_NOT_OK(glewInit(), false);
@@ -274,7 +281,7 @@ namespace Engine
                 7,
                 4,
 
-                /* -Y face */
+                /* +Y face */
                 3,
                 2,
                 6,
@@ -282,7 +289,7 @@ namespace Engine
                 7,
                 3,
 
-                /* +Y face */
+                /* -Y face */
                 0,
                 1,
                 5,
@@ -361,14 +368,24 @@ namespace Engine
          */
         float horizontal_angle = 0.f;
         float vertical_angle = 0.f;
-        glm::vec3 position = glm::vec3(0.f, 3.f, -5.f);
+        glm::vec3 position = glm::vec3(0.f, 3.f, -10.f);
 
-        std::chrono::steady_clock::time_point last_stats_time =
+        std::chrono::steady_clock::time_point stats_time_prev =
             std::chrono::steady_clock::now();
         const std::chrono::steady_clock::time_point game_start_time =
             std::chrono::steady_clock::now();
         std::chrono::steady_clock::time_point frame_start_time =
             std::chrono::steady_clock::now();
+
+        const int window_center_x = window_width / 2;
+        const int window_center_y = window_height / 2;
+
+        /*
+         * Mouse position state.
+         */
+        bool mouse_prev_set = false;
+        double mouse_x_prev;
+        double mouse_y_prev;
 
         /*
          * Loop until the user closes the window or should_run gets set to false by the
@@ -394,49 +411,42 @@ namespace Engine
             /*
              * Get mouse position relative to top-left pixel of the window.
              */
-            double mouse_x, mouse_y;
+            double mouse_x;
+            double mouse_y;
             glfwGetCursorPos(window, &mouse_x, &mouse_y);
 
             /*
-             * If mouse is inside the window, update the viewing angles.
+             * Generate horizontal and vertical viewing angles from
              */
-            const bool mouse_inside_window = mouse_x > 0.0 && mouse_y > 0.0;
-            if (mouse_inside_window)
+            if (!mouse_prev_set)
             {
-                static constexpr float mouse_speed = 0.005f;
+                mouse_x_prev = mouse_x;
+                mouse_y_prev = mouse_y;
+                mouse_prev_set = true;
+            }
+            else
+            {
+                const double x_offset = mouse_x - mouse_x_prev;
+                const double y_offset = mouse_y_prev - mouse_y;
+                mouse_x_prev = mouse_x;
+                mouse_y_prev = mouse_y;
 
-                horizontal_angle += mouse_speed * dt * (window_center_x - mouse_x);
+                static constexpr float mouse_speed = 0.5f;
+                horizontal_angle += mouse_speed * dt * -1 * x_offset;
+                vertical_angle += mouse_speed * dt * y_offset;
 
                 /*
-                 * Clamp the vertical angle on the max angle since we have a neck.
+                 * Clamp the vertical angle since we have a neck.
                  */
                 static constexpr float max_vertical_angle = glm::pi<float>() / 3;
                 static constexpr float min_vertical_angle = -max_vertical_angle;
-
-                /*
-                 * If we are looking down at the highest angle, do not allow looking
-                 * down more, but allow looking back up. Note that the Y is 0 at top and
-                 * window_height at bottom.
-                 */
-                bool update_vertical_angle = true;
-                if (vertical_angle < min_vertical_angle)
+                if (vertical_angle > max_vertical_angle)
                 {
-                    if (mouse_y > window_center_y)
-                    {
-                        update_vertical_angle = false;
-                    }
+                    vertical_angle = max_vertical_angle;
                 }
-                else if (vertical_angle > max_vertical_angle)
+                else if (vertical_angle < min_vertical_angle)
                 {
-                    if (mouse_y < window_center_y)
-                    {
-                        update_vertical_angle = false;
-                    }
-                }
-
-                if (update_vertical_angle)
-                {
-                    vertical_angle += mouse_speed * dt * (window_center_y - mouse_y);
+                    vertical_angle = min_vertical_angle;
                 }
             }
 
@@ -527,9 +537,9 @@ namespace Engine
             const std::chrono::steady_clock::time_point now_time =
                 std::chrono::steady_clock::now();
             static constexpr std::chrono::seconds stats_period = 1s;
-            if (now_time - last_stats_time > stats_period)
+            if (now_time - stats_time_prev > stats_period)
             {
-                last_stats_time = now_time;
+                stats_time_prev = now_time;
                 const std::chrono::nanoseconds frame_duration_ns =
                     now_time - frame_start_time;
                 const float frames_per_second = 1e9f / frame_duration_ns.count();
