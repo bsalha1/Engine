@@ -57,7 +57,7 @@ namespace Engine
             ASSERT_RET_IF(length > sizeof(message), false);
 
             glGetShaderInfoLog(shader_id, length, &length, message);
-            LOG_ERROR("Failed to compile shader: %s", message);
+            LOG_ERROR("Failed to compile shader: %s\n", message);
 
             glDeleteShader(shader_id);
 
@@ -526,7 +526,7 @@ namespace Engine
                 mouse_y_prev = mouse_y;
 
                 static constexpr float mouse_speed = 0.5f;
-                horizontal_angle += mouse_speed * dt * -1 * x_offset;
+                horizontal_angle -= mouse_speed * dt * x_offset;
                 vertical_angle += mouse_speed * dt * y_offset;
 
                 /*
@@ -578,7 +578,7 @@ namespace Engine
             }
             if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
             {
-                velocity += -forwards * move_speed;
+                velocity -= forwards * move_speed;
             }
             if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
             {
@@ -586,7 +586,7 @@ namespace Engine
             }
             if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
             {
-                velocity += -right * move_speed;
+                velocity -= right * move_speed;
             }
 
             /*
