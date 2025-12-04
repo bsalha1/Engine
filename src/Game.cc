@@ -5,13 +5,13 @@
 
 #include <GLFW/glfw3.h>
 #include <array>
-#include <chrono>
 #include <execinfo.h>
 #include <fstream>
 #include <glm/ext/scalar_constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <sstream>
 #include <string>
+#include <unistd.h>
 
 using namespace std::chrono_literals;
 
@@ -132,7 +132,7 @@ namespace Engine
              * Stop the run loop.
              */
             Game *game = reinterpret_cast<Game *>(const_cast<void *>(user_param));
-            game->stop_run();
+            game->quit();
         }
         else
         {
@@ -146,12 +146,25 @@ namespace Engine
     Game::Game():
         window(nullptr),
         program_id(0),
-        should_run(true),
+        state(State::RUNNING),
         window_center_x(0),
         window_center_y(0),
         move_speed(standing_move_speed),
         height(standing_height),
-        position(0.f, height, -10.f)
+        position(0.f, height, -10.f),
+        velocity(0.f, 0.f, 0.f),
+        last_jump_time(std::chrono::steady_clock::now()),
+        last_crouch_time(std::chrono::steady_clock::now()),
+        escape_pressed_prev(false),
+        mouse_prev_set(false),
+        mouse_x_prev(0.0),
+        mouse_y_prev(0.0),
+        horizontal_angle(0.f),
+        vertical_angle(0.f),
+        direction(0.f, 0.f, 0.f),
+        right(0.f, 0.f, 0.f),
+        forwards(0.f, 0.f, 0.f),
+        head(0.f, 0.f, 0.f)
     {}
 
     /**
@@ -375,6 +388,215 @@ namespace Engine
     }
 
     /**
+     * Process menu input.
+     */
+    void Game::process_menu()
+    {
+        bool escape_pressed = glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS;
+        const bool escape_pressed_rising_edge = escape_pressed && !escape_pressed_prev;
+        if (escape_pressed_rising_edge)
+        {
+            if (state == State::PAUSED)
+            {
+                state = State::RUNNING;
+                LOG("PAUSED -> RUNNING\n");
+
+                /*
+                 * Put the mouse back to where it was before pausing and hide it again.
+                 */
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                glfwSetCursorPos(window, mouse_x_prev, mouse_y_prev);
+            }
+            else
+            {
+                state = State::PAUSED;
+                LOG("RUNNING -> PAUSED\n");
+
+                /*
+                 * Show the mouse cursor and put it in the middle of window.
+                 */
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                glfwSetCursorPos(window, window_center_x, window_center_y);
+            }
+        }
+        escape_pressed_prev = escape_pressed;
+    }
+
+    /**
+     * Process jump or crouch input.
+     */
+    void Game::process_jump_crouch()
+    {
+        /*
+         * If the player is off the ground, make gravity pull them down and do not allow
+         * jumping or crouching.
+         */
+        if (position.y > height)
+        {
+            static constexpr float acceleration_gravity = 10.f;
+            velocity.y -= acceleration_gravity * dt;
+        }
+
+        /*
+         * Otherwise, if the player is on the ground, jump when they press space or
+         * crouch when they press left shift.
+         */
+        else
+        {
+            if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+            {
+                static constexpr std::chrono::milliseconds jump_cooldown = 500ms;
+                if (std::chrono::steady_clock::now() - last_jump_time > jump_cooldown)
+                {
+                    last_jump_time = std::chrono::steady_clock::now();
+
+                    velocity.y = 10.f;
+
+                    /*
+                     * If player is jumping from a crouch, they should land
+                     * standing, otherwise it'll be hard on the knees.
+                     */
+                    set_standing();
+                }
+            }
+            else if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
+            {
+                static constexpr std::chrono::milliseconds crouch_cooldown = 500ms;
+                if (std::chrono::steady_clock::now() - last_crouch_time >
+                    crouch_cooldown)
+                {
+                    last_crouch_time = std::chrono::steady_clock::now();
+
+                    if (height == crouching_height)
+                    {
+                        set_standing();
+                    }
+                    else
+                    {
+                        set_crouching();
+                    }
+                }
+            }
+            else
+            {
+                velocity.y = 0.f;
+            }
+        }
+    }
+
+    /**
+     * Update view based on mouse movement.
+     */
+    void Game::update_view()
+    {
+        /*
+         * Get mouse position relative to top-left pixel of the window.
+         */
+        double mouse_x;
+        double mouse_y;
+        glfwGetCursorPos(window, &mouse_x, &mouse_y);
+
+        /*
+         * Generate horizontal and vertical viewing angles from mouse position.
+         */
+        if (!mouse_prev_set)
+        {
+            mouse_x_prev = mouse_x;
+            mouse_y_prev = mouse_y;
+            mouse_prev_set = true;
+        }
+        else
+        {
+            const double x_offset = mouse_x - mouse_x_prev;
+            const double y_offset = mouse_y_prev - mouse_y;
+            mouse_x_prev = mouse_x;
+            mouse_y_prev = mouse_y;
+
+            static constexpr float mouse_speed = 0.5f;
+            horizontal_angle -= mouse_speed * dt * x_offset;
+            vertical_angle += mouse_speed * dt * y_offset;
+
+            /*
+             * Clamp the vertical angle since we have a neck.
+             */
+            static constexpr float max_vertical_angle = glm::radians<float>(90);
+            static constexpr float min_vertical_angle = -max_vertical_angle;
+            if (vertical_angle > max_vertical_angle)
+            {
+                vertical_angle = max_vertical_angle;
+            }
+            else if (vertical_angle < min_vertical_angle)
+            {
+                vertical_angle = min_vertical_angle;
+            }
+        }
+
+        /*
+         * Create vector pointing at target.
+         */
+        direction.x = cos(vertical_angle) * sin(horizontal_angle);
+        direction.y = sin(vertical_angle);
+        direction.z = cos(vertical_angle) * cos(horizontal_angle);
+
+        /*
+         * Get vector pointing to the right.
+         */
+        right.x = -cos(horizontal_angle);
+        right.z = sin(horizontal_angle);
+
+        /*
+         * Get vector pointing forwards, 90deg counter-clockwise from the vector
+         * pointing right on the X-Z plane.
+         */
+        forwards.x = right.z;
+        forwards.z = -right.x;
+
+        /*
+         * Get vector pointing head, perpendicular to right and where we are
+         * looking.
+         */
+        head = glm::cross(right, direction);
+    }
+
+    /**
+     * Update position based on keyboard input.
+     */
+    void Game::update_position()
+    {
+        /*
+         * Move about the X-Z plane given keyboard inputs.
+         */
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        {
+            velocity += forwards * move_speed;
+        }
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        {
+            velocity -= forwards * move_speed;
+        }
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        {
+            velocity += right * move_speed;
+        }
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        {
+            velocity -= right * move_speed;
+        }
+
+        /*
+         * If the player is moving, make friction slow them down.
+         */
+        if (std::fabs(velocity.x) > 0.f || std::fabs(velocity.z) > 0.f)
+        {
+            static constexpr float friction_coeff = 0.07f;
+            velocity.x -= friction_coeff * velocity.x;
+            velocity.z -= friction_coeff * velocity.z;
+        }
+
+        position += velocity * dt;
+    }
+
+    /**
      * Run the game.
      */
     bool Game::run()
@@ -382,14 +604,12 @@ namespace Engine
         LOG("Entering main loop\n");
 
         const glm::mat4 perspective =
-            glm::perspective(glm::radians<float>(45), 4.f / 3.f, 0.1f, 100.f);
+            glm::perspective(glm::radians<float>(65), 4.f / 3.f, 0.1f, 100.f);
 
         /*
          * Place model at origin.
          */
         const glm::mat4 model = glm::mat4(1.0f);
-
-        const glm::vec3 up = glm::vec3(0, 1, 0);
 
         /*
          * Get reference to the model view projection.
@@ -401,16 +621,6 @@ namespace Engine
          * Set initial state.
          */
 
-        float horizontal_angle = 0.f;
-        float vertical_angle = 0.f;
-
-        std::chrono::steady_clock::time_point last_jump_time =
-            std::chrono::steady_clock::now();
-        std::chrono::steady_clock::time_point last_crouch_time =
-            std::chrono::steady_clock::now();
-
-        glm::vec3 velocity = glm::vec3(0, 0, 0);
-
         std::chrono::steady_clock::time_point stats_time_prev =
             std::chrono::steady_clock::now();
         const std::chrono::steady_clock::time_point game_start_time =
@@ -419,17 +629,10 @@ namespace Engine
             std::chrono::steady_clock::now();
 
         /*
-         * Mouse position state.
-         */
-        bool mouse_prev_set = false;
-        double mouse_x_prev;
-        double mouse_y_prev;
-
-        /*
-         * Loop until the user closes the window or should_run gets set to false by the
+         * Loop until the user closes the window or state gets set to QUIT by the
          * program.
          */
-        while (should_run && !glfwWindowShouldClose(window))
+        while (state != State::QUIT && !glfwWindowShouldClose(window))
         {
             /*
              * Compute how much time has passed.
@@ -442,179 +645,51 @@ namespace Engine
              */
             const uint64_t dt_ns =
                 (std::chrono::steady_clock::now() - frame_start_time).count();
-            const float dt = dt_ns / 1e9f;
+            dt = dt_ns / 1e9f;
 
             frame_start_time = std::chrono::steady_clock::now();
 
             /*
-             * If the player is off the ground, make gravity pull them down.
+             * Process menu.
              */
-            if (position.y > height)
-            {
-                static constexpr float acceleration_gravity = 10.f;
-                velocity.y -= acceleration_gravity * dt;
-            }
-            /*
-             * Otherwise, if the player is on the ground, jump when they press space or
-             * crouch when they press left shift.
-             */
-            else
-            {
-                if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
-                {
-                    static constexpr std::chrono::milliseconds jump_cooldown = 500ms;
-
-                    if (std::chrono::steady_clock::now() - last_jump_time >
-                        jump_cooldown)
-                    {
-                        last_jump_time = std::chrono::steady_clock::now();
-
-                        velocity.y = 10.f;
-
-                        /*
-                         * If player is jumping from a crouch, they should land
-                         * standing, otherwise it'll be hard on the knees.
-                         */
-                        set_standing();
-                    }
-                }
-                else if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
-                {
-                    static constexpr std::chrono::milliseconds crouch_cooldown = 500ms;
-                    if (std::chrono::steady_clock::now() - last_crouch_time >
-                        crouch_cooldown)
-                    {
-                        last_crouch_time = std::chrono::steady_clock::now();
-
-                        if (height == crouching_height)
-                        {
-                            set_standing();
-                        }
-                        else
-                        {
-                            set_crouching();
-                        }
-                    }
-                }
-                else
-                {
-                    velocity.y = 0.f;
-                }
-            }
+            process_menu();
 
             /*
-             * Get mouse position relative to top-left pixel of the window.
+             * If not paused, run gameplay.
              */
-            double mouse_x;
-            double mouse_y;
-            glfwGetCursorPos(window, &mouse_x, &mouse_y);
-
-            /*
-             * Generate horizontal and vertical viewing angles from mouse position.
-             */
-            if (!mouse_prev_set)
+            if (state != State::PAUSED)
             {
-                mouse_x_prev = mouse_x;
-                mouse_y_prev = mouse_y;
-                mouse_prev_set = true;
-            }
-            else
-            {
-                const double x_offset = mouse_x - mouse_x_prev;
-                const double y_offset = mouse_y_prev - mouse_y;
-                mouse_x_prev = mouse_x;
-                mouse_y_prev = mouse_y;
-
-                static constexpr float mouse_speed = 0.5f;
-                horizontal_angle -= mouse_speed * dt * x_offset;
-                vertical_angle += mouse_speed * dt * y_offset;
+                /*
+                 * Process jumps or crouches.
+                 */
+                process_jump_crouch();
 
                 /*
-                 * Clamp the vertical angle since we have a neck.
+                 * Update view based on mouse movement.
                  */
-                static constexpr float max_vertical_angle = glm::radians<float>(90);
-                static constexpr float min_vertical_angle = -max_vertical_angle;
-                if (vertical_angle > max_vertical_angle)
-                {
-                    vertical_angle = max_vertical_angle;
-                }
-                else if (vertical_angle < min_vertical_angle)
-                {
-                    vertical_angle = min_vertical_angle;
-                }
+                update_view();
+
+                /*
+                 * Update position based on keyboard input.
+                 */
+                update_position();
+
+                /*
+                 * Compute view looking at the direction our mouse is pointing.
+                 */
+                const glm::mat4 camera_view =
+                    glm::lookAt(position, position + direction, head);
+
+                /*
+                 * Update model view projection.
+                 */
+                const glm::mat4 model_view_projection =
+                    perspective * camera_view * model;
+                glUniformMatrix4fv(model_view_projection_object,
+                                   1,
+                                   GL_FALSE,
+                                   &model_view_projection[0][0]);
             }
-
-            /*
-             * Create vector pointing at target.
-             */
-            const glm::vec3 direction(cos(vertical_angle) * sin(horizontal_angle),
-                                      sin(vertical_angle),
-                                      cos(vertical_angle) * cos(horizontal_angle));
-
-            /*
-             * Get vector pointing to the right.
-             */
-            const glm::vec3 right =
-                glm::vec3(-cos(horizontal_angle), 0, sin(horizontal_angle));
-
-            /*
-             * Get vector pointing forwards, 90deg counter-clockwise from the vector
-             * pointing right on the X-Z plane.
-             */
-            const glm::vec3 forwards = glm::vec3(right.z, 0, -right.x);
-
-            /*
-             * Get vector pointing head, perpendicular to right and where we are
-             * looking.
-             */
-            const glm::vec3 head = glm::cross(right, direction);
-
-            /*
-             * Move about the X-Z plane given keyboard inputs.
-             */
-            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-            {
-                velocity += forwards * move_speed;
-            }
-            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-            {
-                velocity -= forwards * move_speed;
-            }
-            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-            {
-                velocity += right * move_speed;
-            }
-            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-            {
-                velocity -= right * move_speed;
-            }
-
-            /*
-             * If the player is moving, make friction slow them down.
-             */
-            if (std::fabs(velocity.x) > 0.f || std::fabs(velocity.z) > 0.f)
-            {
-                static constexpr float friction_coeff = 0.07f;
-                velocity.x -= friction_coeff * velocity.x;
-                velocity.z -= friction_coeff * velocity.z;
-            }
-
-            position += velocity * dt;
-
-            /*
-             * Compute view looking at the direction our mouse is pointing.
-             */
-            const glm::mat4 camera_view =
-                glm::lookAt(position, position + direction, head);
-
-            /*
-             * Update model view projection.
-             */
-            const glm::mat4 model_view_projection = perspective * camera_view * model;
-            glUniformMatrix4fv(model_view_projection_object,
-                               1,
-                               GL_FALSE,
-                               &model_view_projection[0][0]);
 
             /*
              * Clear both the color and depth buffers.
@@ -660,8 +735,8 @@ namespace Engine
     /**
      * Stop running the game.
      */
-    void Game::stop_run()
+    void Game::quit()
     {
-        should_run = false;
+        state = State::QUIT;
     }
 }

@@ -63,4 +63,12 @@ format:
 clean:
 	rm -rf $(BUILD_DIR)
 
-.PHONY: all play format clean
+# List targets.
+help:
+	@echo "Available targets:"
+	@echo "  all      - Build the program and assembly."
+	@echo "  play     - Run the built program."
+	@echo "  format   - Format all source files."
+	@echo "  clean    - Remove built artifacts."
+
+.PHONY: all play format clean help
