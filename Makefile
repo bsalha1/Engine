@@ -1,10 +1,11 @@
 # Libraries.
-STATIC_LIBS = glfw/build/src/libglfw3.a glew/lib/libGLEW.a glm/build/glm/libglm.a
+STATIC_LIBS = glfw/build/src/libglfw3.a glew/lib/libGLEW.a glm/build/glm/libglm.a stb/build/stb_image.a
 LDFLAGS += $(STATIC_LIBS)
 LDFLAGS += -lGL -lGLX
+CXXFLAGS += -DGLEW_STATIC
 
 # Include directories.
-INCLUDE_DIRS = glfw/include glew/include glu/include glm/
+INCLUDE_DIRS = glfw/include glew/include glu/include glm/ stb/include
 CXXFLAGS += $(addprefix -I,$(INCLUDE_DIRS))
 
 # Object files.

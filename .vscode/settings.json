@@ -3,6 +3,7 @@
         "-I${workspaceFolder}/glfw/include",
         "-I${workspaceFolder}/glew/include",
         "-I${workspaceFolder}/glu/include",
-        "-I${workspaceFolder}/glm/"
+        "-I${workspaceFolder}/glm/",
+        "-I${workspaceFolder}/stb_image/include"
     ]
 }

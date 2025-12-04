@@ -10,6 +10,7 @@
 #include <glm/ext/scalar_constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <sstream>
+#include <stb/stb_image.h>
 #include <string>
 #include <unistd.h>
 
@@ -17,11 +18,14 @@ using namespace std::chrono_literals;
 
 namespace Engine
 {
-    struct Vertex3d
+    struct __attribute__((packed)) TexturedVertex3d
     {
         float x;
         float y;
         float z;
+
+        float texture_x;
+        float texture_y;
     };
 
     static bool get_shader_src(const std::string &file_path, std::string &shader_src)
@@ -53,7 +57,7 @@ namespace Engine
             GLsizei length;
             glGetShaderiv(shader_id, GL_INFO_LOG_LENGTH, &length);
 
-            char message[1024];
+            char message[4096];
             ASSERT_RET_IF(length > sizeof(message), false);
 
             glGetShaderInfoLog(shader_id, length, &length, message);
@@ -233,27 +237,19 @@ namespace Engine
          * Create vertex buffer.
          */
         {
-            /*
-             *     |
-             *  3  -  2
-             *     |
-             * -|-----|-
-             *     |
-             *  0  -  1
-             *     |
-             */
-
-            const std::array<Vertex3d, 8> positions = {{
-                {-1, -1, 1}, /* 0 */
-                {1, -1, 1},  /* 1 */
-                {1, 1, 1},   /* 2 */
-                {-1, 1, 1},  /* 3 */
-
-                {-1, -1, -1}, /* 4 */
-                {1, -1, -1},  /* 5 */
-                {1, 1, -1},   /* 6 */
-                {-1, 1, -1},  /* 7 */
+            /* clang-format off */
+            const std::array<TexturedVertex3d, 8> vertices = {{
+            /*      x,    y,   z,  texture_x, texture_y        */
+                {-1.f, -1.f, 1.f,        0.f,       0.f}, /* 0 */
+                { 1.f, -1.f, 1.f,        1.f,       0.f}, /* 1 */
+                { 1.f,  1.f, 1.f,        1.f,       1.f}, /* 2 */
+                {-1.f,  1.f, 1.f,        0.f,       1.f}, /* 3 */
+                {-1.f, -1.f, -1.f,       0.f,       0.f}, /* 4 */
+                { 1.f, -1.f, -1.f,       1.f,       0.f}, /* 5 */
+                { 1.f,  1.f, -1.f,       1.f,       1.f}, /* 6 */
+                {-1.f,  1.f, -1.f,       0.f,       1.f}, /* 7 */
             }};
+            /* clang-format on */
 
             GLuint vertex_array_obj;
             glGenVertexArrays(1, &vertex_array_obj);
@@ -263,74 +259,106 @@ namespace Engine
             glGenBuffers(1, &buffer_obj);
             glBindBuffer(GL_ARRAY_BUFFER, buffer_obj);
             glBufferData(
-                GL_ARRAY_BUFFER, sizeof(positions), positions.data(), GL_STATIC_DRAW);
+                GL_ARRAY_BUFFER, sizeof(vertices), vertices.data(), GL_STATIC_DRAW);
 
-            glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(Vertex3d), 0);
-            glEnableVertexAttribArray(0);
+            /*
+             * Position coordinate attribute.
+             */
+            static constexpr GLuint position_coord_attrib_index = 0;
+            static constexpr GLuint position_coord_attrib_start_offset =
+                offsetof(TexturedVertex3d, x);
+            static constexpr GLuint position_coord_attrib_end_offset =
+                offsetof(TexturedVertex3d, z);
+            static constexpr GLuint position_coord_attrib_size = sizeof(float);
+            static constexpr GLuint position_coord_attrib_count =
+                (position_coord_attrib_end_offset - position_coord_attrib_start_offset +
+                 position_coord_attrib_size) /
+                position_coord_attrib_size;
+            glVertexAttribPointer(position_coord_attrib_index,
+                                  position_coord_attrib_count,
+                                  GL_FLOAT,
+                                  GL_FALSE,
+                                  sizeof(TexturedVertex3d),
+                                  (GLvoid *)position_coord_attrib_start_offset);
+            glEnableVertexAttribArray(position_coord_attrib_index);
+
+            /*
+             * Texture coordinate attribute.
+             */
+            static constexpr GLuint texture_coord_attrib_index = 1;
+            static constexpr GLuint texture_coord_attrib_start_offset =
+                offsetof(TexturedVertex3d, texture_x);
+            static constexpr GLuint texture_coord_attrib_end_offset =
+                offsetof(TexturedVertex3d, texture_y);
+            static constexpr GLuint texture_coord_attrib_size = sizeof(float);
+            static constexpr GLuint texture_coord_attrib_count =
+                (texture_coord_attrib_end_offset - texture_coord_attrib_start_offset +
+                 texture_coord_attrib_size) /
+                texture_coord_attrib_size;
+            glVertexAttribPointer(texture_coord_attrib_index,
+                                  texture_coord_attrib_count,
+                                  GL_FLOAT,
+                                  GL_FALSE,
+                                  sizeof(TexturedVertex3d),
+                                  (GLvoid *)texture_coord_attrib_start_offset);
+            glEnableVertexAttribArray(texture_coord_attrib_index);
         }
 
         /*
          * Create index buffer.
          */
-        {
-            const std::array<unsigned int, 36> indices = {
-                /* +Z face */
-                0,
-                1,
-                2,
-                2,
-                3,
-                0,
+        const std::array<unsigned int, 36> indices = {
+            /* +Z face */
+            0,
+            1,
+            2,
+            2,
+            3,
+            0,
 
-                /* -Z face */
-                4,
-                5,
-                6,
-                6,
-                7,
-                4,
+            /* -Z face */
+            4,
+            5,
+            6,
+            6,
+            7,
+            4,
 
-                /* +X face */
-                1,
-                5,
-                6,
-                6,
-                2,
-                1,
+            /* +X face */
+            1,
+            5,
+            6,
+            6,
+            2,
+            1,
 
-                /* -X face */
-                4,
-                0,
-                3,
-                3,
-                7,
-                4,
+            /* -X face */
+            4,
+            0,
+            3,
+            3,
+            7,
+            4,
 
-                /* +Y face */
-                3,
-                2,
-                6,
-                6,
-                7,
-                3,
+            /* +Y face */
+            3,
+            2,
+            6,
+            6,
+            7,
+            3,
 
-                /* -Y face */
-                0,
-                1,
-                5,
-                5,
-                4,
-                0,
-            };
+            /* -Y face */
+            0,
+            1,
+            5,
+            5,
+            4,
+            0,
+        };
 
-            GLuint buffer_obj;
-            glGenBuffers(1, &buffer_obj);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer_obj);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                         sizeof(indices),
-                         indices.data(),
-                         GL_STATIC_DRAW);
-        }
+        index_buffer.create(reinterpret_cast<const void *>(indices.data()),
+                            sizeof(indices));
 
         LOG("Compiling shaders\n");
 
@@ -344,6 +372,42 @@ namespace Engine
         ASSERT_RET_IF_NOT(
             create_shader(program_id, vertex_shader_src, fragment_shader_src), false);
         glUseProgram(program_id);
+
+        LOG("Loading textures\n");
+
+        GLuint texture_obj;
+        glGenTextures(1, &texture_obj);
+        glBindTexture(GL_TEXTURE_2D, texture_obj);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+        stbi_set_flip_vertically_on_load(1);
+        int texture_width;
+        int texture_height;
+        int channels;
+        uint8_t *texture_buffer = stbi_load(
+            "textures/obama.png", &texture_width, &texture_height, &channels, 0);
+        if (texture_buffer == nullptr)
+        {
+            LOG_ERROR("Failed to load texture\n");
+            return false;
+        }
+
+        glTexImage2D(GL_TEXTURE_2D,
+                     0,
+                     GL_RGBA8,
+                     texture_width,
+                     texture_height,
+                     0,
+                     GL_RGBA,
+                     GL_UNSIGNED_BYTE,
+                     texture_buffer);
+
+        free(texture_buffer);
+
+        glActiveTexture(GL_TEXTURE0);
 
         return true;
     }
@@ -532,7 +596,7 @@ namespace Engine
         }
 
         /*
-         * Create vector pointing at target.
+         * Get vector pointing at target.
          */
         direction.x = cos(vertical_angle) * sin(horizontal_angle);
         direction.y = sin(vertical_angle);
@@ -614,8 +678,25 @@ namespace Engine
         /*
          * Get reference to the model view projection.
          */
-        const GLuint model_view_projection_object =
+        const GLint model_view_projection_object =
             glGetUniformLocation(program_id, "model_view_projection");
+        if (model_view_projection_object == -1)
+        {
+            LOG_ERROR("Failed to get model_view_projection uniform location\n");
+            return false;
+        }
+
+        /*
+         * Get reference to the texture object.
+         */
+        const GLint texture_sampler_object =
+            glGetUniformLocation(program_id, "texture_sampler");
+        if (texture_sampler_object == -1)
+        {
+            LOG_ERROR("Failed to get texture_sampler uniform location\n");
+            return false;
+        }
+        glUniform1i(texture_sampler_object, 0);
 
         /*
          * Set initial state.
@@ -699,7 +780,10 @@ namespace Engine
             /*
              * Draw the scene.
              */
-            glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, nullptr);
+            glDrawElements(GL_TRIANGLES,
+                           index_buffer.get_count(),
+                           decltype(index_buffer)::IndexGLtype,
+                           nullptr);
 
             /*
              * Swap front and back buffers.

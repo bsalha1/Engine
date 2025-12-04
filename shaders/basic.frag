@@ -1,10 +1,15 @@
 #version 460 core
 
-layout(location = 0) out vec3 color;
+out vec4 color;
 
-in vec3 fragment_color;
+/**
+ * Variables from vertex shader.
+ */
+in vec2 v_texture_coord;
+
+uniform sampler2D texture_sampler;
 
 void main()
 {
-    color = fragment_color;
+    color = texture(texture_sampler, v_texture_coord);
 }
