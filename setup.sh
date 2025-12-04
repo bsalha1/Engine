@@ -3,11 +3,29 @@
 set -e
 
 base_dir="$(dirname $(realpath $0))"
-sudo pacman -Sy clang
+
+git submodule update --init
+
+source /etc/os-release
+if [ "$ID" = debian ]; then
+    echo "Detected Debian Linux"
+    sudo apt update
+    #sudo apt install -y clang
+
+    # GLFW dependencies.
+    sudo apt install xorg-dev python3 python-is-python3
+
+    # GLEW dependencies.
+    sudo apt install libtool
+
+elif [ "$ID" = "arch" ]; then
+    echo "Detected Arch Linux"
+    sudo pacman -Sy clang
+fi
 
 # Build GLFW library and headers.
 cd glfw
-cmake -S . -B build
+cmake -S . -B build -D GLFW_BUILD_WAYLAND=OFF
 cd build
 make
 cd "$base_dir"
