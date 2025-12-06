@@ -36,7 +36,7 @@ namespace Engine
 
         void update_view();
 
-        void update_position();
+        void update_player_position();
 
         /**
          * Window handle.
@@ -76,24 +76,24 @@ namespace Engine
          */
         static constexpr float standing_move_speed = 1.5f;
         static constexpr float crouching_move_speed = 0.5f;
-        float move_speed;
+        float player_move_speed;
 
         /**
          * Player height.
          */
         static constexpr float standing_height = 3.f;
         static constexpr float crouching_height = 1.5f;
-        float height;
+        float player_height;
 
         /**
          * Player position.
          */
-        glm::vec3 position;
+        glm::vec3 player_position;
 
         /**
          * Player velocity.
          */
-        glm::vec3 velocity;
+        glm::vec3 player_velocity;
 
         /**
          * Timestamp of last jump.
@@ -170,5 +170,10 @@ namespace Engine
          */
 
         IndexBuffer index_buffer;
+
+        /**
+         * Position of the chaser.
+         */
+        glm::vec3 chaser_position;
     };
 }

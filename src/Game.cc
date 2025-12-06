@@ -160,10 +160,10 @@ namespace Engine
         state_prev(State::RUNNING),
         window_center_x(0),
         window_center_y(0),
-        move_speed(standing_move_speed),
-        height(standing_height),
-        position(0.f, height, -10.f),
-        velocity(0.f, 0.f, 0.f),
+        player_move_speed(standing_move_speed),
+        player_height(standing_height),
+        player_position(0.f, player_height, -10.f),
+        player_velocity(0.f, 0.f, 0.f),
         last_jump_time(std::chrono::steady_clock::now()),
         last_crouch_time(std::chrono::steady_clock::now()),
         escape_pressed_prev(false),
@@ -175,7 +175,8 @@ namespace Engine
         direction(0.f, 0.f, 0.f),
         right(0.f, 0.f, 0.f),
         forwards(0.f, 0.f, 0.f),
-        head(0.f, 0.f, 0.f)
+        head(0.f, 0.f, 0.f),
+        chaser_position(0.f, 0.f, 0.f)
     {}
 
     /**
@@ -460,9 +461,9 @@ namespace Engine
      */
     void Game::set_crouching()
     {
-        height = crouching_height;
-        move_speed = crouching_move_speed;
-        position.y = height;
+        player_height = crouching_height;
+        player_move_speed = crouching_move_speed;
+        player_position.y = player_height;
     }
 
     /**
@@ -470,9 +471,9 @@ namespace Engine
      */
     void Game::set_standing()
     {
-        height = standing_height;
-        move_speed = standing_move_speed;
-        position.y = height;
+        player_height = standing_height;
+        player_move_speed = standing_move_speed;
+        player_position.y = player_height;
     }
 
     /**
@@ -566,10 +567,10 @@ namespace Engine
          * If the player is off the ground, make gravity pull them down and do not allow
          * jumping or crouching.
          */
-        if (position.y > height)
+        if (player_position.y > player_height)
         {
             static constexpr float acceleration_gravity = 10.f;
-            velocity.y -= acceleration_gravity * dt;
+            player_velocity.y -= acceleration_gravity * dt;
         }
 
         /*
@@ -585,7 +586,7 @@ namespace Engine
                 {
                     last_jump_time = std::chrono::steady_clock::now();
 
-                    velocity.y = 10.f;
+                    player_velocity.y = 8.f;
 
                     /*
                      * If player is jumping from a crouch, they should land
@@ -602,7 +603,7 @@ namespace Engine
                 {
                     last_crouch_time = std::chrono::steady_clock::now();
 
-                    if (height == crouching_height)
+                    if (player_height == crouching_height)
                     {
                         set_standing();
                     }
@@ -614,7 +615,7 @@ namespace Engine
             }
             else
             {
-                velocity.y = 0.f;
+                player_velocity.y = 0.f;
             }
         }
     }
@@ -625,14 +626,14 @@ namespace Engine
     void Game::update_view()
     {
         /*
-         * Get mouse position relative to top-left pixel of the window.
+         * Get mouse player_position relative to top-left pixel of the window.
          */
         double mouse_x;
         double mouse_y;
         glfwGetCursorPos(window, &mouse_x, &mouse_y);
 
         /*
-         * Generate horizontal and vertical viewing angles from mouse position.
+         * Generate horizontal and vertical viewing angles from mouse player_position.
          */
         if (!mouse_prev_set)
         {
@@ -654,7 +655,7 @@ namespace Engine
             /*
              * Clamp the vertical angle since we have a neck.
              */
-            static constexpr float max_vertical_angle = glm::radians<float>(90);
+            static constexpr float max_vertical_angle = glm::radians<float>(90.f);
             static constexpr float min_vertical_angle = -max_vertical_angle;
             if (vertical_angle > max_vertical_angle)
             {
@@ -694,41 +695,41 @@ namespace Engine
     }
 
     /**
-     * Update position based on keyboard input.
+     * Update player_position based on keyboard input.
      */
-    void Game::update_position()
+    void Game::update_player_position()
     {
         /*
          * Move about the X-Z plane given keyboard inputs.
          */
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
         {
-            velocity += forwards * move_speed;
+            player_velocity += forwards * player_move_speed;
         }
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
         {
-            velocity -= forwards * move_speed;
+            player_velocity -= forwards * player_move_speed;
         }
         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         {
-            velocity += right * move_speed;
+            player_velocity += right * player_move_speed;
         }
         if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
         {
-            velocity -= right * move_speed;
+            player_velocity -= right * player_move_speed;
         }
 
         /*
          * If the player is moving, make friction slow them down.
          */
-        if (std::fabs(velocity.x) > 0.f || std::fabs(velocity.z) > 0.f)
+        if (std::fabs(player_velocity.x) > 0.f || std::fabs(player_velocity.z) > 0.f)
         {
             static constexpr float friction_coeff = 0.07f;
-            velocity.x -= friction_coeff * velocity.x;
-            velocity.z -= friction_coeff * velocity.z;
+            player_velocity.x -= friction_coeff * player_velocity.x;
+            player_velocity.z -= friction_coeff * player_velocity.z;
         }
 
-        position += velocity * dt;
+        player_position += player_velocity * dt;
     }
 
     /**
@@ -760,11 +761,6 @@ namespace Engine
 
         const glm::mat4 perspective =
             glm::perspective(glm::radians<float>(65), 4.f / 3.f, 0.1f, 100.f);
-
-        /*
-         * Place model at origin.
-         */
-        const glm::mat4 model = glm::mat4(1.0f);
 
         /*
          * Get reference to the model view projection.
@@ -807,6 +803,11 @@ namespace Engine
             frame_start_time = std::chrono::steady_clock::now();
 
             /*
+             * Clear both the color and depth buffers.
+             */
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            /*
              * Process menu.
              */
             process_menu();
@@ -827,39 +828,75 @@ namespace Engine
                 update_view();
 
                 /*
-                 * Update position based on keyboard input.
+                 * Update player_position based on keyboard input.
                  */
-                update_position();
+                update_player_position();
 
                 /*
                  * Compute view looking at the direction our mouse is pointing.
                  */
                 const glm::mat4 camera_view =
-                    glm::lookAt(position, position + direction, head);
+                    glm::lookAt(player_position, player_position + direction, head);
 
                 /*
                  * Update model view projection.
                  */
-                const glm::mat4 model_view_projection =
-                    perspective * camera_view * model;
-                glUniformMatrix4fv(model_view_projection_object,
-                                   1,
-                                   GL_FALSE,
-                                   &model_view_projection[0][0]);
+                {
+                    const glm::mat4 model_view_projection =
+                        perspective * camera_view * glm::mat4(1.0f);
+                    glUniformMatrix4fv(model_view_projection_object,
+                                       1,
+                                       GL_FALSE,
+                                       &model_view_projection[0][0]);
+                    glDrawElements(GL_TRIANGLES,
+                                   index_buffer.get_count(),
+                                   decltype(index_buffer)::IndexGLtype,
+                                   nullptr);
+                }
+
+                /*
+                 * Make this one chase the player.
+                 */
+                {
+                    /*
+                     * Update chaser position to move towards player position on X-Z
+                     * plane.
+                     */
+                    const glm::vec3 direction_to_player_xz = glm::normalize(
+                        glm::vec3(player_position.x - chaser_position.x,
+                                  0.f,
+                                  player_position.z - chaser_position.z));
+                    static constexpr float chaser_move_speed = 7.f;
+                    chaser_position += direction_to_player_xz * chaser_move_speed * dt;
+
+                    /*
+                     * Create model matrix for the chaser at its position.
+                     */
+                    glm::mat4 chaser_model =
+                        glm::translate(glm::mat4(1.f), chaser_position);
+
+                    /*
+                     * Set the chaser's angle to face us.
+                     */
+                    chaser_model = glm::rotate(chaser_model,
+                                               glm::radians<float>(180.f) +
+                                                   std::atan2(direction_to_player_xz.x,
+                                                              direction_to_player_xz.z),
+                                               glm::vec3(0.f, 1.f, 0.f));
+
+                    const glm::mat4 model_view_projection =
+                        perspective * camera_view * chaser_model;
+
+                    glUniformMatrix4fv(model_view_projection_object,
+                                       1,
+                                       GL_FALSE,
+                                       &model_view_projection[0][0]);
+                    glDrawElements(GL_TRIANGLES,
+                                   index_buffer.get_count(),
+                                   decltype(index_buffer)::IndexGLtype,
+                                   nullptr);
+                }
             }
-
-            /*
-             * Clear both the color and depth buffers.
-             */
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-            /*
-             * Draw the scene.
-             */
-            glDrawElements(GL_TRIANGLES,
-                           index_buffer.get_count(),
-                           decltype(index_buffer)::IndexGLtype,
-                           nullptr);
 
             /*
              * Render GUI.
