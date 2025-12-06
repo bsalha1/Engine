@@ -56,3 +56,20 @@ cd "$base_dir"
 # Build stb_image library.
 cd stb
 make
+cd "$base_dir"
+
+# Build imgui library.
+cd imgui
+g++ \
+    -c \
+    -I. \
+    -I../glfw/include \
+    backends/imgui_impl_opengl3.cpp \
+    backends/imgui_impl_glfw.cpp \
+    imgui_draw.cpp \
+    imgui_tables.cpp \
+    imgui_widgets.cpp \
+    imgui.cpp \
+    imgui_demo.cpp
+
+ar rcs libimgui.a *.o

@@ -1,11 +1,11 @@
 # Libraries.
-STATIC_LIBS = glfw/build/src/libglfw3.a glew/lib/libGLEW.a glm/build/glm/libglm.a stb/build/stb_image.a
+STATIC_LIBS = glfw/build/src/libglfw3.a glew/lib/libGLEW.a glm/build/glm/libglm.a stb/build/stb_image.a imgui/libimgui.a
 LDFLAGS += $(STATIC_LIBS)
 LDFLAGS += -lGL -lGLX
 CXXFLAGS += -DGLEW_STATIC
 
 # Include directories.
-INCLUDE_DIRS = glfw/include glew/include glu/include glm/ stb/include
+INCLUDE_DIRS = glfw/include/ glew/include/ glu/include/ glm/ stb/include/ imgui/
 CXXFLAGS += $(addprefix -I,$(INCLUDE_DIRS))
 
 # Object files.
@@ -22,11 +22,10 @@ BUILD_DEPS = $(patsubst %.o,%.d,$(BUILD_OBJS))
 GIT_COMMIT := $(shell git describe --dirty --always)
 CXXFLAGS += -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
-DEBUG=0
-
 ifdef DEBUG
 CXXFLAGS += -O0 -g
 else
+CXXFLAGS += -O3
 LDFLAGS += -s
 endif
 

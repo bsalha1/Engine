@@ -1,9 +1,10 @@
 {
     "clangd.fallbackFlags": [
-        "-I${workspaceFolder}/glfw/include",
-        "-I${workspaceFolder}/glew/include",
-        "-I${workspaceFolder}/glu/include",
+        "-I${workspaceFolder}/glfw/include/",
+        "-I${workspaceFolder}/glew/include/",
+        "-I${workspaceFolder}/glu/include/",
         "-I${workspaceFolder}/glm/",
-        "-I${workspaceFolder}/stb_image/include"
+        "-I${workspaceFolder}/stb_image/include/",
+        "-I${workspaceFolder}/imgui/"
     ]
 }

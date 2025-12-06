@@ -56,7 +56,10 @@ namespace Engine
             RUNNING,
             PAUSED,
             QUIT,
-        } state;
+        };
+        State state;
+        State state_prev;
+        static const char *state_to_string(const State state);
 
         /**
          * Coordinate of window center on X axis.

@@ -5,10 +5,13 @@
 
 #include <GLFW/glfw3.h>
 #include <array>
+#include <backends/imgui_impl_glfw.h>
+#include <backends/imgui_impl_opengl3.h>
 #include <execinfo.h>
 #include <fstream>
 #include <glm/ext/scalar_constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <imgui.h>
 #include <sstream>
 #include <stb/stb_image.h>
 #include <string>
@@ -138,10 +141,13 @@ namespace Engine
             Game *game = reinterpret_cast<Game *>(const_cast<void *>(user_param));
             game->quit();
         }
+
+#ifdef DEBUG
         else
         {
             LOG("OpenGL debug: %s\n", message);
         }
+#endif
     }
 
     /**
@@ -151,6 +157,7 @@ namespace Engine
         window(nullptr),
         program_id(0),
         state(State::RUNNING),
+        state_prev(State::RUNNING),
         window_center_x(0),
         window_center_y(0),
         move_speed(standing_move_speed),
@@ -183,6 +190,11 @@ namespace Engine
         return new_game;
     }
 
+    /**
+     * Initialize the game.
+     *
+     * @return True on success, otherwise false.
+     */
     bool Game::_init()
     {
         LOG("Creating window\n");
@@ -213,6 +225,12 @@ namespace Engine
          */
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         glfwSetCursorPos(window, window_center_x, window_center_y);
+
+        /*
+         * Enable blending for transparent/translucent textures.
+         */
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glEnable(GL_BLEND);
 
         LOG("Initializing GLEW\n");
         ASSERT_RET_IF_GLEW_NOT_OK(glewInit(), false);
@@ -409,6 +427,12 @@ namespace Engine
 
         glActiveTexture(GL_TEXTURE0);
 
+        LOG("Initializing GUI\n");
+        ImGui::CreateContext();
+        ImGui::StyleColorsDark();
+        ImGui_ImplGlfw_InitForOpenGL(window, true);
+        ImGui_ImplOpenGL3_Init("#version 460");
+
         return true;
     }
 
@@ -456,14 +480,14 @@ namespace Engine
      */
     void Game::process_menu()
     {
-        bool escape_pressed = glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS;
+        const bool escape_pressed = glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS;
         const bool escape_pressed_rising_edge = escape_pressed && !escape_pressed_prev;
+        escape_pressed_prev = escape_pressed;
         if (escape_pressed_rising_edge)
         {
             if (state == State::PAUSED)
             {
                 state = State::RUNNING;
-                LOG("PAUSED -> RUNNING\n");
 
                 /*
                  * Put the mouse back to where it was before pausing and hide it again.
@@ -474,7 +498,6 @@ namespace Engine
             else
             {
                 state = State::PAUSED;
-                LOG("RUNNING -> PAUSED\n");
 
                 /*
                  * Show the mouse cursor and put it in the middle of window.
@@ -483,7 +506,55 @@ namespace Engine
                 glfwSetCursorPos(window, window_center_x, window_center_y);
             }
         }
-        escape_pressed_prev = escape_pressed;
+
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        /*
+         * Configure the pause menu if paused.
+         */
+        if (state == State::PAUSED)
+        {
+            const ImGuiViewport *viewport = ImGui::GetMainViewport();
+            ImGui::SetNextWindowPos(viewport->GetCenter(),
+                                    ImGuiCond_Always,
+                                    ImVec2(0.5f, 0.5f));
+            ImGui::Begin("Pause Menu",
+                         nullptr,
+                         ImGuiWindowFlags_AlwaysAutoResize |
+                             ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoNavFocus |
+                             ImGuiWindowFlags_NoResize |
+                             ImGuiWindowFlags_NoSavedSettings);
+            ImGui::Text("Press ESC to unpause");
+            ImGui::Separator();
+            if (ImGui::Button("Settings"))
+            {
+                LOG("Pause Menu -> Settings Menu\n");
+            }
+            ImGui::Separator();
+            if (ImGui::Button("Quit"))
+            {
+                LOG("Pause Menu -> Quitting\n");
+                quit();
+            }
+            ImGui::End();
+        }
+
+        ImGuiIO &io = ImGui::GetIO();
+
+        /*
+         * Show FPS window in top left.
+         */
+        ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+        ImGui::Begin("Stats",
+                     nullptr,
+                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoFocusOnAppearing |
+                         ImGuiWindowFlags_NoBringToFrontOnFocus |
+                         ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoResize |
+                         ImGuiWindowFlags_NoSavedSettings);
+        ImGui::Text("%.3f ms (%.1f FPS)", 1000.f / io.Framerate, io.Framerate);
+        ImGui::End();
     }
 
     /**
@@ -525,7 +596,7 @@ namespace Engine
             }
             else if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
             {
-                static constexpr std::chrono::milliseconds crouch_cooldown = 500ms;
+                static constexpr std::chrono::milliseconds crouch_cooldown = 250ms;
                 if (std::chrono::steady_clock::now() - last_crouch_time >
                     crouch_cooldown)
                 {
@@ -661,6 +732,26 @@ namespace Engine
     }
 
     /**
+     * @param state State.
+     *
+     * @return String representation of the state.
+     */
+    const char *Game::state_to_string(const Game::State state)
+    {
+        switch (state)
+        {
+        case Game::State::RUNNING:
+            return "RUNNING";
+        case Game::State::PAUSED:
+            return "PAUSED";
+        case Game::State::QUIT:
+            return "QUIT";
+        default:
+            return "UNKNOWN";
+        }
+    }
+
+    /**
      * Run the game.
      */
     bool Game::run()
@@ -699,28 +790,13 @@ namespace Engine
         glUniform1i(texture_sampler_object, 0);
 
         /*
-         * Set initial state.
-         */
-
-        std::chrono::steady_clock::time_point stats_time_prev =
-            std::chrono::steady_clock::now();
-        const std::chrono::steady_clock::time_point game_start_time =
-            std::chrono::steady_clock::now();
-        std::chrono::steady_clock::time_point frame_start_time =
-            std::chrono::steady_clock::now();
-
-        /*
          * Loop until the user closes the window or state gets set to QUIT by the
          * program.
          */
+        std::chrono::steady_clock::time_point frame_start_time =
+            std::chrono::steady_clock::now();
         while (state != State::QUIT && !glfwWindowShouldClose(window))
         {
-            /*
-             * Compute how much time has passed.
-             */
-            const std::chrono::steady_clock::duration total_time =
-                std::chrono::steady_clock::now() - game_start_time;
-
             /*
              * Compute how much time has passed since the last frame.
              */
@@ -786,6 +862,12 @@ namespace Engine
                            nullptr);
 
             /*
+             * Render GUI.
+             */
+            ImGui::Render();
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+            /*
              * Swap front and back buffers.
              */
             glfwSwapBuffers(window);
@@ -796,20 +878,24 @@ namespace Engine
             glfwPollEvents();
 
             /*
-             * Display stats.
+             * Log state transitions for debug.
              */
-            const std::chrono::steady_clock::time_point now_time =
-                std::chrono::steady_clock::now();
-            static constexpr std::chrono::seconds stats_period = 1s;
-            if (now_time - stats_time_prev > stats_period)
+            if (state != state_prev)
             {
-                stats_time_prev = now_time;
-                const std::chrono::nanoseconds frame_duration_ns =
-                    now_time - frame_start_time;
-                const float frames_per_second = 1e9f / frame_duration_ns.count();
-                LOG("%.2f fps\n", frames_per_second);
+                LOG("State transition: %s -> %s\n",
+                    state_to_string(state_prev),
+                    state_to_string(state));
             }
+            state_prev = state;
         }
+
+        LOG("Exited main loop\n");
+
+        ImGui_ImplOpenGL3_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
+
+        glfwDestroyWindow(window);
 
         glfwTerminate();
 
