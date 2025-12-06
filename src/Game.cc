@@ -160,8 +160,8 @@ namespace Engine
         state_prev(State::RUNNING),
         window_center_x(0),
         window_center_y(0),
-        player_move_speed(standing_move_speed),
-        player_height(standing_height),
+        player_move_speed(move_speed_walking),
+        player_height(height_standing),
         player_position(0.f, player_height, -10.f),
         player_velocity(0.f, 0.f, 0.f),
         last_jump_time(std::chrono::steady_clock::now()),
@@ -461,9 +461,8 @@ namespace Engine
      */
     void Game::set_crouching()
     {
-        player_height = crouching_height;
-        player_move_speed = crouching_move_speed;
-        player_position.y = player_height;
+        player_height = height_crouching;
+        player_move_speed = move_speed_crouching;
     }
 
     /**
@@ -471,9 +470,50 @@ namespace Engine
      */
     void Game::set_standing()
     {
-        player_height = standing_height;
-        player_move_speed = standing_move_speed;
-        player_position.y = player_height;
+        player_height = height_standing;
+        player_move_speed = move_speed_walking;
+    }
+
+    /**
+     * Make player sprint.
+     */
+    void Game::set_sprinting()
+    {
+        player_height = height_standing;
+        player_move_speed = move_speed_sprinting;
+    }
+
+    /**
+     * Make player walk.
+     */
+    void Game::set_walking()
+    {
+        player_height = height_standing;
+        player_move_speed = move_speed_walking;
+    }
+
+    /**
+     * @return Whether player is crouching.
+     */
+    bool Game::is_crouching() const
+    {
+        return player_height == height_crouching;
+    }
+
+    /**
+     * @return Whether player is on the ground.
+     */
+    bool Game::is_on_ground() const
+    {
+        return player_position.y <= player_height;
+    }
+
+    /**
+     * @return Whether player is sprinting.
+     */
+    bool Game::is_sprinting() const
+    {
+        return player_move_speed == move_speed_sprinting;
     }
 
     /**
@@ -567,7 +607,7 @@ namespace Engine
          * If the player is off the ground, make gravity pull them down and do not allow
          * jumping or crouching.
          */
-        if (player_position.y > player_height)
+        if (!is_on_ground())
         {
             static constexpr float acceleration_gravity = 10.f;
             player_velocity.y -= acceleration_gravity * dt;
@@ -603,7 +643,7 @@ namespace Engine
                 {
                     last_crouch_time = std::chrono::steady_clock::now();
 
-                    if (player_height == crouching_height)
+                    if (is_crouching())
                     {
                         set_standing();
                     }
@@ -695,41 +735,86 @@ namespace Engine
     }
 
     /**
-     * Update player_position based on keyboard input.
+     * Update player position based on keyboard input.
      */
     void Game::update_player_position()
     {
         /*
-         * Move about the X-Z plane given keyboard inputs.
+         * Determine which direction to move into.
          */
+        glm::vec3 direction(0.f, 0.f, 0.f);
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
         {
-            player_velocity += forwards * player_move_speed;
+            direction += forwards;
         }
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
         {
-            player_velocity -= forwards * player_move_speed;
+            direction -= forwards;
         }
         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         {
-            player_velocity += right * player_move_speed;
+            direction += right;
         }
         if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
         {
-            player_velocity -= right * player_move_speed;
+            direction -= right;
+        }
+
+        const bool sprint_button_pressed =
+            glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
+        const bool in_sprintable_direction =
+            direction.x * forwards.x + direction.z * forwards.z > 0.f;
+
+        /*
+         * While sprint button is being pressed and the player is on the ground,
+         * set them to sprinting.
+         */
+        if (sprint_button_pressed && in_sprintable_direction)
+        {
+            if (is_on_ground())
+            {
+                set_sprinting();
+            }
         }
 
         /*
-         * If the player is moving, make friction slow them down.
+         * If sprinting but the sprint button is no longer being pressed or the player
+         * is no longer moving in a sprintable direction, restore the player to walking.
+         */
+        else if (is_sprinting())
+        {
+            set_walking();
+        }
+
+        /*
+         * Update player velocity.
+         */
+        if (direction.x != 0.f || direction.y != 0.f || direction.z != 0.f)
+        {
+            player_velocity += glm::normalize(direction) * player_move_speed;
+        }
+
+        /*
+         * If the player is moving, make friction slow them down. Note that this also
+         * applies while in the air which is not realistic but feels better for
+         * gameplay.
          */
         if (std::fabs(player_velocity.x) > 0.f || std::fabs(player_velocity.z) > 0.f)
         {
-            static constexpr float friction_coeff = 0.07f;
+            static constexpr float friction_coeff = 0.4f;
             player_velocity.x -= friction_coeff * player_velocity.x;
             player_velocity.z -= friction_coeff * player_velocity.z;
         }
 
         player_position += player_velocity * dt;
+
+        /*
+         * Don't let the player go under the ground.
+         */
+        if (player_position.y < player_height)
+        {
+            player_position.y = player_height;
+        }
     }
 
     /**
@@ -774,7 +859,7 @@ namespace Engine
         }
 
         /*
-         * Get reference to the texture object.
+         * Get reference to the texture object and set it to slot 0.
          */
         const GLint texture_sampler_object =
             glGetUniformLocation(program_id, "texture_sampler");
@@ -866,7 +951,7 @@ namespace Engine
                         glm::vec3(player_position.x - chaser_position.x,
                                   0.f,
                                   player_position.z - chaser_position.z));
-                    static constexpr float chaser_move_speed = 7.f;
+                    static constexpr float chaser_move_speed = 1.f;
                     chaser_position += direction_to_player_xz * chaser_move_speed * dt;
 
                     /*

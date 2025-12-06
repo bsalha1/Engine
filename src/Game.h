@@ -30,6 +30,16 @@ namespace Engine
 
         void set_standing();
 
+        void set_sprinting();
+
+        void set_walking();
+
+        bool is_crouching() const;
+
+        bool is_on_ground() const;
+
+        bool is_sprinting() const;
+
         void process_menu();
 
         void process_jump_crouch();
@@ -51,7 +61,7 @@ namespace Engine
         /**
          * Game state.
          */
-        enum class State
+        enum class State : uint8_t
         {
             RUNNING,
             PAUSED,
@@ -74,15 +84,16 @@ namespace Engine
         /**
          * Player movement speed.
          */
-        static constexpr float standing_move_speed = 1.5f;
-        static constexpr float crouching_move_speed = 0.5f;
+        static constexpr float move_speed_walking = 1.5f;
+        static constexpr float move_speed_sprinting = 3.0f;
+        static constexpr float move_speed_crouching = 0.5f;
         float player_move_speed;
 
         /**
          * Player height.
          */
-        static constexpr float standing_height = 3.f;
-        static constexpr float crouching_height = 1.5f;
+        static constexpr float height_standing = 1.78f;
+        static constexpr float height_crouching = 1.f;
         float player_height;
 
         /**
