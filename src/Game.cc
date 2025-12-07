@@ -31,76 +31,12 @@ namespace Engine
         float texture_y;
     };
 
-    static bool get_shader_src(const std::string &file_path, std::string &shader_src)
+    struct __attribute__((packed)) Vertex3d
     {
-        const std::ifstream file(file_path);
-        ASSERT_RET_IF_NOT(file, false);
-
-        std::stringstream buffer_obj;
-        buffer_obj << file.rdbuf();
-        shader_src = buffer_obj.str();
-
-        return true;
-    }
-
-    static bool
-    compile_shader(GLuint &shader_id, const GLuint type, const std::string &src)
-    {
-        shader_id = glCreateShader(type);
-        ASSERT_RET_IF(shader_id == 0, false);
-
-        const char *_src = src.c_str();
-        glShaderSource(shader_id, 1, &_src, nullptr);
-        glCompileShader(shader_id);
-
-        GLint shader_compiled;
-        glGetShaderiv(shader_id, GL_COMPILE_STATUS, &shader_compiled);
-        if (shader_compiled != GL_TRUE)
-        {
-            GLsizei length;
-            glGetShaderiv(shader_id, GL_INFO_LOG_LENGTH, &length);
-
-            char message[4096];
-            ASSERT_RET_IF(length > sizeof(message), false);
-
-            glGetShaderInfoLog(shader_id, length, &length, message);
-            LOG_ERROR("Failed to compile shader: %s\n", message);
-
-            glDeleteShader(shader_id);
-
-            return false;
-        }
-
-        return true;
-    }
-
-    static bool create_shader(GLuint &program_id,
-                              const std::string &vertex_shader_src,
-                              const std::string &fragment_shader_src)
-    {
-        program_id = glCreateProgram();
-        ASSERT_RET_IF(program_id == 0, false);
-
-        GLuint vertex_shader_id;
-        ASSERT_RET_IF_NOT(
-            compile_shader(vertex_shader_id, GL_VERTEX_SHADER, vertex_shader_src),
-            false);
-
-        GLuint fragment_shader_id;
-        ASSERT_RET_IF_NOT(
-            compile_shader(fragment_shader_id, GL_FRAGMENT_SHADER, fragment_shader_src),
-            false);
-
-        glAttachShader(program_id, vertex_shader_id);
-        glAttachShader(program_id, fragment_shader_id);
-        glLinkProgram(program_id);
-        glValidateProgram(program_id);
-
-        glDeleteShader(vertex_shader_id);
-        glDeleteShader(fragment_shader_id);
-
-        return true;
-    }
+        float x;
+        float y;
+        float z;
+    };
 
     static void gl_debug_message_callback(GLenum source,
                                           GLenum type,
@@ -155,13 +91,13 @@ namespace Engine
      */
     Game::Game():
         window(nullptr),
-        program_id(0),
         state(State::RUNNING),
         state_prev(State::RUNNING),
         window_center_x(0),
         window_center_y(0),
         player_move_speed(move_speed_walking),
         player_height(height_standing),
+        player_flying(false),
         player_position(0.f, player_height, -10.f),
         player_velocity(0.f, 0.f, 0.f),
         last_jump_time(std::chrono::steady_clock::now()),
@@ -250,10 +186,10 @@ namespace Engine
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LESS);
 
-        LOG("Allocating buffers\n");
+        LOG("Creating entity buffers\n");
 
         /*
-         * Create vertex buffer.
+         * Create chaser buffers.
          */
         {
             /* clang-format off */
@@ -270,13 +206,12 @@ namespace Engine
             }};
             /* clang-format on */
 
-            GLuint vertex_array_obj;
-            glGenVertexArrays(1, &vertex_array_obj);
-            glBindVertexArray(vertex_array_obj);
+            chaser_vertex_array.create();
+            chaser_vertex_array.bind();
 
-            GLuint buffer_obj;
-            glGenBuffers(1, &buffer_obj);
-            glBindBuffer(GL_ARRAY_BUFFER, buffer_obj);
+            GLuint chaser_buffer_obj;
+            glGenBuffers(1, &chaser_buffer_obj);
+            glBindBuffer(GL_ARRAY_BUFFER, chaser_buffer_obj);
             glBufferData(
                 GL_ARRAY_BUFFER, sizeof(vertices), vertices.data(), GL_STATIC_DRAW);
 
@@ -321,112 +256,205 @@ namespace Engine
                                   sizeof(TexturedVertex3d),
                                   (GLvoid *)texture_coord_attrib_start_offset);
             glEnableVertexAttribArray(texture_coord_attrib_index);
+
+            const std::array<unsigned int, 36> indices = {
+                /* +Z face */
+                0,
+                1,
+                2,
+                2,
+                3,
+                0,
+
+                /* -Z face */
+                4,
+                5,
+                6,
+                6,
+                7,
+                4,
+
+                /* +X face */
+                1,
+                5,
+                6,
+                6,
+                2,
+                1,
+
+                /* -X face */
+                4,
+                0,
+                3,
+                3,
+                7,
+                4,
+
+                /* +Y face */
+                3,
+                2,
+                6,
+                6,
+                7,
+                3,
+
+                /* -Y face */
+                0,
+                1,
+                5,
+                5,
+                4,
+                0,
+            };
+
+            chaser_index_buffer.create(reinterpret_cast<const void *>(indices.data()),
+                                       sizeof(indices));
         }
-
-        /*
-         * Create index buffer.
-         */
-        const std::array<unsigned int, 36> indices = {
-            /* +Z face */
-            0,
-            1,
-            2,
-            2,
-            3,
-            0,
-
-            /* -Z face */
-            4,
-            5,
-            6,
-            6,
-            7,
-            4,
-
-            /* +X face */
-            1,
-            5,
-            6,
-            6,
-            2,
-            1,
-
-            /* -X face */
-            4,
-            0,
-            3,
-            3,
-            7,
-            4,
-
-            /* +Y face */
-            3,
-            2,
-            6,
-            6,
-            7,
-            3,
-
-            /* -Y face */
-            0,
-            1,
-            5,
-            5,
-            4,
-            0,
-        };
-
-        index_buffer.create(reinterpret_cast<const void *>(indices.data()),
-                            sizeof(indices));
 
         LOG("Compiling shaders\n");
-
-        std::string vertex_shader_src;
-        ASSERT_RET_IF_NOT(get_shader_src("shaders/basic.vert", vertex_shader_src),
-                          false);
-        std::string fragment_shader_src;
-        ASSERT_RET_IF_NOT(get_shader_src("shaders/basic.frag", fragment_shader_src),
-                          false);
-
-        ASSERT_RET_IF_NOT(
-            create_shader(program_id, vertex_shader_src, fragment_shader_src), false);
-        glUseProgram(program_id);
+        ASSERT_RET_IF_NOT(basic_shader.compile("basic"), false);
+        ASSERT_RET_IF_NOT(heightmap_shader.compile("heightmap"), false);
 
         LOG("Loading textures\n");
-
-        GLuint texture_obj;
-        glGenTextures(1, &texture_obj);
-        glBindTexture(GL_TEXTURE_2D, texture_obj);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-
-        stbi_set_flip_vertically_on_load(1);
-        int texture_width;
-        int texture_height;
-        int channels;
-        uint8_t *texture_buffer = stbi_load(
-            "textures/obama.png", &texture_width, &texture_height, &channels, 0);
-        if (texture_buffer == nullptr)
         {
-            LOG_ERROR("Failed to load texture\n");
-            return false;
+            GLuint texture_obj;
+            glGenTextures(1, &texture_obj);
+            glBindTexture(GL_TEXTURE_2D, texture_obj);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+            stbi_set_flip_vertically_on_load(1);
+            int width;
+            int length;
+            int channels;
+            uint8_t *texture_buffer =
+                stbi_load("textures/obama.png", &width, &length, &channels, 0);
+            if (texture_buffer == nullptr)
+            {
+                LOG_ERROR("Failed to load texture\n");
+                return false;
+            }
+
+            glTexImage2D(GL_TEXTURE_2D,
+                         0,
+                         GL_RGBA8,
+                         width,
+                         length,
+                         0,
+                         GL_RGBA,
+                         GL_UNSIGNED_BYTE,
+                         texture_buffer);
+
+            stbi_image_free(texture_buffer);
+
+            glActiveTexture(GL_TEXTURE0);
         }
 
-        glTexImage2D(GL_TEXTURE_2D,
-                     0,
-                     GL_RGBA8,
-                     texture_width,
-                     texture_height,
-                     0,
-                     GL_RGBA,
-                     GL_UNSIGNED_BYTE,
-                     texture_buffer);
+        LOG("Loading terrain heightmaps\n");
+        {
+            stbi_set_flip_vertically_on_load(0);
+            int width;
+            int length;
+            int channels;
+            uint8_t *height = stbi_load(
+                "terrain/iceland_heightmap.png", &width, &length, &channels, 0);
+            if (height == nullptr)
+            {
+                LOG_ERROR("Failed to load heightmap\n");
+                return false;
+            }
 
-        free(texture_buffer);
+            /*
+             * Load the heightmap in with (x,z) = (0,0) being in the middle and y going
+             * from -16 to 64.
+             *
+             * Lay out the vertices like (x,y,z):
+             *
+             * (0,height(0,0),0)   (1,height(1,0),0)   (2,height(2,0),0)
+             * 0-------------------2 . . .       . . . 4
+             * |                  /.                 . .
+             * |               /   .               .   .
+             * |            /      .             .     .
+             * |         /
+             * |      /            .      .            .
+             * |   /               .    .              .
+             * |/                  .  .                .
+             * 1 . . .       . . . 3 . . .             5
+             * (0,height(0,1),1)   (1,height(1,1),1)   (2,height(2,1),1)
+             *
+             */
+            static constexpr unsigned int num_indices_per_vertex = 2;
+            const float x_middle = length / 2.f;
+            const float z_middle = width / 2.f;
+            static constexpr float y_top = 64.f;
+            static constexpr float y_bottom = -16.0f;
+            float y_scale = y_top / 0xFF;
 
-        glActiveTexture(GL_TEXTURE0);
+            const unsigned int num_vertices = length * width;
+            const unsigned int num_indices =
+                (length - 1) * width * num_indices_per_vertex;
+            std::unique_ptr<Vertex3d[]> vertices(new Vertex3d[num_vertices]);
+            std::unique_ptr<unsigned int[]> indices(new unsigned int[num_indices]);
+            for (int x = 0; x < length; x++)
+            {
+                for (int z = 0; z < width; z++)
+                {
+                    const uint8_t y = height[(width * x + z) * channels];
+
+                    vertices[width * x + z] = {.x = x - x_middle,
+                                               .y = y * y_scale + y_bottom,
+                                               .z = z - z_middle};
+
+                    if (x != length - 1)
+                    {
+                        for (unsigned int index = 0; index < num_indices_per_vertex;
+                             index++)
+                        {
+                            indices[(x * width + z) * num_indices_per_vertex + index] =
+                                width * (x + index) + z;
+                        }
+                    }
+                }
+            }
+
+            stbi_image_free(height);
+
+            terrain_vertex_array.create();
+            terrain_vertex_array.bind();
+
+            GLuint terrain_vertex_chaser_buffer_obj;
+            glGenBuffers(1, &terrain_vertex_chaser_buffer_obj);
+            glBindBuffer(GL_ARRAY_BUFFER, terrain_vertex_chaser_buffer_obj);
+            glBufferData(GL_ARRAY_BUFFER,
+                         length * width * sizeof(vertices[0]),
+                         &vertices[0],
+                         GL_STATIC_DRAW);
+
+            /*
+             * Position coordinate attribute.
+             */
+            static constexpr GLuint position_coord_attrib_index = 0;
+            static constexpr GLuint position_coord_attrib_start_offset =
+                offsetof(Vertex3d, x);
+            static constexpr GLuint position_coord_attrib_end_offset =
+                offsetof(Vertex3d, z);
+            static constexpr GLuint position_coord_attrib_size = sizeof(float);
+            static constexpr GLuint position_coord_attrib_count =
+                (position_coord_attrib_end_offset - position_coord_attrib_start_offset +
+                 position_coord_attrib_size) /
+                position_coord_attrib_size;
+            glVertexAttribPointer(position_coord_attrib_index,
+                                  position_coord_attrib_count,
+                                  GL_FLOAT,
+                                  GL_FALSE,
+                                  sizeof(Vertex3d),
+                                  (GLvoid *)position_coord_attrib_start_offset);
+            glEnableVertexAttribArray(position_coord_attrib_index);
+
+            terrain_index_buffer.create(indices.get(), num_indices);
+        }
 
         LOG("Initializing GUI\n");
         ImGui::CreateContext();
@@ -594,7 +622,15 @@ namespace Engine
                          ImGuiWindowFlags_NoBringToFrontOnFocus |
                          ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoResize |
                          ImGuiWindowFlags_NoSavedSettings);
-        ImGui::Text("%.3f ms (%.1f FPS)", 1000.f / io.Framerate, io.Framerate);
+        ImGui::Text("%.3f ms (%.0f FPS)", 1000.f / io.Framerate, io.Framerate);
+        ImGui::Text("Position: (%.2f, %.2f, %.2f)",
+                    player_position.x,
+                    player_position.y,
+                    player_position.z);
+        ImGui::Text("Velocity: (%.2f, %.2f, %.2f)",
+                    player_velocity.x,
+                    player_velocity.y,
+                    player_velocity.z);
         ImGui::End();
     }
 
@@ -603,16 +639,41 @@ namespace Engine
      */
     void Game::process_jump_crouch()
     {
+        if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS)
+        {
+            player_flying = true;
+
+            /*
+             * Weird to crouch when flying.
+             */
+            set_standing();
+
+            player_move_speed = move_speed_flying;
+        }
+
+        if (player_flying)
+        {
+            if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+            {
+                player_velocity.y = player_move_speed;
+            }
+            else if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
+            {
+                player_velocity.y = -player_move_speed;
+            }
+
+            player_velocity.y -= friction_coeff * player_velocity.y;
+        }
+
         /*
          * If the player is off the ground, make gravity pull them down and do not allow
          * jumping or crouching.
          */
-        if (!is_on_ground())
+        else if (!is_on_ground())
         {
             static constexpr float acceleration_gravity = 10.f;
             player_velocity.y -= acceleration_gravity * dt;
         }
-
         /*
          * Otherwise, if the player is on the ground, jump when they press space or
          * crouch when they press left shift.
@@ -801,7 +862,6 @@ namespace Engine
          */
         if (std::fabs(player_velocity.x) > 0.f || std::fabs(player_velocity.z) > 0.f)
         {
-            static constexpr float friction_coeff = 0.4f;
             player_velocity.x -= friction_coeff * player_velocity.x;
             player_velocity.z -= friction_coeff * player_velocity.z;
         }
@@ -844,14 +904,18 @@ namespace Engine
     {
         LOG("Entering main loop\n");
 
+        const float fov_deg = 65.f;
+        const float far_clip = 1000.f;
+        const float aspect = 4.f / height_standing;
+        const float near_clip = 1.f;
         const glm::mat4 perspective =
-            glm::perspective(glm::radians<float>(65), 4.f / 3.f, 0.1f, 100.f);
+            glm::perspective(glm::radians(fov_deg), aspect, near_clip, far_clip);
 
         /*
          * Get reference to the model view projection.
          */
         const GLint model_view_projection_object =
-            glGetUniformLocation(program_id, "model_view_projection");
+            glGetUniformLocation(basic_shader.id(), "model_view_projection");
         if (model_view_projection_object == -1)
         {
             LOG_ERROR("Failed to get model_view_projection uniform location\n");
@@ -862,12 +926,13 @@ namespace Engine
          * Get reference to the texture object and set it to slot 0.
          */
         const GLint texture_sampler_object =
-            glGetUniformLocation(program_id, "texture_sampler");
+            glGetUniformLocation(basic_shader.id(), "texture_sampler");
         if (texture_sampler_object == -1)
         {
             LOG_ERROR("Failed to get texture_sampler uniform location\n");
             return false;
         }
+        basic_shader.use();
         glUniform1i(texture_sampler_object, 0);
 
         /*
@@ -924,7 +989,14 @@ namespace Engine
                     glm::lookAt(player_position, player_position + direction, head);
 
                 /*
-                 * Update model view projection.
+                 * Draw the chasers.
+                 */
+
+                chaser_vertex_array.bind();
+                basic_shader.use();
+
+                /*
+                 * Draw a chaser at the origin.
                  */
                 {
                     const glm::mat4 model_view_projection =
@@ -934,8 +1006,8 @@ namespace Engine
                                        GL_FALSE,
                                        &model_view_projection[0][0]);
                     glDrawElements(GL_TRIANGLES,
-                                   index_buffer.get_count(),
-                                   decltype(index_buffer)::IndexGLtype,
+                                   chaser_index_buffer.get_count(),
+                                   decltype(chaser_index_buffer)::IndexGLtype,
                                    nullptr);
                 }
 
@@ -977,10 +1049,29 @@ namespace Engine
                                        GL_FALSE,
                                        &model_view_projection[0][0]);
                     glDrawElements(GL_TRIANGLES,
-                                   index_buffer.get_count(),
-                                   decltype(index_buffer)::IndexGLtype,
+                                   chaser_index_buffer.get_count(),
+                                   decltype(chaser_index_buffer)::IndexGLtype,
                                    nullptr);
                 }
+
+                /*
+                 * Draw the terrain.
+                 */
+
+                terrain_vertex_array.bind();
+                heightmap_shader.use();
+
+                const glm::mat4 model_view_projection =
+                    perspective * camera_view * glm::mat4(1.0f);
+                glUniformMatrix4fv(model_view_projection_object,
+                                   1,
+                                   GL_FALSE,
+                                   &model_view_projection[0][0]);
+
+                glDrawElements(GL_TRIANGLE_STRIP,
+                               terrain_index_buffer.get_count(),
+                               decltype(terrain_index_buffer)::IndexGLtype,
+                               nullptr);
             }
 
             /*

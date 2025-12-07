@@ -1,6 +1,8 @@
 #pragma once
 
 #include "IndexBuffer.h"
+#include "Shader.h"
+#include "VertexArray.h"
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -54,9 +56,14 @@ namespace Engine
         GLFWwindow *window;
 
         /**
-         * Shader program ID.
+         * Basic shader program ID.
          */
-        GLuint program_id;
+        Shader basic_shader;
+
+        /**
+         * Heightmap shader program ID.
+         */
+        Shader heightmap_shader;
 
         /**
          * Game state.
@@ -84,9 +91,11 @@ namespace Engine
         /**
          * Player movement speed.
          */
+        static constexpr float friction_coeff = 0.4f;
         static constexpr float move_speed_walking = 1.5f;
         static constexpr float move_speed_sprinting = 3.0f;
         static constexpr float move_speed_crouching = 0.5f;
+        static constexpr float move_speed_flying = 30.0f;
         float player_move_speed;
 
         /**
@@ -95,6 +104,11 @@ namespace Engine
         static constexpr float height_standing = 1.78f;
         static constexpr float height_crouching = 1.f;
         float player_height;
+
+        /**
+         * Whether player is flying.
+         */
+        bool player_flying;
 
         /**
          * Player position.
@@ -180,7 +194,11 @@ namespace Engine
          * @}
          */
 
-        IndexBuffer index_buffer;
+        IndexBuffer chaser_index_buffer;
+        VertexArray chaser_vertex_array;
+
+        IndexBuffer terrain_index_buffer;
+        VertexArray terrain_vertex_array;
 
         /**
          * Position of the chaser.
