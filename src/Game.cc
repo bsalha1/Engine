@@ -95,12 +95,16 @@ namespace Engine
         state_prev(State::RUNNING),
         window_center_x(0),
         window_center_y(0),
-        player_move_speed(move_speed_walking),
+        is_on_ground(true),
+        time_on_ground(0.f),
+        friction_coeff(friction_coeff_ground),
+        player_state(PlayerState::WALKING),
+        player_move_impulse(move_impulse_walking),
         player_height(height_standing),
-        player_flying(false),
+        fly_key_pressed_prev(false),
+        crouch_button_pressed_prev(false),
         player_position(0.f, player_height, -10.f),
         player_velocity(0.f, 0.f, 0.f),
-        last_jump_time(std::chrono::steady_clock::now()),
         last_crouch_time(std::chrono::steady_clock::now()),
         escape_pressed_prev(false),
         mouse_prev_set(false),
@@ -151,8 +155,6 @@ namespace Engine
         /*
          * Get the actual window's size. Window managers can disobey our request.
          */
-        int window_width;
-        int window_height;
         glfwGetFramebufferSize(window, &window_width, &window_height);
         window_center_x = window_width / 2;
         window_center_y = window_height / 2;
@@ -355,12 +357,14 @@ namespace Engine
         LOG("Loading terrain heightmaps\n");
         {
             stbi_set_flip_vertically_on_load(0);
-            int width;
-            int length;
-            int channels;
-            uint8_t *height = stbi_load(
-                "terrain/iceland_heightmap.png", &width, &length, &channels, 0);
-            if (height == nullptr)
+            int terrain_length;
+            int terrain_channels;
+            uint8_t *heightmap = stbi_load("terrain/iceland_heightmap.png",
+                                           &terrain_width,
+                                           &terrain_length,
+                                           &terrain_channels,
+                                           0);
+            if (heightmap == nullptr)
             {
                 LOG_ERROR("Failed to load heightmap\n");
                 return false;
@@ -368,7 +372,7 @@ namespace Engine
 
             /*
              * Load the heightmap in with (x,z) = (0,0) being in the middle and y going
-             * from -16 to 64.
+             * from y_bottom to y_top.
              *
              * Lay out the vertices like (x,y,z):
              *
@@ -386,50 +390,60 @@ namespace Engine
              *
              */
             static constexpr unsigned int num_indices_per_vertex = 2;
-            const float x_middle = length / 2.f;
-            const float z_middle = width / 2.f;
+            terrain_x_middle = terrain_length / 2.f;
+            terrain_z_middle = terrain_width / 2.f;
             static constexpr float y_top = 64.f;
-            static constexpr float y_bottom = -16.0f;
+            static constexpr float y_bottom = 0.f;
             float y_scale = y_top / 0xFF;
 
-            const unsigned int num_vertices = length * width;
+            const unsigned int num_vertices = terrain_length * terrain_width;
             const unsigned int num_indices =
-                (length - 1) * width * num_indices_per_vertex;
-            std::unique_ptr<Vertex3d[]> vertices(new Vertex3d[num_vertices]);
-            std::unique_ptr<unsigned int[]> indices(new unsigned int[num_indices]);
-            for (int x = 0; x < length; x++)
+                (terrain_length - 1) * terrain_width * num_indices_per_vertex;
+
+            std::vector<Vertex3d> vertices;
+            vertices.reserve(num_vertices);
+
+            std::vector<unsigned int> indices;
+            indices.reserve(num_indices);
+
+            xz_to_height_map.reserve(num_vertices);
+
+            for (int x = 0; x < terrain_length; x++)
             {
-                for (int z = 0; z < width; z++)
+                for (int z = 0; z < terrain_width; z++)
                 {
-                    const uint8_t y = height[(width * x + z) * channels];
+                    const uint8_t y =
+                        heightmap[(terrain_width * x + z) * terrain_channels];
 
-                    vertices[width * x + z] = {.x = x - x_middle,
-                                               .y = y * y_scale + y_bottom,
-                                               .z = z - z_middle};
+                    const float x_coord = x - terrain_x_middle;
+                    const float y_coord = y * y_scale + y_bottom;
+                    const float z_coord = z - terrain_z_middle;
+                    vertices.push_back({.x = x_coord, .y = y_coord, .z = z_coord});
 
-                    if (x != length - 1)
+                    xz_to_height_map.push_back(y_coord);
+
+                    if (x != terrain_length - 1)
                     {
                         for (unsigned int index = 0; index < num_indices_per_vertex;
                              index++)
                         {
-                            indices[(x * width + z) * num_indices_per_vertex + index] =
-                                width * (x + index) + z;
+                            indices.push_back(terrain_width * (x + index) + z);
                         }
                     }
                 }
             }
 
-            stbi_image_free(height);
+            stbi_image_free(heightmap);
 
             terrain_vertex_array.create();
             terrain_vertex_array.bind();
 
-            GLuint terrain_vertex_chaser_buffer_obj;
-            glGenBuffers(1, &terrain_vertex_chaser_buffer_obj);
-            glBindBuffer(GL_ARRAY_BUFFER, terrain_vertex_chaser_buffer_obj);
+            GLuint terrain_vertex_buffer_array_obj;
+            glGenBuffers(1, &terrain_vertex_buffer_array_obj);
+            glBindBuffer(GL_ARRAY_BUFFER, terrain_vertex_buffer_array_obj);
             glBufferData(GL_ARRAY_BUFFER,
-                         length * width * sizeof(vertices[0]),
-                         &vertices[0],
+                         vertices.size() * sizeof(Vertex3d),
+                         vertices.data(),
                          GL_STATIC_DRAW);
 
             /*
@@ -453,7 +467,7 @@ namespace Engine
                                   (GLvoid *)position_coord_attrib_start_offset);
             glEnableVertexAttribArray(position_coord_attrib_index);
 
-            terrain_index_buffer.create(indices.get(), num_indices);
+            terrain_index_buffer.create(indices.data(), indices.size());
         }
 
         LOG("Initializing GUI\n");
@@ -485,63 +499,66 @@ namespace Engine
     }
 
     /**
-     * Make player crouch.
+     * @return Terrain height at given (x, z) world coordinates.
+     *
+     * @param x X world coordinate.
+     * @param z Z world coordinate.
      */
-    void Game::set_crouching()
+    float Game::get_terrain_height(const float x, const float z) const
     {
-        player_height = height_crouching;
-        player_move_speed = move_speed_crouching;
-    }
+        /*
+         * Convert from world coordinates to heightmap coordinates. To be smooth,
+         * linearly interpolate the height between the 3 vertices of the triangle the
+         * point is in.
+         *
+         *     |
+         *     |   0--2
+         *     |   |P/|
+         *     |   |/ |
+         *     |   1--3
+         * x ---------------
+         *     |
+         *     z
+         */
+        const float x_terrain = x + terrain_x_middle;
+        const float z_terrain = z + terrain_z_middle;
 
-    /**
-     * Make player stand.
-     */
-    void Game::set_standing()
-    {
-        player_height = height_standing;
-        player_move_speed = move_speed_walking;
-    }
+        const int cell_x_left = static_cast<int>(std::floor(x + terrain_x_middle));
+        const int cell_x_right = static_cast<int>(std::ceil(x + terrain_x_middle));
+        const int cell_z_down = static_cast<int>(std::floor(z + terrain_z_middle));
+        const int cell_z_up = static_cast<int>(std::ceil(z + terrain_z_middle));
 
-    /**
-     * Make player sprint.
-     */
-    void Game::set_sprinting()
-    {
-        player_height = height_standing;
-        player_move_speed = move_speed_sprinting;
-    }
+        const float dx = x_terrain - cell_x_left;
+        const float dz = z_terrain - cell_z_down;
 
-    /**
-     * Make player walk.
-     */
-    void Game::set_walking()
-    {
-        player_height = height_standing;
-        player_move_speed = move_speed_walking;
-    }
+        const float y2 = xz_to_height_map[terrain_width * cell_x_right + cell_z_up];
 
-    /**
-     * @return Whether player is crouching.
-     */
-    bool Game::is_crouching() const
-    {
-        return player_height == height_crouching;
-    }
+        /*
+         * In bottom-right triangle.
+         */
+        if (dx > dz)
+        {
+            const float y0 =
+                xz_to_height_map[terrain_width * cell_x_left + cell_z_down];
+            const float y3 =
+                xz_to_height_map[terrain_width * cell_x_right + cell_z_down];
+            const float x_slope = (y3 - y0);
+            const float z_slope = (y2 - y3);
+            return y0 + x_slope * dx + z_slope * dz;
+        }
 
-    /**
-     * @return Whether player is on the ground.
-     */
-    bool Game::is_on_ground() const
-    {
-        return player_position.y <= player_height;
-    }
-
-    /**
-     * @return Whether player is sprinting.
-     */
-    bool Game::is_sprinting() const
-    {
-        return player_move_speed == move_speed_sprinting;
+        /*
+         * In top-left triangle.
+         */
+        else
+        {
+            const float y0 =
+                xz_to_height_map[terrain_width * cell_x_left + cell_z_down];
+            const float y1 = xz_to_height_map[terrain_width * cell_x_left + cell_z_up];
+            const float x_slope = (y2 - y1);
+            const float z_slope = (y1 - y0);
+            return y0 + x_slope * dx + z_slope * dz;
+        }
     }
 
     /**
@@ -623,102 +640,20 @@ namespace Engine
                          ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoResize |
                          ImGuiWindowFlags_NoSavedSettings);
         ImGui::Text("%.3f ms (%.0f FPS)", 1000.f / io.Framerate, io.Framerate);
-        ImGui::Text("Position: (%.2f, %.2f, %.2f)",
+        ImGui::Text("state: %s", state_to_string(state));
+        ImGui::Text("player state: %s", player_state_to_string(player_state));
+        ImGui::Text("player_position: (%.2f, %.2f, %.2f)",
                     player_position.x,
                     player_position.y,
                     player_position.z);
-        ImGui::Text("Velocity: (%.2f, %.2f, %.2f)",
+        ImGui::Text("player_velocity: (%.2f, %.2f, %.2f) (%.2f m/s)",
                     player_velocity.x,
                     player_velocity.y,
-                    player_velocity.z);
+                    player_velocity.z,
+                    glm::length(player_velocity));
+        ImGui::Text("move_impulse: %.2f", player_move_impulse);
+        ImGui::Text("friction_coeff: %.2f", friction_coeff);
         ImGui::End();
-    }
-
-    /**
-     * Process jump or crouch input.
-     */
-    void Game::process_jump_crouch()
-    {
-        if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS)
-        {
-            player_flying = true;
-
-            /*
-             * Weird to crouch when flying.
-             */
-            set_standing();
-
-            player_move_speed = move_speed_flying;
-        }
-
-        if (player_flying)
-        {
-            if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
-            {
-                player_velocity.y = player_move_speed;
-            }
-            else if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
-            {
-                player_velocity.y = -player_move_speed;
-            }
-
-            player_velocity.y -= friction_coeff * player_velocity.y;
-        }
-
-        /*
-         * If the player is off the ground, make gravity pull them down and do not allow
-         * jumping or crouching.
-         */
-        else if (!is_on_ground())
-        {
-            static constexpr float acceleration_gravity = 10.f;
-            player_velocity.y -= acceleration_gravity * dt;
-        }
-        /*
-         * Otherwise, if the player is on the ground, jump when they press space or
-         * crouch when they press left shift.
-         */
-        else
-        {
-            if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
-            {
-                static constexpr std::chrono::milliseconds jump_cooldown = 500ms;
-                if (std::chrono::steady_clock::now() - last_jump_time > jump_cooldown)
-                {
-                    last_jump_time = std::chrono::steady_clock::now();
-
-                    player_velocity.y = 8.f;
-
-                    /*
-                     * If player is jumping from a crouch, they should land
-                     * standing, otherwise it'll be hard on the knees.
-                     */
-                    set_standing();
-                }
-            }
-            else if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
-            {
-                static constexpr std::chrono::milliseconds crouch_cooldown = 250ms;
-                if (std::chrono::steady_clock::now() - last_crouch_time >
-                    crouch_cooldown)
-                {
-                    last_crouch_time = std::chrono::steady_clock::now();
-
-                    if (is_crouching())
-                    {
-                        set_standing();
-                    }
-                    else
-                    {
-                        set_crouching();
-                    }
-                }
-            }
-            else
-            {
-                player_velocity.y = 0.f;
-            }
-        }
     }
 
     /**
@@ -796,6 +731,41 @@ namespace Engine
     }
 
     /**
+     * Update a grounded player's state.
+     *
+     * @param fly_key_pressed Whether the fly key is currently pressed.
+     *
+     * @return True if the player state was changed, otherwise false.
+     */
+    bool Game::update_player_state_grounded(const bool fly_key_pressed)
+    {
+        if (!is_on_ground)
+        {
+            player_state = PlayerState::MIDAIR;
+            return true;
+        }
+
+        if (fly_key_pressed && !fly_key_pressed_prev)
+        {
+            player_state = PlayerState::FLYING;
+            return true;
+        }
+
+        static constexpr float time_on_ground_to_jump = 0.1f;
+        const bool can_jump = time_on_ground >= time_on_ground_to_jump;
+        const bool jump_button_pressed =
+            glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
+        if (can_jump && jump_button_pressed)
+        {
+            player_velocity.y += move_impulse_jump * dt;
+            player_state = PlayerState::MIDAIR;
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Update player position based on keyboard input.
      */
     void Game::update_player_position()
@@ -803,77 +773,263 @@ namespace Engine
         /*
          * Determine which direction to move into.
          */
-        glm::vec3 direction(0.f, 0.f, 0.f);
+        glm::vec3 move_direction(0.f, 0.f, 0.f);
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
         {
-            direction += forwards;
+            move_direction = forwards;
         }
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        else if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
         {
-            direction -= forwards;
+            move_direction = -forwards;
         }
+
         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         {
-            direction += right;
+            move_direction += right;
         }
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        else if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
         {
-            direction -= right;
+            move_direction -= right;
         }
-
-        const bool sprint_button_pressed =
-            glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
-        const bool in_sprintable_direction =
-            direction.x * forwards.x + direction.z * forwards.z > 0.f;
 
         /*
-         * While sprint button is being pressed and the player is on the ground,
-         * set them to sprinting.
+         * Get next player state.
          */
-        if (sprint_button_pressed && in_sprintable_direction)
+        const bool crouch_button_pressed =
+            glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
+        const bool fly_key_pressed = glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS;
+
+        switch (player_state)
         {
-            if (is_on_ground())
+        case PlayerState::WALKING:
+        {
+            if (update_player_state_grounded(fly_key_pressed))
             {
-                set_sprinting();
+                break;
             }
+
+            const bool sprint_button_pressed =
+                glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
+            const bool in_sprintable_direction =
+                move_direction.x * forwards.x + move_direction.z * forwards.z > 0.f;
+
+            /*
+             * While sprint button is being pressed and the player is on the ground,
+             * set them to sprinting.
+             */
+            if (sprint_button_pressed && in_sprintable_direction)
+            {
+                player_state = PlayerState::SPRINTING;
+            }
+
+            /*
+             * Crouch if crouch button is pressed.
+             */
+            else if (crouch_button_pressed && !crouch_button_pressed_prev)
+            {
+                player_state = PlayerState::CROUCHING;
+            }
+
+            break;
+        }
+
+        case PlayerState::SPRINTING:
+        {
+            if (update_player_state_grounded(fly_key_pressed))
+            {
+                break;
+            }
+
+            /*
+             * If sprinting but the sprint button is no longer being pressed or the
+             * player is no longer moving in a sprintable direction, restore the player
+             * to walking.
+             */
+            const bool sprint_button_pressed =
+                glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
+            const bool in_sprintable_direction =
+                move_direction.x * forwards.x + move_direction.z * forwards.z > 0.f;
+            if (!sprint_button_pressed || !in_sprintable_direction)
+            {
+                player_state = PlayerState::WALKING;
+            }
+
+            break;
+        }
+
+        case PlayerState::CROUCHING:
+        {
+            if (update_player_state_grounded(fly_key_pressed))
+            {
+                break;
+            }
+
+            /*
+             * Uncrouch if crouch button is pressed again.
+             */
+            const bool crouch_button_pressed =
+                glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
+            if (crouch_button_pressed && !crouch_button_pressed_prev)
+            {
+                player_state = PlayerState::WALKING;
+            }
+            crouch_button_pressed_prev = crouch_button_pressed;
+
+            break;
+        }
+
+        case PlayerState::FLYING:
+            if (fly_key_pressed && !fly_key_pressed_prev)
+            {
+                player_state =
+                    is_on_ground ? PlayerState::WALKING : PlayerState::MIDAIR;
+                break;
+            }
+
+            break;
+
+        case PlayerState::MIDAIR:
+            if (is_on_ground)
+            {
+                player_state = PlayerState::WALKING;
+                break;
+            }
+
+            if (fly_key_pressed && !fly_key_pressed_prev)
+            {
+                player_state = PlayerState::FLYING;
+                break;
+            }
+
+            break;
+
+        default:
+            LOG_ERROR("Unknown player state: %u\n", player_state);
+        }
+
+        crouch_button_pressed_prev = crouch_button_pressed;
+        fly_key_pressed_prev = fly_key_pressed;
+
+        /*
+         * Set player parameters based on current state.
+         */
+        switch (player_state)
+        {
+        case PlayerState::WALKING:
+            player_height = height_standing;
+            player_move_impulse = move_impulse_walking;
+            friction_coeff = friction_coeff_ground;
+            break;
+
+        case PlayerState::SPRINTING:
+            player_height = height_standing;
+            player_move_impulse = move_impulse_sprinting;
+            friction_coeff = friction_coeff_ground;
+            break;
+
+        case PlayerState::CROUCHING:
+            player_height = height_crouching;
+            player_move_impulse = move_impulse_crouching;
+            friction_coeff = friction_coeff_ground;
+
+            /*
+             * Snap the player's Y position to the crouching position
+             * so it doesn't count as being MIDAIR.
+             */
+            player_position.y = terrain_height + height_crouching;
+            break;
+
+        case PlayerState::FLYING:
+            player_height = height_standing;
+            player_move_impulse = move_impulse_flying;
+            friction_coeff = friction_coeff_flying;
+
+            /*
+             * If player presses space, go up.
+             */
+            if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+            {
+                player_velocity.y += player_move_impulse * dt;
+            }
+
+            /*
+             * If player presses left shift, go down.
+             */
+            if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
+            {
+                player_velocity.y -= player_move_impulse * dt;
+            }
+
+            break;
+
+        case PlayerState::MIDAIR:
+            player_height = height_standing;
+            player_move_impulse = move_impulse_midair;
+            friction_coeff = friction_coeff_air;
+
+            /*
+             * Apply gravity.
+             */
+            player_velocity.y -= acceleration_gravity * dt;
+
+            break;
+
+        default:
+            LOG_ERROR("Unknown player state: %u\n", player_state);
         }
 
         /*
-         * If sprinting but the sprint button is no longer being pressed or the player
-         * is no longer moving in a sprintable direction, restore the player to walking.
+         * Cache the camera Y position when on the ground.
          */
-        else if (is_sprinting())
+        on_ground_camera_y = player_height + terrain_height;
+
+        /*
+         * Add player move impulse.
+         */
+        if (move_direction.x != 0.f || move_direction.y != 0.f ||
+            move_direction.z != 0.f)
         {
-            set_walking();
+            player_velocity +=
+                glm::normalize(move_direction) * player_move_impulse * dt;
         }
 
         /*
-         * Update player velocity.
+         * Apply friction.
          */
-        if (direction.x != 0.f || direction.y != 0.f || direction.z != 0.f)
-        {
-            player_velocity += glm::normalize(direction) * player_move_speed;
-        }
+        player_velocity -= player_velocity * friction_coeff * dt;
 
         /*
-         * If the player is moving, make friction slow them down. Note that this also
-         * applies while in the air which is not realistic but feels better for
-         * gameplay.
+         * Update player position.
          */
-        if (std::fabs(player_velocity.x) > 0.f || std::fabs(player_velocity.z) > 0.f)
-        {
-            player_velocity.x -= friction_coeff * player_velocity.x;
-            player_velocity.z -= friction_coeff * player_velocity.z;
-        }
-
         player_position += player_velocity * dt;
 
         /*
-         * Don't let the player go under the ground.
+         * Don't let the player go outside the world.
          */
-        if (player_position.y < player_height)
+        if (player_position.y < on_ground_camera_y)
         {
-            player_position.y = player_height;
+            player_position.y = on_ground_camera_y;
+        }
+        // else if (player_position.y > )
+    }
+
+    /**
+     * @param state State.
+     *
+     * @return String representation of the state.
+     */
+    const char *Game::state_to_string(const State state)
+    {
+        switch (state)
+        {
+        case State::RUNNING:
+            return "RUNNING";
+        case State::PAUSED:
+            return "PAUSED";
+        case State::QUIT:
+            return "QUIT";
+        default:
+            return "UNKNOWN";
         }
     }
 
@@ -882,16 +1038,20 @@ namespace Engine
      *
      * @return String representation of the state.
      */
-    const char *Game::state_to_string(const Game::State state)
+    const char *Game::player_state_to_string(const PlayerState state)
     {
         switch (state)
         {
-        case Game::State::RUNNING:
-            return "RUNNING";
-        case Game::State::PAUSED:
-            return "PAUSED";
-        case Game::State::QUIT:
-            return "QUIT";
+        case PlayerState::WALKING:
+            return "WALKING";
+        case PlayerState::CROUCHING:
+            return "CROUCHING";
+        case PlayerState::SPRINTING:
+            return "SPRINTING";
+        case PlayerState::FLYING:
+            return "FLYING";
+        case PlayerState::MIDAIR:
+            return "MIDAIR";
         default:
             return "UNKNOWN";
         }
@@ -906,8 +1066,8 @@ namespace Engine
 
         const float fov_deg = 65.f;
         const float far_clip = 1000.f;
-        const float aspect = 4.f / height_standing;
-        const float near_clip = 1.f;
+        const float aspect = static_cast<float>(window_width) / window_height;
+        const float near_clip = 0.1f;
         const glm::mat4 perspective =
             glm::perspective(glm::radians(fov_deg), aspect, near_clip, far_clip);
 
@@ -968,9 +1128,20 @@ namespace Engine
             if (state != State::PAUSED)
             {
                 /*
-                 * Process jumps or crouches.
+                 * Cache variables used multiple times.
                  */
-                process_jump_crouch();
+                terrain_height =
+                    get_terrain_height(player_position.x, player_position.z);
+
+                /*
+                 * Cache whether player is on the ground.
+                 */
+                is_on_ground = player_position.y <= on_ground_camera_y;
+
+                /*
+                 * Update time the player has been on the ground.
+                 */
+                time_on_ground = is_on_ground ? time_on_ground + dt : 0.f;
 
                 /*
                  * Update view based on mouse movement.
@@ -1023,8 +1194,9 @@ namespace Engine
                         glm::vec3(player_position.x - chaser_position.x,
                                   0.f,
                                   player_position.z - chaser_position.z));
-                    static constexpr float chaser_move_speed = 1.f;
-                    chaser_position += direction_to_player_xz * chaser_move_speed * dt;
+                    static constexpr float chaser_move_impulse = 1.f;
+                    chaser_position +=
+                        direction_to_player_xz * chaser_move_impulse * dt;
 
                     /*
                      * Create model matrix for the chaser at its position.

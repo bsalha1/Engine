@@ -8,6 +8,7 @@
 #include <GLFW/glfw3.h>
 #include <chrono>
 #include <glm/vec3.hpp>
+#include <map>
 #include <memory>
 
 namespace Engine
@@ -22,31 +23,35 @@ namespace Engine
         void quit();
 
     private:
+        enum class State : uint8_t
+        {
+            RUNNING,
+            PAUSED,
+            QUIT,
+        };
+
+        enum class PlayerState : uint8_t
+        {
+            WALKING,
+            CROUCHING,
+            SPRINTING,
+            FLYING,
+            MIDAIR,
+        };
+
         Game();
 
         bool _init();
 
         bool init();
 
-        void set_crouching();
-
-        void set_standing();
-
-        void set_sprinting();
-
-        void set_walking();
-
-        bool is_crouching() const;
-
-        bool is_on_ground() const;
-
-        bool is_sprinting() const;
+        float get_terrain_height(const float x, const float z) const;
 
         void process_menu();
 
-        void process_jump_crouch();
-
         void update_view();
+
+        bool update_player_state_grounded(const bool fly_key_pressed);
 
         void update_player_position();
 
@@ -68,15 +73,16 @@ namespace Engine
         /**
          * Game state.
          */
-        enum class State : uint8_t
-        {
-            RUNNING,
-            PAUSED,
-            QUIT,
-        };
         State state;
         State state_prev;
         static const char *state_to_string(const State state);
+        static const char *player_state_to_string(const PlayerState state);
+
+        /**
+         * Window dimensions in pixels.
+         */
+        int window_width;
+        int window_height;
 
         /**
          * Coordinate of window center on X axis.
@@ -88,15 +94,29 @@ namespace Engine
          */
         int window_center_y;
 
+        PlayerState player_state;
+
         /**
-         * Player movement speed.
+         * Player movement.
          */
-        static constexpr float friction_coeff = 0.4f;
-        static constexpr float move_speed_walking = 1.5f;
-        static constexpr float move_speed_sprinting = 3.0f;
-        static constexpr float move_speed_crouching = 0.5f;
-        static constexpr float move_speed_flying = 30.0f;
-        float player_move_speed;
+        static constexpr float acceleration_gravity = 10.f;
+        bool is_on_ground;
+        static constexpr float friction_coeff_ground = 10.f;
+        static constexpr float friction_coeff_air = 0.05f;
+        static constexpr float friction_coeff_flying = 5.f;
+        float friction_coeff;
+        static constexpr float move_impulse_walking = 30.0f;
+        static constexpr float move_impulse_sprinting = 100.0f;
+        static constexpr float move_impulse_crouching = 15.0f;
+        static constexpr float move_impulse_midair = 1.0f;
+        static constexpr float move_impulse_flying = 150.0f;
+        static constexpr float move_impulse_jump = 4000.0f;
+        float player_move_impulse;
+
+        /**
+         * Time on ground in seconds.
+         */
+        float time_on_ground;
 
         /**
          * Player height.
@@ -106,9 +126,10 @@ namespace Engine
         float player_height;
 
         /**
-         * Whether player is flying.
+         * Rising edge detectors.
          */
-        bool player_flying;
+        bool fly_key_pressed_prev;
+        bool crouch_button_pressed_prev;
 
         /**
          * Player position.
@@ -119,11 +140,6 @@ namespace Engine
          * Player velocity.
          */
         glm::vec3 player_velocity;
-
-        /**
-         * Timestamp of last jump.
-         */
-        std::chrono::steady_clock::time_point last_jump_time;
 
         /**
          * Timestamp of last crouch.
@@ -194,15 +210,31 @@ namespace Engine
          * @}
          */
 
-        IndexBuffer chaser_index_buffer;
-        VertexArray chaser_vertex_array;
-
-        IndexBuffer terrain_index_buffer;
-        VertexArray terrain_vertex_array;
-
         /**
-         * Position of the chaser.
+         * Chaser entity.
+         * @{
          */
         glm::vec3 chaser_position;
+        IndexBuffer chaser_index_buffer;
+        VertexArray chaser_vertex_array;
+        /**
+         * @}
+         */
+
+        /**
+         * Terrain.
+         * @{
+         */
+        std::vector<float> xz_to_height_map;
+        int terrain_width;
+        int terrain_x_middle;
+        int terrain_z_middle;
+        IndexBuffer terrain_index_buffer;
+        VertexArray terrain_vertex_array;
+        float terrain_height;
+        float on_ground_camera_y;
+        /**
+         * @}
+         */
     };
 }
