@@ -2,6 +2,7 @@
 
 #include "IndexBuffer.h"
 #include "Shader.h"
+#include "Texture.h"
 #include "VertexArray.h"
 
 #include <GL/glew.h>
@@ -110,7 +111,7 @@ namespace Engine
         static constexpr float move_impulse_walking = 30.0f;
         static constexpr float move_impulse_sprinting = 100.0f;
         static constexpr float move_impulse_crouching = 15.0f;
-        static constexpr float move_impulse_midair = 1.0f;
+        static constexpr float move_impulse_midair = 10.0f;
         static constexpr float move_impulse_flying = 150.0f;
         static constexpr float move_impulse_jump = 4000.0f;
         float player_move_impulse;
@@ -222,7 +223,7 @@ namespace Engine
          * @{
          */
         glm::vec3 chaser_position;
-        GLuint chaser_texture;
+        Texture chaser_texture;
         VertexArray chaser_vertex_array;
         /**
          * @}
@@ -236,7 +237,7 @@ namespace Engine
         int terrain_num_cols;
         int terrain_x_middle;
         int terrain_z_middle;
-        GLuint dirt_texture;
+        Texture dirt_texture;
         IndexBuffer terrain_index_buffer;
         VertexArray terrain_vertex_array;
         float terrain_height;

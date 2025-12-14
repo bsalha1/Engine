@@ -34,12 +34,13 @@ namespace Engine
     /**
      * A vertex with a position and a normal vector.
      */
-    struct Vertex3dNormal
+    struct TexturedVector3dNormal
     {
         glm::vec3 position;
         glm::vec3 norm = glm::vec3(0.f);
+        glm::vec2 texture;
     };
-    static_assert(sizeof(Vertex3dNormal) == 6 * sizeof(float));
+    static_assert(sizeof(TexturedVector3dNormal) == 8 * sizeof(float));
 
     static void gl_debug_message_callback(GLenum source,
                                           GLenum type,
@@ -135,6 +136,67 @@ namespace Engine
     }
 
     /**
+     * @brief Apply a Gaussian blur to the given heightmap.
+     *
+     * @param[out] heightmap Heightmap data.
+     * @param num_rows Number of rows in the heightmap.
+     * @param num_cols Number of columns in the heightmap.
+     * @param dimensions Number of dimensions in the heightmap.
+     * @param iterations Number of times to apply the blur.
+     */
+    static void gaussian_blur(uint8_t *heightmap,
+                              const int num_rows,
+                              const int num_cols,
+                              const int dimensions,
+                              const uint8_t iterations)
+    {
+        for (uint8_t i = 0; i < iterations; i++)
+        {
+            /*
+             * Copy original heightmap for reference.
+             */
+            std::vector<uint8_t> heightmap_original(heightmap,
+                                                    heightmap + num_rows * num_cols *
+                                                                    dimensions);
+
+            const float kernel[3][3] = {{1, 2, 1}, {2, 4, 2}, {1, 2, 1}};
+
+            /*
+             * Apply blur.
+             */
+            for (int row = 0; row < num_rows; row++)
+            {
+                for (int col = 0; col < num_cols; col++)
+                {
+                    float sum = 0.f;
+                    float weight_sum = 0.f;
+
+                    for (int kernel_z = -1; kernel_z <= 1; kernel_z++)
+                    {
+                        for (int kernel_x = -1; kernel_x <= 1; kernel_x++)
+                        {
+                            int height_kerneled = col + kernel_x;
+                            int row_kerneled = row + kernel_z;
+                            height_kerneled =
+                                std::clamp(height_kerneled, 0, num_cols - 1);
+                            row_kerneled = std::clamp(row_kerneled, 0, num_rows - 1);
+
+                            const float kern = kernel[kernel_z + 1][kernel_x + 1];
+                            sum += heightmap_original[(row_kerneled * num_cols +
+                                                       height_kerneled) *
+                                                      dimensions] *
+                                   kern;
+                            weight_sum += kern;
+                        }
+                    }
+
+                    heightmap[(row * num_cols + col) * dimensions] = sum / weight_sum;
+                }
+            }
+        }
+    }
+
+    /**
      * Initialize the game.
      *
      * @return True on success, otherwise false.
@@ -143,7 +205,7 @@ namespace Engine
     {
         LOG("Creating window\n");
 
-        glfwWindowHint(GLFW_SAMPLES, 4);               /* 4x antialiasing */
+        glfwWindowHint(GLFW_SAMPLES, 16);              /* 16x antialiasing */
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4); /* OpenGL 4.6 */
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -244,7 +306,7 @@ namespace Engine
             }};
             /* clang-format on */
 
-            chaser_vertex_array.create();
+            chaser_vertex_array.create(vertices.size());
             chaser_vertex_array.bind();
 
             GLuint chaser_buffer_obj;
@@ -301,83 +363,35 @@ namespace Engine
         ASSERT_RET_IF_NOT(terrain_shader.compile("terrain"), false);
 
         LOG("Loading textures\n");
-        {
-            glGenTextures(1, &chaser_texture);
-            glBindTexture(GL_TEXTURE_2D, chaser_texture);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-            stbi_set_flip_vertically_on_load(1);
-            int width;
-            int length;
-            int channels;
-            uint8_t *texture_buffer =
-                stbi_load("textures/obama.png", &width, &length, &channels, 0);
-            ASSERT_RET_IF_NOT(texture_buffer, false);
-
-            glTexImage2D(GL_TEXTURE_2D,
-                         0,
-                         GL_RGBA8,
-                         width,
-                         length,
-                         0,
-                         GL_RGBA,
-                         GL_UNSIGNED_BYTE,
-                         texture_buffer);
-
-            stbi_image_free(texture_buffer);
-
-            glActiveTexture(GL_TEXTURE0);
-        }
-
-        {
-            glGenTextures(1, &dirt_texture);
-            glBindTexture(GL_TEXTURE_2D, dirt_texture);
-            glTexParameteri(GL_TEXTURE_2D,
-                            GL_TEXTURE_MIN_FILTER,
-                            GL_LINEAR_MIPMAP_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-            stbi_set_flip_vertically_on_load(1);
-            int width;
-            int length;
-            int channels;
-            uint8_t *texture_buffer =
-                stbi_load("textures/dirt.jpg", &width, &length, &channels, 0);
-            ASSERT_RET_IF_NOT(texture_buffer, false);
-            const GLenum internal_format = (channels == 4) ? GL_RGBA8 : GL_RGB8;
-            const GLenum format = (channels == 4) ? GL_RGBA : GL_RGB;
-            glTexImage2D(GL_TEXTURE_2D,
-                         0,
-                         internal_format,
-                         width,
-                         length,
-                         0,
-                         format,
-                         GL_UNSIGNED_BYTE,
-                         texture_buffer);
-
-            glGenerateMipmap(GL_TEXTURE_2D);
-            stbi_image_free(texture_buffer);
-
-            glActiveTexture(GL_TEXTURE1);
-        }
+        ASSERT_RET_IF_NOT(chaser_texture.load_from_file("textures/obama.png", 0),
+                          false);
+        ASSERT_RET_IF_NOT(dirt_texture.load_from_file("textures/dirt.jpg", 1), false);
 
         LOG("Loading terrain heightmaps\n");
         {
             stbi_set_flip_vertically_on_load(0);
             int terrain_num_rows;
             int terrain_channels;
-            uint8_t *heightmap = stbi_load("terrain/iceland_heightmap.png",
-                                           &terrain_num_cols,
-                                           &terrain_num_rows,
-                                           &terrain_channels,
-                                           0);
-            ASSERT_RET_IF_NOT(heightmap, false);
+            uint8_t *_heightmap = stbi_load("terrain/iceland_heightmap.png",
+                                            &terrain_num_cols,
+                                            &terrain_num_rows,
+                                            &terrain_channels,
+                                            0);
+            ASSERT_RET_IF_NOT(_heightmap, false);
+
+            /*
+             * Wrap in RAII container for automatic freeing.
+             */
+            std::unique_ptr<uint8_t[]> heightmap(_heightmap);
+
+            /*
+             * First, apply a Gaussian blur to the heightmap to smooth out sharp edges.
+             */
+            gaussian_blur(heightmap.get(),
+                          terrain_num_rows,
+                          terrain_num_cols,
+                          terrain_channels,
+                          2 /* iterations */);
 
             /*
              * We need to have a right-handed coordinate system. If we choose to map the
@@ -407,10 +421,6 @@ namespace Engine
              *        /  |
              *    +y /   o
              *          +z
-             *
-             * The total Z range is the height of the image, and the total X range is
-             * the width of the image. Place (0,0) of the heightmap at (width/2,
-             * height/2) in X-Z coordinates.
              */
             terrain_z_middle = terrain_num_rows / 2.f;
             terrain_x_middle = terrain_num_cols / 2.f;
@@ -424,7 +434,15 @@ namespace Engine
                                              (terrain_num_cols - 1) *
                                              num_indices_per_vertex;
 
-            std::vector<Vertex3dNormal> vertices;
+            /*
+             * Draw one copy of the texture per cell.
+             */
+            const float texture_col_scale =
+                1.f / static_cast<float>(terrain_num_cols) * dirt_texture.get_width();
+            const float texture_row_scale =
+                1.f / static_cast<float>(terrain_num_rows) * dirt_texture.get_height();
+
+            std::vector<TexturedVector3dNormal> vertices;
             vertices.reserve(num_vertices);
 
             std::vector<unsigned int> indices;
@@ -443,12 +461,17 @@ namespace Engine
                     const uint8_t y =
                         heightmap[(terrain_num_cols * row + col) * terrain_channels];
 
-                    Vertex3dNormal &vertex = vertices.emplace_back();
+                    TexturedVector3dNormal &vertex = vertices.emplace_back();
 
                     vertex.position = {
                         col - terrain_x_middle,
                         y * y_scale + y_bottom,
                         row - terrain_z_middle,
+                    };
+
+                    vertex.texture = {
+                        col * texture_col_scale,
+                        row * texture_row_scale,
                     };
 
                     xz_to_height_map.push_back(vertex.position.y);
@@ -503,9 +526,9 @@ namespace Engine
                  * v1------------------v2
                  */
 
-                Vertex3dNormal &v0 = vertices[indices[i + 0]];
-                Vertex3dNormal &v1 = vertices[indices[i + 1]];
-                Vertex3dNormal &v2 = vertices[indices[i + 2]];
+                TexturedVector3dNormal &v0 = vertices[indices[i + 0]];
+                TexturedVector3dNormal &v1 = vertices[indices[i + 1]];
+                TexturedVector3dNormal &v2 = vertices[indices[i + 2]];
 
                 const glm::vec3 e1 = v1.position - v0.position;
                 const glm::vec3 e2 = v2.position - v0.position;
@@ -520,21 +543,19 @@ namespace Engine
             /*
              * Normalize the normals to average them.
              */
-            for (Vertex3dNormal &vertex : vertices)
+            for (TexturedVector3dNormal &vertex : vertices)
             {
                 vertex.norm = glm::normalize(vertex.norm);
             }
 
-            stbi_image_free(heightmap);
-
-            terrain_vertex_array.create();
+            terrain_vertex_array.create(vertices.size());
             terrain_vertex_array.bind();
 
             GLuint terrain_vertex_buffer_array_obj;
             glGenBuffers(1, &terrain_vertex_buffer_array_obj);
             glBindBuffer(GL_ARRAY_BUFFER, terrain_vertex_buffer_array_obj);
             glBufferData(GL_ARRAY_BUFFER,
-                         vertices.size() * sizeof(Vertex3dNormal),
+                         vertices.size() * sizeof(TexturedVector3dNormal),
                          vertices.data(),
                          GL_STATIC_DRAW);
 
@@ -543,19 +564,18 @@ namespace Engine
              */
             static constexpr GLuint position_attrib_index = 0;
             static constexpr GLuint position_attrib_start_offset =
-                offsetof(Vertex3dNormal, position.x);
+                offsetof(TexturedVector3dNormal, position);
             static constexpr GLuint position_attrib_end_offset =
-                offsetof(Vertex3dNormal, position.z);
+                position_attrib_start_offset + sizeof(TexturedVector3dNormal::position);
             static constexpr GLuint position_attrib_size = sizeof(float);
             static constexpr GLuint position_attrib_count =
-                (position_attrib_end_offset - position_attrib_start_offset +
-                 position_attrib_size) /
+                (position_attrib_end_offset - position_attrib_start_offset) /
                 position_attrib_size;
             glVertexAttribPointer(position_attrib_index,
                                   position_attrib_count,
                                   GL_FLOAT,
                                   GL_FALSE,
-                                  sizeof(Vertex3dNormal),
+                                  sizeof(TexturedVector3dNormal),
                                   (GLvoid *)position_attrib_start_offset);
             glEnableVertexAttribArray(position_attrib_index);
 
@@ -564,20 +584,39 @@ namespace Engine
              */
             static constexpr GLuint norm_attrib_index = 1;
             static constexpr GLuint norm_attrib_start_offset =
-                offsetof(Vertex3dNormal, norm.x);
+                offsetof(TexturedVector3dNormal, norm);
             static constexpr GLuint norm_attrib_end_offset =
-                offsetof(Vertex3dNormal, norm.z);
+                norm_attrib_start_offset + sizeof(TexturedVector3dNormal::norm);
             static constexpr GLuint norm_attrib_size = sizeof(float);
             static constexpr GLuint norm_attrib_count =
-                (norm_attrib_end_offset - norm_attrib_start_offset + norm_attrib_size) /
-                norm_attrib_size;
+                (norm_attrib_end_offset - norm_attrib_start_offset) / norm_attrib_size;
             glVertexAttribPointer(norm_attrib_index,
                                   norm_attrib_count,
                                   GL_FLOAT,
                                   GL_FALSE,
-                                  sizeof(Vertex3dNormal),
+                                  sizeof(TexturedVector3dNormal),
                                   (GLvoid *)norm_attrib_start_offset);
             glEnableVertexAttribArray(norm_attrib_index);
+
+            /*
+             * Texture coordinate attribute.
+             */
+            static constexpr GLuint texture_attrib_index = 2;
+            static constexpr GLuint texture_attrib_start_offset =
+                offsetof(TexturedVector3dNormal, texture);
+            static constexpr GLuint texture_attrib_end_offset =
+                texture_attrib_start_offset + sizeof(TexturedVector3dNormal::texture);
+            static constexpr GLuint texture_attrib_size = sizeof(float);
+            static constexpr GLuint texture_attrib_count =
+                (texture_attrib_end_offset - texture_attrib_start_offset) /
+                texture_attrib_size;
+            glVertexAttribPointer(texture_attrib_index,
+                                  texture_attrib_count,
+                                  GL_FLOAT,
+                                  GL_FALSE,
+                                  sizeof(TexturedVector3dNormal),
+                                  (GLvoid *)texture_attrib_start_offset);
+            glEnableVertexAttribArray(texture_attrib_index);
 
             terrain_index_buffer.create(indices.data(), indices.size());
         }
@@ -1160,7 +1199,6 @@ namespace Engine
         {
             player_position.y = on_ground_camera_y;
         }
-        // else if (player_position.y > )
     }
 
     /**
@@ -1222,22 +1260,11 @@ namespace Engine
             glm::perspective(glm::radians(fov_deg), aspect, near_clip, far_clip);
 
         /*
-         * Set texture sampler to slot 0.
-         */
-        glBindTexture(GL_TEXTURE_2D, dirt_texture);
-        ASSERT_RET_IF_NOT(basic_textured_shader.set_Uniform1i("texture_sampler", 1),
-                          false);
-
-        /*
-         * Set terrain and light colors.
+         * Set light color.
          */
         const glm::vec3 light_color_rgb = glm::vec3(0xFF, 0xDF, 0x22);
-        const glm::vec3 terrain_color_rgb = glm::vec3(0x6E, 0xF5, 0x3F);
         ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("light_color",
                                                        light_color_rgb / 255.f),
-                          false);
-        ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("terrain_color",
-                                                       terrain_color_rgb / 255.f),
                           false);
 
         /*
@@ -1313,8 +1340,11 @@ namespace Engine
                  * Draw the chasers.
                  */
 
-                chaser_vertex_array.bind();
                 basic_textured_shader.use();
+                chaser_texture.bind();
+                ASSERT_RET_IF_NOT(basic_textured_shader.set_Uniform1i(
+                                      "texture_sampler", chaser_texture.get_slot()),
+                                  false);
 
                 /*
                  * Draw a chaser at the origin.
@@ -1327,7 +1357,7 @@ namespace Engine
                                           &model_view_projection[0][0]),
                                       false);
 
-                    glDrawArrays(GL_TRIANGLES, 0, 36);
+                    chaser_vertex_array.draw();
                 }
 
                 /*
@@ -1368,14 +1398,13 @@ namespace Engine
                                           &model_view_projection[0][0]),
                                       false);
 
-                    glDrawArrays(GL_TRIANGLES, 0, 36);
+                    chaser_vertex_array.draw();
                 }
 
                 /*
                  * Draw the light.
                  */
                 {
-                    chaser_vertex_array.bind();
                     basic_textured_shader.use();
                     static float t = 0.f;
                     static float light_velocity = 20.f;
@@ -1399,7 +1428,8 @@ namespace Engine
                                           "model_view_projection",
                                           &model_view_projection[0][0]),
                                       false);
-                    glDrawArrays(GL_TRIANGLES, 0, 36);
+
+                    chaser_vertex_array.draw();
                 }
 
                 /*
@@ -1408,6 +1438,11 @@ namespace Engine
 
                 terrain_vertex_array.bind();
                 terrain_shader.use();
+
+                dirt_texture.bind();
+                ASSERT_RET_IF_NOT(terrain_shader.set_Uniform1i("texture_sampler",
+                                                               dirt_texture.get_slot()),
+                                  false);
 
                 const glm::mat4 model = glm::mat4(1.0f);
 
@@ -1418,9 +1453,11 @@ namespace Engine
                 ASSERT_RET_IF_NOT(terrain_shader.set_UniformMatrix4fv(
                                       "projection", &projection[0][0]),
                                   false);
-
                 ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("light_position",
                                                                light_position),
+                                  false);
+                ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("camera_position",
+                                                               player_position),
                                   false);
 
                 glDrawElements(GL_TRIANGLES,

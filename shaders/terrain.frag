@@ -7,10 +7,13 @@ out vec4 color;
  */
 in vec3 v_position_world_coords;
 in vec3 v_norm;
+in vec2 v_texture_coord;
 
+uniform sampler2D texture_sampler;
 uniform vec3 light_position;
 uniform vec3 light_color;
 uniform vec3 terrain_color;
+uniform vec3 camera_position;
 
 void main()
 {
@@ -32,8 +35,19 @@ void main()
     const vec3 diffuse_light = diff * light_color;
 
     /*
+     * Compute specular light component.
+     */
+    const float specular_light_strength = 0.5;
+    const int shininess = 4;
+    const vec3 camera_direction = normalize(camera_position - v_position_world_coords);
+    const vec3 reflect_direction = reflect(-light_direction, v_norm);
+    const float shine = pow(max(dot(camera_direction, reflect_direction), 0.0), shininess);
+    const vec3 specular_light = specular_light_strength * shine * light_color;  
+
+    /*
      * Combine lighting components with terrain color.
      */
-    const vec3 result = (ambient_light + diffuse_light) * terrain_color;
+    const vec3 terrain_color = texture(texture_sampler, v_texture_coord).rgb;
+    const vec3 result = (ambient_light + diffuse_light + specular_light) * terrain_color;
     color = vec4(result, 1.0);
 }
