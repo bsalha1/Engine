@@ -2,14 +2,7 @@
 
 out vec4 color;
 
-/**
- * Variables from vertex shader.
- */
-in vec2 v_texture_coord;
-
-uniform sampler2D texture_sampler;
-
 void main()
 {
-    color = texture(texture_sampler, v_texture_coord);
+    color =vec4(1.0, 0.0, 0.0, 1.0);
 }

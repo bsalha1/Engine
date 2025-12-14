@@ -45,6 +45,8 @@ namespace Engine
 
         bool init();
 
+        float cell_to_height(const int cell_x, const int cell_z) const;
+
         float get_terrain_height(const float x, const float z) const;
 
         void process_menu();
@@ -61,14 +63,14 @@ namespace Engine
         GLFWwindow *window;
 
         /**
-         * Basic shader program ID.
+         * Basic textured shader program ID.
          */
-        Shader basic_shader;
+        Shader basic_textured_shader;
 
         /**
          * Heightmap shader program ID.
          */
-        Shader heightmap_shader;
+        Shader terrain_shader;
 
         /**
          * Game state.
@@ -140,6 +142,11 @@ namespace Engine
          * Player velocity.
          */
         glm::vec3 player_velocity;
+
+        /**
+         * Player speed.
+         */
+        float player_speed;
 
         /**
          * Timestamp of last crouch.
@@ -215,7 +222,7 @@ namespace Engine
          * @{
          */
         glm::vec3 chaser_position;
-        IndexBuffer chaser_index_buffer;
+        GLuint chaser_texture;
         VertexArray chaser_vertex_array;
         /**
          * @}
@@ -226,9 +233,10 @@ namespace Engine
          * @{
          */
         std::vector<float> xz_to_height_map;
-        int terrain_width;
+        int terrain_num_cols;
         int terrain_x_middle;
         int terrain_z_middle;
+        GLuint dirt_texture;
         IndexBuffer terrain_index_buffer;
         VertexArray terrain_vertex_array;
         float terrain_height;

@@ -31,12 +31,15 @@ namespace Engine
         float texture_y;
     };
 
-    struct __attribute__((packed)) Vertex3d
+    /**
+     * A vertex with a position and a normal vector.
+     */
+    struct Vertex3dNormal
     {
-        float x;
-        float y;
-        float z;
+        glm::vec3 position;
+        glm::vec3 norm = glm::vec3(0.f);
     };
+    static_assert(sizeof(Vertex3dNormal) == 6 * sizeof(float));
 
     static void gl_debug_message_callback(GLenum source,
                                           GLenum type,
@@ -195,16 +198,49 @@ namespace Engine
          */
         {
             /* clang-format off */
-            const std::array<TexturedVertex3d, 8> vertices = {{
+            const std::array<TexturedVertex3d, 36> vertices = {{
             /*      x,    y,   z,  texture_x, texture_y        */
-                {-1.f, -1.f, 1.f,        0.f,       0.f}, /* 0 */
-                { 1.f, -1.f, 1.f,        1.f,       0.f}, /* 1 */
-                { 1.f,  1.f, 1.f,        1.f,       1.f}, /* 2 */
-                {-1.f,  1.f, 1.f,        0.f,       1.f}, /* 3 */
-                {-1.f, -1.f, -1.f,       0.f,       0.f}, /* 4 */
-                { 1.f, -1.f, -1.f,       1.f,       0.f}, /* 5 */
-                { 1.f,  1.f, -1.f,       1.f,       1.f}, /* 6 */
-                {-1.f,  1.f, -1.f,       0.f,       1.f}, /* 7 */
+                -0.5f, -0.5f, -0.5f,    0.0f, 0.0f,
+                 0.5f, -0.5f, -0.5f,    1.0f, 0.0f,
+                 0.5f,  0.5f, -0.5f,    1.0f, 1.0f,
+                 0.5f,  0.5f, -0.5f,    1.0f, 1.0f,
+                -0.5f,  0.5f, -0.5f,    0.0f, 1.0f,
+                -0.5f, -0.5f, -0.5f,    0.0f, 0.0f,
+
+                -0.5f, -0.5f,  0.5f,    0.0f, 0.0f,
+                 0.5f, -0.5f,  0.5f,    1.0f, 0.0f,
+                 0.5f,  0.5f,  0.5f,    1.0f, 1.0f,
+                 0.5f,  0.5f,  0.5f,    1.0f, 1.0f,
+                -0.5f,  0.5f,  0.5f,    0.0f, 1.0f,
+                -0.5f, -0.5f,  0.5f,    0.0f, 0.0f,
+
+                -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+                -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+                -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+                -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+                -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+                -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+
+                0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+                0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+                0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+                0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+                0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+                0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+
+                -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+                 0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
+                 0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+                 0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+                -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+                -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+
+                -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+                 0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+                 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+                 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+                -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
+                -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
             }};
             /* clang-format on */
 
@@ -258,70 +294,16 @@ namespace Engine
                                   sizeof(TexturedVertex3d),
                                   (GLvoid *)texture_coord_attrib_start_offset);
             glEnableVertexAttribArray(texture_coord_attrib_index);
-
-            const std::array<unsigned int, 36> indices = {
-                /* +Z face */
-                0,
-                1,
-                2,
-                2,
-                3,
-                0,
-
-                /* -Z face */
-                4,
-                5,
-                6,
-                6,
-                7,
-                4,
-
-                /* +X face */
-                1,
-                5,
-                6,
-                6,
-                2,
-                1,
-
-                /* -X face */
-                4,
-                0,
-                3,
-                3,
-                7,
-                4,
-
-                /* +Y face */
-                3,
-                2,
-                6,
-                6,
-                7,
-                3,
-
-                /* -Y face */
-                0,
-                1,
-                5,
-                5,
-                4,
-                0,
-            };
-
-            chaser_index_buffer.create(reinterpret_cast<const void *>(indices.data()),
-                                       sizeof(indices));
         }
 
         LOG("Compiling shaders\n");
-        ASSERT_RET_IF_NOT(basic_shader.compile("basic"), false);
-        ASSERT_RET_IF_NOT(heightmap_shader.compile("heightmap"), false);
+        ASSERT_RET_IF_NOT(basic_textured_shader.compile("basic_textured"), false);
+        ASSERT_RET_IF_NOT(terrain_shader.compile("terrain"), false);
 
         LOG("Loading textures\n");
         {
-            GLuint texture_obj;
-            glGenTextures(1, &texture_obj);
-            glBindTexture(GL_TEXTURE_2D, texture_obj);
+            glGenTextures(1, &chaser_texture);
+            glBindTexture(GL_TEXTURE_2D, chaser_texture);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -333,11 +315,7 @@ namespace Engine
             int channels;
             uint8_t *texture_buffer =
                 stbi_load("textures/obama.png", &width, &length, &channels, 0);
-            if (texture_buffer == nullptr)
-            {
-                LOG_ERROR("Failed to load texture\n");
-                return false;
-            }
+            ASSERT_RET_IF_NOT(texture_buffer, false);
 
             glTexImage2D(GL_TEXTURE_2D,
                          0,
@@ -354,53 +332,99 @@ namespace Engine
             glActiveTexture(GL_TEXTURE0);
         }
 
+        {
+            glGenTextures(1, &dirt_texture);
+            glBindTexture(GL_TEXTURE_2D, dirt_texture);
+            glTexParameteri(GL_TEXTURE_2D,
+                            GL_TEXTURE_MIN_FILTER,
+                            GL_LINEAR_MIPMAP_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+            stbi_set_flip_vertically_on_load(1);
+            int width;
+            int length;
+            int channels;
+            uint8_t *texture_buffer =
+                stbi_load("textures/dirt.jpg", &width, &length, &channels, 0);
+            ASSERT_RET_IF_NOT(texture_buffer, false);
+            const GLenum internal_format = (channels == 4) ? GL_RGBA8 : GL_RGB8;
+            const GLenum format = (channels == 4) ? GL_RGBA : GL_RGB;
+            glTexImage2D(GL_TEXTURE_2D,
+                         0,
+                         internal_format,
+                         width,
+                         length,
+                         0,
+                         format,
+                         GL_UNSIGNED_BYTE,
+                         texture_buffer);
+
+            glGenerateMipmap(GL_TEXTURE_2D);
+            stbi_image_free(texture_buffer);
+
+            glActiveTexture(GL_TEXTURE1);
+        }
+
         LOG("Loading terrain heightmaps\n");
         {
             stbi_set_flip_vertically_on_load(0);
-            int terrain_length;
+            int terrain_num_rows;
             int terrain_channels;
             uint8_t *heightmap = stbi_load("terrain/iceland_heightmap.png",
-                                           &terrain_width,
-                                           &terrain_length,
+                                           &terrain_num_cols,
+                                           &terrain_num_rows,
                                            &terrain_channels,
                                            0);
-            if (heightmap == nullptr)
-            {
-                LOG_ERROR("Failed to load heightmap\n");
-                return false;
-            }
+            ASSERT_RET_IF_NOT(heightmap, false);
 
             /*
-             * Load the heightmap in with (x,z) = (0,0) being in the middle and y going
-             * from y_bottom to y_top.
+             * We need to have a right-handed coordinate system. If we choose to map the
+             * heightmap image to:
              *
-             * Lay out the vertices like (x,y,z):
+             *          +z
+             *           o   / +y
+             *           |  /
+             *           | /
+             *   -x o----o----o +x
+             *           |
+             *           |
+             *           o
+             *          -z
              *
-             * (0,height(0,0),0)   (1,height(1,0),0)   (2,height(2,0),0)
-             * 0-------------------2 . . .       . . . 4
-             * |                  /.                 . .
-             * |               /   .               .   .
-             * |            /      .             .     .
-             * |         /
-             * |      /            .      .            .
-             * |   /               .    .              .
-             * |/                  .  .                .
-             * 1 . . .       . . . 3 . . .             5
-             * (0,height(0,1),1)   (1,height(1,1),1)   (2,height(2,1),1)
+             * Then Y must point into the the screen. This means that the height values
+             * in the heightmap would turn to depth values which is wrong and if we try
+             * to reverse those effects, we will end up flipping the X or Z axis weirdly
+             * enough. Therefore, we map the heightmap image to:
              *
+             *          -z
+             *           o
+             *           |
+             *           |
+             *   -x o----o----o +x
+             *         / |
+             *        /  |
+             *    +y /   o
+             *          +z
+             *
+             * The total Z range is the height of the image, and the total X range is
+             * the width of the image. Place (0,0) of the heightmap at (width/2,
+             * height/2) in X-Z coordinates.
              */
-            static constexpr unsigned int num_indices_per_vertex = 2;
-            terrain_x_middle = terrain_length / 2.f;
-            terrain_z_middle = terrain_width / 2.f;
+            terrain_z_middle = terrain_num_rows / 2.f;
+            terrain_x_middle = terrain_num_cols / 2.f;
             static constexpr float y_top = 64.f;
             static constexpr float y_bottom = 0.f;
             float y_scale = y_top / 0xFF;
 
-            const unsigned int num_vertices = terrain_length * terrain_width;
-            const unsigned int num_indices =
-                (terrain_length - 1) * terrain_width * num_indices_per_vertex;
+            const unsigned int num_vertices = terrain_num_rows * terrain_num_cols;
+            static constexpr unsigned int num_indices_per_vertex = 6;
+            const unsigned int num_indices = (terrain_num_rows - 1) *
+                                             (terrain_num_cols - 1) *
+                                             num_indices_per_vertex;
 
-            std::vector<Vertex3d> vertices;
+            std::vector<Vertex3dNormal> vertices;
             vertices.reserve(num_vertices);
 
             std::vector<unsigned int> indices;
@@ -408,29 +432,97 @@ namespace Engine
 
             xz_to_height_map.reserve(num_vertices);
 
-            for (int x = 0; x < terrain_length; x++)
+            /*
+             * Compute vertices and indices iterating from the top row to the bottom row
+             * and from the left column to the right column.
+             */
+            for (int row = 0; row < terrain_num_rows; row++)
             {
-                for (int z = 0; z < terrain_width; z++)
+                for (int col = 0; col < terrain_num_cols; col++)
                 {
                     const uint8_t y =
-                        heightmap[(terrain_width * x + z) * terrain_channels];
+                        heightmap[(terrain_num_cols * row + col) * terrain_channels];
 
-                    const float x_coord = x - terrain_x_middle;
-                    const float y_coord = y * y_scale + y_bottom;
-                    const float z_coord = z - terrain_z_middle;
-                    vertices.push_back({.x = x_coord, .y = y_coord, .z = z_coord});
+                    Vertex3dNormal &vertex = vertices.emplace_back();
 
-                    xz_to_height_map.push_back(y_coord);
+                    vertex.position = {
+                        col - terrain_x_middle,
+                        y * y_scale + y_bottom,
+                        row - terrain_z_middle,
+                    };
 
-                    if (x != terrain_length - 1)
+                    xz_to_height_map.push_back(vertex.position.y);
+
+                    /*
+                     * If we are not on the bottom row or rightmost column, wind the
+                     * triangles.
+                     */
+                    if (row != terrain_num_rows - 1 && col != terrain_num_cols - 1)
                     {
-                        for (unsigned int index = 0; index < num_indices_per_vertex;
-                             index++)
-                        {
-                            indices.push_back(terrain_width * (x + index) + z);
-                        }
+                        const int this_vertex = terrain_num_cols * row + col;
+                        const int right_vertex = this_vertex + 1;
+                        const int bottom_vertex = terrain_num_cols * (row + 1) + col;
+                        const int bottom_right_vertex = bottom_vertex + 1;
+
+                        indices.push_back(this_vertex);
+                        indices.push_back(bottom_vertex);
+                        indices.push_back(right_vertex);
+
+                        indices.push_back(right_vertex);
+                        indices.push_back(bottom_vertex);
+                        indices.push_back(bottom_right_vertex);
                     }
                 }
+            }
+
+            /*
+             * Compute normals by averaging face normals of adjacent faces.
+             */
+            for (size_t i = 0; i < indices.size(); i += 3)
+            {
+                /*
+                 *             e2
+                 *     v0------->---------v2
+                 *     |                  /
+                 *     |     +         /
+                 *     |            /
+                 * e1 \ /        /
+                 *     |      /
+                 *     |   /
+                 *     |/
+                 *     v1
+                 *
+                 *                     v0
+                 *                    /|
+                 *                 /   |
+                 *         e1   /      |
+                 *          /_        \ / e2
+                 *        /            |
+                 *     /       +       |
+                 *  /                  |
+                 * v1------------------v2
+                 */
+
+                Vertex3dNormal &v0 = vertices[indices[i + 0]];
+                Vertex3dNormal &v1 = vertices[indices[i + 1]];
+                Vertex3dNormal &v2 = vertices[indices[i + 2]];
+
+                const glm::vec3 e1 = v1.position - v0.position;
+                const glm::vec3 e2 = v2.position - v0.position;
+
+                const glm::vec3 face_normal = glm::normalize(glm::cross(e1, e2));
+
+                v0.norm += face_normal;
+                v1.norm += face_normal;
+                v2.norm += face_normal;
+            }
+
+            /*
+             * Normalize the normals to average them.
+             */
+            for (Vertex3dNormal &vertex : vertices)
+            {
+                vertex.norm = glm::normalize(vertex.norm);
             }
 
             stbi_image_free(heightmap);
@@ -442,30 +534,50 @@ namespace Engine
             glGenBuffers(1, &terrain_vertex_buffer_array_obj);
             glBindBuffer(GL_ARRAY_BUFFER, terrain_vertex_buffer_array_obj);
             glBufferData(GL_ARRAY_BUFFER,
-                         vertices.size() * sizeof(Vertex3d),
+                         vertices.size() * sizeof(Vertex3dNormal),
                          vertices.data(),
                          GL_STATIC_DRAW);
 
             /*
              * Position coordinate attribute.
              */
-            static constexpr GLuint position_coord_attrib_index = 0;
-            static constexpr GLuint position_coord_attrib_start_offset =
-                offsetof(Vertex3d, x);
-            static constexpr GLuint position_coord_attrib_end_offset =
-                offsetof(Vertex3d, z);
-            static constexpr GLuint position_coord_attrib_size = sizeof(float);
-            static constexpr GLuint position_coord_attrib_count =
-                (position_coord_attrib_end_offset - position_coord_attrib_start_offset +
-                 position_coord_attrib_size) /
-                position_coord_attrib_size;
-            glVertexAttribPointer(position_coord_attrib_index,
-                                  position_coord_attrib_count,
+            static constexpr GLuint position_attrib_index = 0;
+            static constexpr GLuint position_attrib_start_offset =
+                offsetof(Vertex3dNormal, position.x);
+            static constexpr GLuint position_attrib_end_offset =
+                offsetof(Vertex3dNormal, position.z);
+            static constexpr GLuint position_attrib_size = sizeof(float);
+            static constexpr GLuint position_attrib_count =
+                (position_attrib_end_offset - position_attrib_start_offset +
+                 position_attrib_size) /
+                position_attrib_size;
+            glVertexAttribPointer(position_attrib_index,
+                                  position_attrib_count,
                                   GL_FLOAT,
                                   GL_FALSE,
-                                  sizeof(Vertex3d),
-                                  (GLvoid *)position_coord_attrib_start_offset);
-            glEnableVertexAttribArray(position_coord_attrib_index);
+                                  sizeof(Vertex3dNormal),
+                                  (GLvoid *)position_attrib_start_offset);
+            glEnableVertexAttribArray(position_attrib_index);
+
+            /*
+             * Normal vector attribute.
+             */
+            static constexpr GLuint norm_attrib_index = 1;
+            static constexpr GLuint norm_attrib_start_offset =
+                offsetof(Vertex3dNormal, norm.x);
+            static constexpr GLuint norm_attrib_end_offset =
+                offsetof(Vertex3dNormal, norm.z);
+            static constexpr GLuint norm_attrib_size = sizeof(float);
+            static constexpr GLuint norm_attrib_count =
+                (norm_attrib_end_offset - norm_attrib_start_offset + norm_attrib_size) /
+                norm_attrib_size;
+            glVertexAttribPointer(norm_attrib_index,
+                                  norm_attrib_count,
+                                  GL_FLOAT,
+                                  GL_FALSE,
+                                  sizeof(Vertex3dNormal),
+                                  (GLvoid *)norm_attrib_start_offset);
+            glEnableVertexAttribArray(norm_attrib_index);
 
             terrain_index_buffer.create(indices.data(), indices.size());
         }
@@ -499,6 +611,19 @@ namespace Engine
     }
 
     /**
+     * @brief Convert a cell coordinate to the height at that cell.
+     *
+     * @param cell_x X cell coordinate.
+     * @param cell_z Z cell coordinate.
+     *
+     * @return Terrain height.
+     */
+    float Game::cell_to_height(const int cell_x, const int cell_z) const
+    {
+        return xz_to_height_map[terrain_num_cols * cell_z + cell_x];
+    }
+
+    /**
      * @return Terrain height at given (x, z) world coordinates.
      *
      * @param x X world coordinate.
@@ -523,25 +648,23 @@ namespace Engine
         const float x_terrain = x + terrain_x_middle;
         const float z_terrain = z + terrain_z_middle;
 
-        const int cell_x_left = static_cast<int>(std::floor(x + terrain_x_middle));
-        const int cell_x_right = static_cast<int>(std::ceil(x + terrain_x_middle));
-        const int cell_z_down = static_cast<int>(std::floor(z + terrain_z_middle));
-        const int cell_z_up = static_cast<int>(std::ceil(z + terrain_z_middle));
+        const int cell_x_left = static_cast<int>(std::floor(x_terrain));
+        const int cell_x_right = static_cast<int>(std::ceil(x_terrain));
+        const int cell_z_down = static_cast<int>(std::floor(z_terrain));
+        const int cell_z_up = static_cast<int>(std::ceil(z_terrain));
 
         const float dx = x_terrain - cell_x_left;
         const float dz = z_terrain - cell_z_down;
 
-        const float y2 = xz_to_height_map[terrain_width * cell_x_right + cell_z_up];
+        const float y2 = cell_to_height(cell_x_right, cell_z_up);
 
         /*
          * In bottom-right triangle.
          */
         if (dx > dz)
         {
-            const float y0 =
-                xz_to_height_map[terrain_width * cell_x_left + cell_z_down];
-            const float y3 =
-                xz_to_height_map[terrain_width * cell_x_right + cell_z_down];
+            const float y0 = cell_to_height(cell_x_left, cell_z_down);
+            const float y3 = cell_to_height(cell_x_right, cell_z_down);
             const float x_slope = (y3 - y0);
             const float z_slope = (y2 - y3);
             return y0 + x_slope * dx + z_slope * dz;
@@ -552,9 +675,8 @@ namespace Engine
          */
         else
         {
-            const float y0 =
-                xz_to_height_map[terrain_width * cell_x_left + cell_z_down];
-            const float y1 = xz_to_height_map[terrain_width * cell_x_left + cell_z_up];
+            const float y0 = cell_to_height(cell_x_left, cell_z_down);
+            const float y1 = cell_to_height(cell_x_left, cell_z_up);
             const float x_slope = (y2 - y1);
             const float z_slope = (y1 - y0);
             return y0 + x_slope * dx + z_slope * dz;
@@ -613,15 +735,42 @@ namespace Engine
                              ImGuiWindowFlags_NoResize |
                              ImGuiWindowFlags_NoSavedSettings);
             ImGui::Text("Press ESC to unpause");
+
+            /*
+             * Add settings button.
+             */
             ImGui::Separator();
             if (ImGui::Button("Settings"))
             {
-                LOG("Pause Menu -> Settings Menu\n");
+                LOG("Pause Menu -> Settings\n");
             }
+
+            /*
+             * Add button to toggle triangle outlining for debugging.
+             */
+            ImGui::Separator();
+            if (ImGui::Button("Outline Triangles"))
+            {
+                LOG("Pause Menu -> Outline Triangles\n");
+                GLint gl_polygon_mode[2];
+                glGetIntegerv(GL_POLYGON_MODE, gl_polygon_mode);
+                if (gl_polygon_mode[0] == GL_LINE)
+                {
+                    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+                }
+                else
+                {
+                    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                }
+            }
+
+            /*
+             * Add quit button.
+             */
             ImGui::Separator();
             if (ImGui::Button("Quit"))
             {
-                LOG("Pause Menu -> Quitting\n");
+                LOG("Pause Menu -> Quit\n");
                 quit();
             }
             ImGui::End();
@@ -641,7 +790,7 @@ namespace Engine
                          ImGuiWindowFlags_NoSavedSettings);
         ImGui::Text("%.3f ms (%.0f FPS)", 1000.f / io.Framerate, io.Framerate);
         ImGui::Text("state: %s", state_to_string(state));
-        ImGui::Text("player state: %s", player_state_to_string(player_state));
+        ImGui::Text("player_state: %s", player_state_to_string(player_state));
         ImGui::Text("player_position: (%.2f, %.2f, %.2f)",
                     player_position.x,
                     player_position.y,
@@ -650,7 +799,7 @@ namespace Engine
                     player_velocity.x,
                     player_velocity.y,
                     player_velocity.z,
-                    glm::length(player_velocity));
+                    player_speed);
         ImGui::Text("move_impulse: %.2f", player_move_impulse);
         ImGui::Text("friction_coeff: %.2f", friction_coeff);
         ImGui::End();
@@ -997,6 +1146,7 @@ namespace Engine
          * Apply friction.
          */
         player_velocity -= player_velocity * friction_coeff * dt;
+        player_speed = glm::length(player_velocity);
 
         /*
          * Update player position.
@@ -1064,36 +1214,36 @@ namespace Engine
     {
         LOG("Entering main loop\n");
 
-        const float fov_deg = 65.f;
+        float fov_deg = 90.f;
         const float far_clip = 1000.f;
         const float aspect = static_cast<float>(window_width) / window_height;
         const float near_clip = 0.1f;
-        const glm::mat4 perspective =
+        const glm::mat4 projection =
             glm::perspective(glm::radians(fov_deg), aspect, near_clip, far_clip);
 
         /*
-         * Get reference to the model view projection.
+         * Set texture sampler to slot 0.
          */
-        const GLint model_view_projection_object =
-            glGetUniformLocation(basic_shader.id(), "model_view_projection");
-        if (model_view_projection_object == -1)
-        {
-            LOG_ERROR("Failed to get model_view_projection uniform location\n");
-            return false;
-        }
+        glBindTexture(GL_TEXTURE_2D, dirt_texture);
+        ASSERT_RET_IF_NOT(basic_textured_shader.set_Uniform1i("texture_sampler", 1),
+                          false);
 
         /*
-         * Get reference to the texture object and set it to slot 0.
+         * Set terrain and light colors.
          */
-        const GLint texture_sampler_object =
-            glGetUniformLocation(basic_shader.id(), "texture_sampler");
-        if (texture_sampler_object == -1)
-        {
-            LOG_ERROR("Failed to get texture_sampler uniform location\n");
-            return false;
-        }
-        basic_shader.use();
-        glUniform1i(texture_sampler_object, 0);
+        const glm::vec3 light_color_rgb = glm::vec3(0xFF, 0xDF, 0x22);
+        const glm::vec3 terrain_color_rgb = glm::vec3(0x6E, 0xF5, 0x3F);
+        ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("light_color",
+                                                       light_color_rgb / 255.f),
+                          false);
+        ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("terrain_color",
+                                                       terrain_color_rgb / 255.f),
+                          false);
+
+        /*
+         * Set initial light position.
+         */
+        glm::vec3 light_position = glm::vec3(150.f, 100.f, 120.f);
 
         /*
          * Loop until the user closes the window or state gets set to QUIT by the
@@ -1156,7 +1306,7 @@ namespace Engine
                 /*
                  * Compute view looking at the direction our mouse is pointing.
                  */
-                const glm::mat4 camera_view =
+                const glm::mat4 view =
                     glm::lookAt(player_position, player_position + direction, head);
 
                 /*
@@ -1164,22 +1314,20 @@ namespace Engine
                  */
 
                 chaser_vertex_array.bind();
-                basic_shader.use();
+                basic_textured_shader.use();
 
                 /*
                  * Draw a chaser at the origin.
                  */
                 {
                     const glm::mat4 model_view_projection =
-                        perspective * camera_view * glm::mat4(1.0f);
-                    glUniformMatrix4fv(model_view_projection_object,
-                                       1,
-                                       GL_FALSE,
-                                       &model_view_projection[0][0]);
-                    glDrawElements(GL_TRIANGLES,
-                                   chaser_index_buffer.get_count(),
-                                   decltype(chaser_index_buffer)::IndexGLtype,
-                                   nullptr);
+                        projection * view * glm::mat4(1.0f);
+                    ASSERT_RET_IF_NOT(basic_textured_shader.set_UniformMatrix4fv(
+                                          "model_view_projection",
+                                          &model_view_projection[0][0]),
+                                      false);
+
+                    glDrawArrays(GL_TRIANGLES, 0, 36);
                 }
 
                 /*
@@ -1214,16 +1362,44 @@ namespace Engine
                                                glm::vec3(0.f, 1.f, 0.f));
 
                     const glm::mat4 model_view_projection =
-                        perspective * camera_view * chaser_model;
+                        projection * view * chaser_model;
+                    ASSERT_RET_IF_NOT(basic_textured_shader.set_UniformMatrix4fv(
+                                          "model_view_projection",
+                                          &model_view_projection[0][0]),
+                                      false);
 
-                    glUniformMatrix4fv(model_view_projection_object,
-                                       1,
-                                       GL_FALSE,
-                                       &model_view_projection[0][0]);
-                    glDrawElements(GL_TRIANGLES,
-                                   chaser_index_buffer.get_count(),
-                                   decltype(chaser_index_buffer)::IndexGLtype,
-                                   nullptr);
+                    glDrawArrays(GL_TRIANGLES, 0, 36);
+                }
+
+                /*
+                 * Draw the light.
+                 */
+                {
+                    chaser_vertex_array.bind();
+                    basic_textured_shader.use();
+                    static float t = 0.f;
+                    static float light_velocity = 20.f;
+                    t += dt;
+                    if (light_position.y <
+                        get_terrain_height(light_position.x, light_position.z) + 5.f)
+                    {
+                        light_velocity = 20.f;
+                    }
+                    if (light_position.y >
+                        get_terrain_height(light_position.x, light_position.z) + 100.f)
+                    {
+                        light_velocity = -20.f;
+                    }
+                    light_position.y += light_velocity * dt;
+                    const glm::mat4 light_model =
+                        glm::translate(glm::mat4(1.f), light_position);
+                    const glm::mat4 model_view_projection =
+                        projection * view * light_model;
+                    ASSERT_RET_IF_NOT(basic_textured_shader.set_UniformMatrix4fv(
+                                          "model_view_projection",
+                                          &model_view_projection[0][0]),
+                                      false);
+                    glDrawArrays(GL_TRIANGLES, 0, 36);
                 }
 
                 /*
@@ -1231,16 +1407,23 @@ namespace Engine
                  */
 
                 terrain_vertex_array.bind();
-                heightmap_shader.use();
+                terrain_shader.use();
 
-                const glm::mat4 model_view_projection =
-                    perspective * camera_view * glm::mat4(1.0f);
-                glUniformMatrix4fv(model_view_projection_object,
-                                   1,
-                                   GL_FALSE,
-                                   &model_view_projection[0][0]);
+                const glm::mat4 model = glm::mat4(1.0f);
 
-                glDrawElements(GL_TRIANGLE_STRIP,
+                ASSERT_RET_IF_NOT(
+                    terrain_shader.set_UniformMatrix4fv("model", &model[0][0]), false);
+                ASSERT_RET_IF_NOT(
+                    terrain_shader.set_UniformMatrix4fv("view", &view[0][0]), false);
+                ASSERT_RET_IF_NOT(terrain_shader.set_UniformMatrix4fv(
+                                      "projection", &projection[0][0]),
+                                  false);
+
+                ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("light_position",
+                                                               light_position),
+                                  false);
+
+                glDrawElements(GL_TRIANGLES,
                                terrain_index_buffer.get_count(),
                                decltype(terrain_index_buffer)::IndexGLtype,
                                nullptr);
