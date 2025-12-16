@@ -111,7 +111,7 @@ namespace Engine
         static constexpr float move_impulse_walking = 30.0f;
         static constexpr float move_impulse_sprinting = 100.0f;
         static constexpr float move_impulse_crouching = 15.0f;
-        static constexpr float move_impulse_midair = 10.0f;
+        static constexpr float move_impulse_midair = 1.0f;
         static constexpr float move_impulse_flying = 150.0f;
         static constexpr float move_impulse_jump = 4000.0f;
         float player_move_impulse;
@@ -157,7 +157,12 @@ namespace Engine
         /**
          * Time since last frame in seconds.
          */
-        float dt;
+        double dt;
+
+        /**
+         * Total time passed since the start of the game in seconds.
+         */
+        double time_since_start;
 
         /**
          * Whether the escape key was pressed in the previous frame.

@@ -58,9 +58,9 @@ namespace Engine
                          format,
                          GL_UNSIGNED_BYTE,
                          texture_buffer);
+            stbi_image_free(texture_buffer);
 
             glGenerateMipmap(GL_TEXTURE_2D);
-            stbi_image_free(texture_buffer);
 
             glActiveTexture(GL_TEXTURE0 + _slot);
 
@@ -68,10 +68,11 @@ namespace Engine
         }
 
         /**
-         * @brief Bind the texture.
+         * @brief Use the texture.
          */
-        void bind() const
+        void use() const
         {
+            glActiveTexture(GL_TEXTURE0 + slot);
             glBindTexture(GL_TEXTURE_2D, texture_id);
         }
 

@@ -7,9 +7,9 @@ out vec4 color;
  */
 in vec2 v_texture_coord;
 
-uniform sampler2D texture_sampler;
+uniform sampler2D u_texture_sampler;
 
 void main()
 {
-    color = texture(texture_sampler, v_texture_coord);
+    color = texture(u_texture_sampler, v_texture_coord);
 }

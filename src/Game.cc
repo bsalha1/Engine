@@ -138,7 +138,7 @@ namespace Engine
     /**
      * @brief Apply a Gaussian blur to the given heightmap.
      *
-     * @param[out] heightmap Heightmap data.
+     * @param[inout] heightmap Heightmap data.
      * @param num_rows Number of rows in the heightmap.
      * @param num_cols Number of columns in the heightmap.
      * @param dimensions Number of dimensions in the heightmap.
@@ -1177,20 +1177,20 @@ namespace Engine
         if (move_direction.x != 0.f || move_direction.y != 0.f ||
             move_direction.z != 0.f)
         {
-            player_velocity +=
-                glm::normalize(move_direction) * player_move_impulse * dt;
+            player_velocity += glm::normalize(move_direction) * player_move_impulse *
+                               static_cast<float>(dt);
         }
 
         /*
          * Apply friction.
          */
-        player_velocity -= player_velocity * friction_coeff * dt;
+        player_velocity -= player_velocity * friction_coeff * static_cast<float>(dt);
         player_speed = glm::length(player_velocity);
 
         /*
          * Update player position.
          */
-        player_position += player_velocity * dt;
+        player_position += player_velocity * static_cast<float>(dt);
 
         /*
          * Don't let the player go outside the world.
@@ -1259,25 +1259,46 @@ namespace Engine
         const glm::mat4 projection =
             glm::perspective(glm::radians(fov_deg), aspect, near_clip, far_clip);
 
-        /*
-         * Set light color.
-         */
+        terrain_shader.use();
+
         const glm::vec3 light_color_rgb = glm::vec3(0xFF, 0xDF, 0x22);
-        ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("light_color",
+
+        /*
+         * Initialize point light.
+         */
+        glm::vec3 point_light_position = glm::vec3(150.f, 100.f, 120.f);
+        ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("u_point_light.color",
+                                                       light_color_rgb / 255.f),
+                          false);
+        /*
+         * Initialize directional light.
+         */
+        glm::vec3 directional_light_direction = glm::vec3(0.f);
+        ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("u_directional_light.color",
                                                        light_color_rgb / 255.f),
                           false);
 
         /*
-         * Set initial light position.
+         * Assign texture samplers.
          */
-        glm::vec3 light_position = glm::vec3(150.f, 100.f, 120.f);
+        ASSERT_RET_IF_NOT(terrain_shader.set_Uniform1i("u_texture_sampler",
+                                                       dirt_texture.get_slot()),
+                          false);
+        dirt_texture.use();
+
+        basic_textured_shader.use();
+        ASSERT_RET_IF_NOT(basic_textured_shader.set_Uniform1i(
+                              "u_texture_sampler", chaser_texture.get_slot()),
+                          false);
+        chaser_texture.use();
 
         /*
          * Loop until the user closes the window or state gets set to QUIT by the
          * program.
          */
-        std::chrono::steady_clock::time_point frame_start_time =
+        std::chrono::steady_clock::time_point start_time =
             std::chrono::steady_clock::now();
+        std::chrono::steady_clock::time_point frame_start_time = start_time;
         while (state != State::QUIT && !glfwWindowShouldClose(window))
         {
             /*
@@ -1285,9 +1306,11 @@ namespace Engine
              */
             const uint64_t dt_ns =
                 (std::chrono::steady_clock::now() - frame_start_time).count();
-            dt = dt_ns / 1e9f;
+            dt = dt_ns / 1e9;
 
             frame_start_time = std::chrono::steady_clock::now();
+
+            time_since_start = (frame_start_time - start_time).count() / 1e9;
 
             /*
              * Clear both the color and depth buffers.
@@ -1341,10 +1364,6 @@ namespace Engine
                  */
 
                 basic_textured_shader.use();
-                chaser_texture.bind();
-                ASSERT_RET_IF_NOT(basic_textured_shader.set_Uniform1i(
-                                      "texture_sampler", chaser_texture.get_slot()),
-                                  false);
 
                 /*
                  * Draw a chaser at the origin.
@@ -1353,7 +1372,7 @@ namespace Engine
                     const glm::mat4 model_view_projection =
                         projection * view * glm::mat4(1.0f);
                     ASSERT_RET_IF_NOT(basic_textured_shader.set_UniformMatrix4fv(
-                                          "model_view_projection",
+                                          "u_model_view_projection",
                                           &model_view_projection[0][0]),
                                       false);
 
@@ -1373,8 +1392,8 @@ namespace Engine
                                   0.f,
                                   player_position.z - chaser_position.z));
                     static constexpr float chaser_move_impulse = 1.f;
-                    chaser_position +=
-                        direction_to_player_xz * chaser_move_impulse * dt;
+                    chaser_position += direction_to_player_xz * chaser_move_impulse *
+                                       static_cast<float>(dt);
 
                     /*
                      * Create model matrix for the chaser at its position.
@@ -1394,7 +1413,7 @@ namespace Engine
                     const glm::mat4 model_view_projection =
                         projection * view * chaser_model;
                     ASSERT_RET_IF_NOT(basic_textured_shader.set_UniformMatrix4fv(
-                                          "model_view_projection",
+                                          "u_model_view_projection",
                                           &model_view_projection[0][0]),
                                       false);
 
@@ -1402,35 +1421,55 @@ namespace Engine
                 }
 
                 /*
-                 * Draw the light.
+                 * Update and draw point light.
                  */
                 {
-                    basic_textured_shader.use();
-                    static float t = 0.f;
                     static float light_velocity = 20.f;
-                    t += dt;
-                    if (light_position.y <
-                        get_terrain_height(light_position.x, light_position.z) + 5.f)
+
+                    /*
+                     * Update point light position.
+                     */
+                    if (point_light_position.y <
+                        get_terrain_height(point_light_position.x,
+                                           point_light_position.z) +
+                            5.f)
                     {
                         light_velocity = 20.f;
                     }
-                    if (light_position.y >
-                        get_terrain_height(light_position.x, light_position.z) + 100.f)
+                    if (point_light_position.y >
+                        get_terrain_height(point_light_position.x,
+                                           point_light_position.z) +
+                            100.f)
                     {
                         light_velocity = -20.f;
                     }
-                    light_position.y += light_velocity * dt;
-                    const glm::mat4 light_model =
-                        glm::translate(glm::mat4(1.f), light_position);
-                    const glm::mat4 model_view_projection =
-                        projection * view * light_model;
+                    point_light_position.y += light_velocity * dt;
+
+                    const glm::mat4 point_light_model =
+                        glm::translate(glm::mat4(1.f), point_light_position);
+
+                    const glm::mat4 point_light_model_view_projection =
+                        projection * view * point_light_model;
+
                     ASSERT_RET_IF_NOT(basic_textured_shader.set_UniformMatrix4fv(
-                                          "model_view_projection",
-                                          &model_view_projection[0][0]),
+                                          "u_model_view_projection",
+                                          &point_light_model_view_projection[0][0]),
                                       false);
 
                     chaser_vertex_array.draw();
                 }
+
+                /*
+                 * Update directional light direction. Let it rise from the -X axis
+                 * and set over the +X axis.
+                 */
+                static constexpr float day_length_s = 10.f;
+                static constexpr float directional_light_angular_speed =
+                    glm::pi<float>() / day_length_s;
+                directional_light_direction.x =
+                    glm::cos(directional_light_angular_speed * time_since_start);
+                directional_light_direction.y =
+                    -glm::sin(directional_light_angular_speed * time_since_start);
 
                 /*
                  * Draw the terrain.
@@ -1439,31 +1478,28 @@ namespace Engine
                 terrain_vertex_array.bind();
                 terrain_shader.use();
 
-                dirt_texture.bind();
-                ASSERT_RET_IF_NOT(terrain_shader.set_Uniform1i("texture_sampler",
-                                                               dirt_texture.get_slot()),
-                                  false);
-
                 const glm::mat4 model = glm::mat4(1.0f);
 
+                ASSERT_RET_IF_NOT(terrain_shader.set_UniformMatrix4fv("u_model",
+                                                                      &model[0][0]),
+                                  false);
                 ASSERT_RET_IF_NOT(
-                    terrain_shader.set_UniformMatrix4fv("model", &model[0][0]), false);
-                ASSERT_RET_IF_NOT(
-                    terrain_shader.set_UniformMatrix4fv("view", &view[0][0]), false);
+                    terrain_shader.set_UniformMatrix4fv("u_view", &view[0][0]), false);
                 ASSERT_RET_IF_NOT(terrain_shader.set_UniformMatrix4fv(
-                                      "projection", &projection[0][0]),
+                                      "u_projection", &projection[0][0]),
                                   false);
-                ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("light_position",
-                                                               light_position),
+                ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("u_point_light.position",
+                                                               point_light_position),
                                   false);
-                ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("camera_position",
+                ASSERT_RET_IF_NOT(
+                    terrain_shader.set_Uniform3f("u_directional_light.direction",
+                                                 directional_light_direction),
+                    false);
+                ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("u_camera_position",
                                                                player_position),
                                   false);
 
-                glDrawElements(GL_TRIANGLES,
-                               terrain_index_buffer.get_count(),
-                               decltype(terrain_index_buffer)::IndexGLtype,
-                               nullptr);
+                terrain_index_buffer.draw();
             }
 
             /*

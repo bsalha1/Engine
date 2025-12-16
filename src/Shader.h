@@ -89,8 +89,6 @@ namespace Engine
          */
         bool set_UniformMatrix4fv(const std::string &uniform_name, const GLfloat *value)
         {
-            use();
-
             GLint location;
             ASSERT_RET_IF_NOT(get_uniform_location(uniform_name, location), false);
             glUniformMatrix4fv(location, 1, GL_FALSE, value);
@@ -108,8 +106,6 @@ namespace Engine
          */
         bool set_Uniform1i(const std::string &uniform_name, const GLint value)
         {
-            use();
-
             GLint location;
             ASSERT_RET_IF_NOT(get_uniform_location(uniform_name, location), false);
             glUniform1i(location, value);
@@ -127,8 +123,6 @@ namespace Engine
          */
         bool set_Uniform3f(const std::string &uniform_name, const glm::vec3 &value)
         {
-            use();
-
             GLint location;
             ASSERT_RET_IF_NOT(get_uniform_location(uniform_name, location), false);
             glUniform3f(location, value.x, value.y, value.z);

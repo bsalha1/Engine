@@ -21,6 +21,12 @@ namespace Engine
         IndexBuffer(): index_buffer_obj(0), count(0)
         {}
 
+        /**
+         * @brief Create index buffer from given items.
+         *
+         * @param items Pointer to the index items.
+         * @param _count Number of indices.
+         */
         void create(const void *items, const size_t _count)
         {
             count = _count;
@@ -33,9 +39,12 @@ namespace Engine
                          GL_STATIC_DRAW);
         }
 
-        inline size_t get_count() const
+        /**
+         * @brief Draw the index buffer.
+         */
+        void draw() const
         {
-            return count;
+            glDrawElements(GL_TRIANGLES, count, IndexGLtype, nullptr);
         }
 
     private:
