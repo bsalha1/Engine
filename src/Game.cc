@@ -21,15 +21,18 @@ using namespace std::chrono_literals;
 
 namespace Engine
 {
-    struct __attribute__((packed)) TexturedVertex3d
+    struct Vertex3d
     {
-        float x;
-        float y;
-        float z;
-
-        float texture_x;
-        float texture_y;
+        glm::vec3 position;
     };
+    static_assert(sizeof(Vertex3d) == 3 * sizeof(float));
+
+    struct TexturedVertex3d
+    {
+        glm::vec3 position;
+        glm::vec2 texture;
+    };
+    static_assert(sizeof(TexturedVertex3d) == 5 * sizeof(float));
 
     /**
      * A vertex with a position and a normal vector.
@@ -261,48 +264,48 @@ namespace Engine
         {
             /* clang-format off */
             const std::array<TexturedVertex3d, 36> vertices = {{
-            /*      x,    y,   z,  texture_x, texture_y        */
-                -0.5f, -0.5f, -0.5f,    0.0f, 0.0f,
-                 0.5f, -0.5f, -0.5f,    1.0f, 0.0f,
-                 0.5f,  0.5f, -0.5f,    1.0f, 1.0f,
-                 0.5f,  0.5f, -0.5f,    1.0f, 1.0f,
-                -0.5f,  0.5f, -0.5f,    0.0f, 1.0f,
-                -0.5f, -0.5f, -0.5f,    0.0f, 0.0f,
+            /*                         position,              texture */
+                {glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec2(0.0f, 0.0f)},
+                {glm::vec3( 0.5f, -0.5f, -0.5f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3( 0.5f,  0.5f, -0.5f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3( 0.5f,  0.5f, -0.5f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3(-0.5f,  0.5f, -0.5f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec2(0.0f, 0.0f)},
 
-                -0.5f, -0.5f,  0.5f,    0.0f, 0.0f,
-                 0.5f, -0.5f,  0.5f,    1.0f, 0.0f,
-                 0.5f,  0.5f,  0.5f,    1.0f, 1.0f,
-                 0.5f,  0.5f,  0.5f,    1.0f, 1.0f,
-                -0.5f,  0.5f,  0.5f,    0.0f, 1.0f,
-                -0.5f, -0.5f,  0.5f,    0.0f, 0.0f,
+                {glm::vec3(-0.5f, -0.5f,  0.5f), glm::vec2(0.0f, 0.0f)},
+                {glm::vec3( 0.5f, -0.5f,  0.5f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3( 0.5f,  0.5f,  0.5f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3( 0.5f,  0.5f,  0.5f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3(-0.5f,  0.5f,  0.5f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3(-0.5f, -0.5f,  0.5f), glm::vec2(0.0f, 0.0f)},
 
-                -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-                -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-                -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-                -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-                -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-                -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+                {glm::vec3(-0.5f,  0.5f,  0.5f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3(-0.5f,  0.5f, -0.5f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3(-0.5f, -0.5f,  0.5f), glm::vec2(0.0f, 0.0f)},
+                {glm::vec3(-0.5f,  0.5f,  0.5f), glm::vec2(1.0f, 0.0f)},
 
-                0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-                0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-                0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-                0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-                0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-                0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+                {glm::vec3( 0.5f,  0.5f,  0.5f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3( 0.5f,  0.5f, -0.5f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3( 0.5f, -0.5f, -0.5f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3( 0.5f, -0.5f, -0.5f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3( 0.5f, -0.5f,  0.5f), glm::vec2(0.0f, 0.0f)},
+                {glm::vec3( 0.5f,  0.5f,  0.5f), glm::vec2(1.0f, 0.0f)},
 
-                -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-                 0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
-                 0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-                 0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-                -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-                -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+                {glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3( 0.5f, -0.5f, -0.5f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3( 0.5f, -0.5f,  0.5f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3( 0.5f, -0.5f,  0.5f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3(-0.5f, -0.5f,  0.5f), glm::vec2(0.0f, 0.0f)},
+                {glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec2(0.0f, 1.0f)},
 
-                -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-                 0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-                 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-                 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-                -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
-                -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
+                {glm::vec3(-0.5f,  0.5f, -0.5f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3( 0.5f,  0.5f, -0.5f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3( 0.5f,  0.5f,  0.5f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3( 0.5f,  0.5f,  0.5f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3(-0.5f,  0.5f,  0.5f), glm::vec2(0.0f, 0.0f)},
+                {glm::vec3(-0.5f,  0.5f, -0.5f), glm::vec2(0.0f, 1.0f)}
             }};
             /* clang-format on */
 
@@ -320,13 +323,13 @@ namespace Engine
              */
             static constexpr GLuint position_coord_attrib_index = 0;
             static constexpr GLuint position_coord_attrib_start_offset =
-                offsetof(TexturedVertex3d, x);
+                offsetof(TexturedVertex3d, position);
             static constexpr GLuint position_coord_attrib_end_offset =
-                offsetof(TexturedVertex3d, z);
+                position_coord_attrib_start_offset + sizeof(TexturedVertex3d::position);
             static constexpr GLuint position_coord_attrib_size = sizeof(float);
             static constexpr GLuint position_coord_attrib_count =
-                (position_coord_attrib_end_offset - position_coord_attrib_start_offset +
-                 position_coord_attrib_size) /
+                (position_coord_attrib_end_offset -
+                 position_coord_attrib_start_offset) /
                 position_coord_attrib_size;
             glVertexAttribPointer(position_coord_attrib_index,
                                   position_coord_attrib_count,
@@ -341,13 +344,12 @@ namespace Engine
              */
             static constexpr GLuint texture_coord_attrib_index = 1;
             static constexpr GLuint texture_coord_attrib_start_offset =
-                offsetof(TexturedVertex3d, texture_x);
+                offsetof(TexturedVertex3d, texture);
             static constexpr GLuint texture_coord_attrib_end_offset =
-                offsetof(TexturedVertex3d, texture_y);
+                texture_coord_attrib_start_offset + sizeof(TexturedVertex3d::texture);
             static constexpr GLuint texture_coord_attrib_size = sizeof(float);
             static constexpr GLuint texture_coord_attrib_count =
-                (texture_coord_attrib_end_offset - texture_coord_attrib_start_offset +
-                 texture_coord_attrib_size) /
+                (texture_coord_attrib_end_offset - texture_coord_attrib_start_offset) /
                 texture_coord_attrib_size;
             glVertexAttribPointer(texture_coord_attrib_index,
                                   texture_coord_attrib_count,
@@ -361,6 +363,7 @@ namespace Engine
         LOG("Compiling shaders\n");
         ASSERT_RET_IF_NOT(basic_textured_shader.compile("basic_textured"), false);
         ASSERT_RET_IF_NOT(terrain_shader.compile("terrain"), false);
+        ASSERT_RET_IF_NOT(skybox_shader.compile("skybox"), false);
 
         LOG("Loading textures\n");
         ASSERT_RET_IF_NOT(chaser_texture.load_from_file("textures/obama.png", 0),
@@ -619,6 +622,89 @@ namespace Engine
             glEnableVertexAttribArray(texture_attrib_index);
 
             terrain_index_buffer.create(indices.data(), indices.size());
+        }
+
+        LOG("Loading skybox\n");
+        {
+            ASSERT_RET_IF_NOT(skybox_texture.load_from_file("textures/skybox/", ".jpg"),
+                              false);
+
+            static const std::array<Vertex3d, 36> skybox_vertices = {
+                /* clang-format off */
+                glm::vec3(-0.5f, -0.5f, -0.5f),
+                glm::vec3( 0.5f, -0.5f, -0.5f),
+                glm::vec3( 0.5f,  0.5f, -0.5f),
+                glm::vec3( 0.5f,  0.5f, -0.5f),
+                glm::vec3(-0.5f,  0.5f, -0.5f),
+                glm::vec3(-0.5f, -0.5f, -0.5f),
+
+                glm::vec3(-0.5f, -0.5f,  0.5f),
+                glm::vec3( 0.5f, -0.5f,  0.5f),
+                glm::vec3( 0.5f,  0.5f,  0.5f),
+                glm::vec3( 0.5f,  0.5f,  0.5f),
+                glm::vec3(-0.5f,  0.5f,  0.5f),
+                glm::vec3(-0.5f, -0.5f,  0.5f),
+
+                glm::vec3(-0.5f,  0.5f,  0.5f),
+                glm::vec3(-0.5f,  0.5f, -0.5f),
+                glm::vec3(-0.5f, -0.5f, -0.5f),
+                glm::vec3(-0.5f, -0.5f, -0.5f),
+                glm::vec3(-0.5f, -0.5f,  0.5f),
+                glm::vec3(-0.5f,  0.5f,  0.5f),
+
+                glm::vec3( 0.5f,  0.5f,  0.5f),
+                glm::vec3( 0.5f,  0.5f, -0.5f),
+                glm::vec3( 0.5f, -0.5f, -0.5f),
+                glm::vec3( 0.5f, -0.5f, -0.5f),
+                glm::vec3( 0.5f, -0.5f,  0.5f),
+                glm::vec3( 0.5f,  0.5f,  0.5f),
+
+                glm::vec3(-0.5f, -0.5f, -0.5f),
+                glm::vec3( 0.5f, -0.5f, -0.5f),
+                glm::vec3( 0.5f, -0.5f,  0.5f),
+                glm::vec3( 0.5f, -0.5f,  0.5f),
+                glm::vec3(-0.5f, -0.5f,  0.5f),
+                glm::vec3(-0.5f, -0.5f, -0.5f),
+
+                glm::vec3(-0.5f,  0.5f, -0.5f),
+                glm::vec3( 0.5f,  0.5f, -0.5f),
+                glm::vec3( 0.5f,  0.5f,  0.5f),
+                glm::vec3( 0.5f,  0.5f,  0.5f),
+                glm::vec3(-0.5f,  0.5f,  0.5f),
+                glm::vec3(-0.5f,  0.5f, -0.5f),
+                /* clang-format on */
+            };
+
+            skybox_vertex_array.create(skybox_vertices.size());
+            skybox_vertex_array.bind();
+
+            GLuint skybox_buffer_obj;
+            glGenBuffers(1, &skybox_buffer_obj);
+            glBindBuffer(GL_ARRAY_BUFFER, skybox_buffer_obj);
+            glBufferData(GL_ARRAY_BUFFER,
+                         sizeof(skybox_vertices),
+                         skybox_vertices.data(),
+                         GL_STATIC_DRAW);
+
+            /*
+             * Position coordinate attribute.
+             */
+            static constexpr GLuint position_attrib_index = 0;
+            static constexpr GLuint position_attrib_start_offset =
+                offsetof(Vertex3d, position);
+            static constexpr GLuint position_attrib_end_offset =
+                position_attrib_start_offset + sizeof(Vertex3d::position);
+            static constexpr GLuint position_attrib_size = sizeof(float);
+            static constexpr GLuint position_attrib_count =
+                (position_attrib_end_offset - position_attrib_start_offset) /
+                position_attrib_size;
+            glVertexAttribPointer(position_attrib_index,
+                                  position_attrib_count,
+                                  GL_FLOAT,
+                                  GL_FALSE,
+                                  sizeof(Vertex3d),
+                                  (GLvoid *)position_attrib_start_offset);
+            glEnableVertexAttribArray(position_attrib_index);
         }
 
         LOG("Initializing GUI\n");
@@ -1255,7 +1341,7 @@ namespace Engine
         float fov_deg = 90.f;
         const float far_clip = 1000.f;
         const float aspect = static_cast<float>(window_width) / window_height;
-        const float near_clip = 0.1f;
+        const float near_clip = 0.001f;
         const glm::mat4 projection =
             glm::perspective(glm::radians(fov_deg), aspect, near_clip, far_clip);
 
@@ -1291,6 +1377,13 @@ namespace Engine
                               "u_texture_sampler", chaser_texture.get_slot()),
                           false);
         chaser_texture.use();
+
+        /*
+         * Set day length and compute the rotational speed.
+         */
+        static constexpr float day_length_s = 10.f;
+        static constexpr float rotational_angular_speed =
+            glm::pi<float>() / day_length_s;
 
         /*
          * Loop until the user closes the window or state gets set to QUIT by the
@@ -1358,6 +1451,39 @@ namespace Engine
                  */
                 const glm::mat4 view =
                     glm::lookAt(player_position, player_position + direction, head);
+
+                /*
+                 * First, draw the skybox.
+                 */
+                {
+                    glDisable(GL_DEPTH_TEST);
+                    glDisable(GL_CULL_FACE);
+
+                    skybox_texture.use();
+
+                    /*
+                     * Use the player's view but remove translation and add rotation to
+                     * emulate the planet rotating.
+                     */
+                    const glm::mat4 view_rotational = glm::mat4(glm::mat3(view));
+                    const float c =
+                        glm::cos(rotational_angular_speed * time_since_start);
+                    const float s =
+                        glm::sin(rotational_angular_speed * time_since_start);
+                    glm::mat4 view_skybox = view_rotational;
+                    view_skybox[0] = view_rotational[0] * c + view_rotational[1] * s;
+                    view_skybox[1] = -view_rotational[0] * s + view_rotational[1] * c;
+
+                    skybox_shader.use();
+                    skybox_shader.set_UniformMatrix4fv("u_view", &view_skybox[0][0]);
+                    skybox_shader.set_UniformMatrix4fv("u_projection",
+                                                       &projection[0][0]);
+
+                    skybox_vertex_array.draw();
+
+                    glEnable(GL_DEPTH_TEST);
+                    glEnable(GL_CULL_FACE);
+                }
 
                 /*
                  * Draw the chasers.
@@ -1463,13 +1589,10 @@ namespace Engine
                  * Update directional light direction. Let it rise from the -X axis
                  * and set over the +X axis.
                  */
-                static constexpr float day_length_s = 10.f;
-                static constexpr float directional_light_angular_speed =
-                    glm::pi<float>() / day_length_s;
                 directional_light_direction.x =
-                    glm::cos(directional_light_angular_speed * time_since_start);
+                    glm::cos(rotational_angular_speed * time_since_start);
                 directional_light_direction.y =
-                    -glm::sin(directional_light_angular_speed * time_since_start);
+                    -glm::sin(rotational_angular_speed * time_since_start);
 
                 /*
                  * Draw the terrain.

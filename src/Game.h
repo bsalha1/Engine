@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CubemapTexture.h"
 #include "IndexBuffer.h"
 #include "Shader.h"
 #include "Texture.h"
@@ -247,6 +248,17 @@ namespace Engine
         VertexArray terrain_vertex_array;
         float terrain_height;
         float on_ground_camera_y;
+        /**
+         * @}
+         */
+
+        /**
+         * Skybox.
+         * @{
+         */
+        VertexArray skybox_vertex_array;
+        Shader skybox_shader;
+        CubemapTexture skybox_texture;
         /**
          * @}
          */
