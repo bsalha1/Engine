@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -ex
 
 base_dir="$(dirname $(realpath $0))"
 
@@ -25,20 +25,23 @@ fi
 
 # Build GLFW library.
 cd glfw
+git clean -fxd
 cmake -S . -B build -D GLFW_BUILD_WAYLAND=OFF
 cd build
-make
+make -j$(nproc)
 cd "$base_dir"
 
 # Build GLEW library.
 cd glew/auto
-make
+git clean -fxd
+make -j$(nproc)
 cd ..
-make
+make -j$(nproc)
 cd "$base_dir"
 
 # Build libglvnd library.
 cd libglvnd
+sudo git clean -fxd
 ./autogen.sh
 ./configure
 sudo make install
@@ -46,6 +49,7 @@ cd "$base_dir"
 
 # Build glm library.
 cd glm
+git clean -fxd
 cmake \
     -DGLM_BUILD_TESTS=OFF \
     -DBUILD_SHARED_LIBS=OFF \
@@ -55,11 +59,13 @@ cd "$base_dir"
 
 # Build stb_image library.
 cd stb
-make
+make clean
+make -j$(nproc)
 cd "$base_dir"
 
 # Build imgui library.
 cd imgui
+git clean -fxd
 g++ \
     -c \
     -I. \

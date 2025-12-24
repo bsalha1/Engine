@@ -262,5 +262,14 @@ namespace Engine
         /**
          * @}
          */
+
+        /**
+         * Lighting.
+         * @{
+         */
+        Shader light_shader;
+        /**
+         * @}
+         */
     };
 }

@@ -15,12 +15,23 @@ namespace Engine
         /**
          * @brief Load texture from file into the given slot.
          *
-         * @param file_name Path to the texture file.
+         * @param file_name_prefix File name prefix.
+         * @param file_name_suffix File name suffix.
+         *
+         * The six faces should be named as:
+         * file_name_prefix + "px" + file_name_suffix
+         * file_name_prefix + "nx" + file_name_suffix
+         * file_name_prefix + "py" + file_name_suffix
+         * file_name_prefix + "ny" + file_name_suffix
+         * file_name_prefix + "pz" + file_name_suffix
+         * file_name_prefix + "nz" + file_name_suffix
+         *
+         * Where p = positive, n = negative, x/y/z = face axial direction.
          *
          * @return True on success, otherwise false.
          */
-        bool load_from_file(const std::string file_name_prefix,
-                            const std::string file_name_suffix)
+        bool load_from_file(const std::string &file_name_prefix,
+                            const std::string &file_name_suffix)
         {
             glGenTextures(1, &texture_id);
             glBindTexture(GL_TEXTURE_CUBE_MAP, texture_id);

@@ -19,7 +19,7 @@ namespace Engine
          *
          * @return True on success, otherwise false.
          */
-        bool load_from_file(const std::string file_name, const uint8_t _slot)
+        bool load_from_file(const std::string &file_name, const uint8_t _slot)
         {
             slot = _slot;
 

@@ -80,7 +80,7 @@ namespace Engine
         }
 
         /**
-         * @brief Set a UniformMatrix4fv variable in the shader.
+         * @brief Set a mat4 variable in the shader.
          *
          * @param uniform_name Name of the uniform variable.
          * @param value Pointer to the matrix data.
@@ -97,10 +97,10 @@ namespace Engine
         }
 
         /**
-         * @brief Set a Uniform1i variable in the shader.
+         * @brief Set a integer variable in the shader.
          *
          * @param uniform_name Name of the uniform variable.
-         * @param value Pointer to the integer data.
+         * @param value Integer value.
          *
          * @return True on success, otherwise false.
          */
@@ -114,10 +114,10 @@ namespace Engine
         }
 
         /**
-         * @brief Set a UniformMatrix4fv variable in the shader.
+         * @brief Set a vec3 variable in the shader.
          *
          * @param uniform_name Name of the uniform variable.
-         * @param value Pointer to the matrix data.
+         * @param value Vector.
          *
          * @return True on success, otherwise false.
          */
@@ -126,6 +126,23 @@ namespace Engine
             GLint location;
             ASSERT_RET_IF_NOT(get_uniform_location(uniform_name, location), false);
             glUniform3f(location, value.x, value.y, value.z);
+
+            return true;
+        }
+
+        /**
+         * @brief Set a float variable in the shader.
+         *
+         * @param uniform_name Name of the uniform variable.
+         * @param value Float value.
+         *
+         * @return True on success, otherwise false.
+         */
+        bool set_Uniform1f(const std::string &uniform_name, const float value)
+        {
+            GLint location;
+            ASSERT_RET_IF_NOT(get_uniform_location(uniform_name, location), false);
+            glUniform1f(location, value);
 
             return true;
         }

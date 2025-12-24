@@ -110,7 +110,7 @@ namespace Engine
         player_height(height_standing),
         fly_key_pressed_prev(false),
         crouch_button_pressed_prev(false),
-        player_position(0.f, player_height, -10.f),
+        player_position(0.f, player_height, 0.f),
         player_velocity(0.f, 0.f, 0.f),
         last_crouch_time(std::chrono::steady_clock::now()),
         escape_pressed_prev(false),
@@ -181,8 +181,8 @@ namespace Engine
                             int height_kerneled = col + kernel_x;
                             int row_kerneled = row + kernel_z;
                             height_kerneled =
-                                std::clamp(height_kerneled, 0, num_cols - 1);
-                            row_kerneled = std::clamp(row_kerneled, 0, num_rows - 1);
+                                glm::clamp(height_kerneled, 0, num_cols - 1);
+                            row_kerneled = glm::clamp(row_kerneled, 0, num_rows - 1);
 
                             const float kern = kernel[kernel_z + 1][kernel_x + 1];
                             sum += heightmap_original[(row_kerneled * num_cols +
@@ -364,6 +364,7 @@ namespace Engine
         ASSERT_RET_IF_NOT(basic_textured_shader.compile("basic_textured"), false);
         ASSERT_RET_IF_NOT(terrain_shader.compile("terrain"), false);
         ASSERT_RET_IF_NOT(skybox_shader.compile("skybox"), false);
+        ASSERT_RET_IF_NOT(light_shader.compile("light"), false);
 
         LOG("Loading textures\n");
         ASSERT_RET_IF_NOT(chaser_texture.load_from_file("textures/obama.png", 0),
@@ -428,7 +429,7 @@ namespace Engine
             terrain_z_middle = terrain_num_rows / 2.f;
             terrain_x_middle = terrain_num_cols / 2.f;
             static constexpr float y_top = 64.f;
-            static constexpr float y_bottom = 0.f;
+            static constexpr float y_bottom = -27.f;
             float y_scale = y_top / 0xFF;
 
             const unsigned int num_vertices = terrain_num_rows * terrain_num_cols;
@@ -1338,8 +1339,8 @@ namespace Engine
     {
         LOG("Entering main loop\n");
 
-        float fov_deg = 90.f;
-        const float far_clip = 1000.f;
+        static constexpr float fov_deg = 90.f;
+        static constexpr const float far_clip = 5000.f;
         const float aspect = static_cast<float>(window_width) / window_height;
         const float near_clip = 0.001f;
         const glm::mat4 projection =
@@ -1359,7 +1360,6 @@ namespace Engine
         /*
          * Initialize directional light.
          */
-        glm::vec3 directional_light_direction = glm::vec3(0.f);
         ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("u_directional_light.color",
                                                        light_color_rgb / 255.f),
                           false);
@@ -1383,7 +1383,30 @@ namespace Engine
          */
         static constexpr float day_length_s = 10.f;
         static constexpr float rotational_angular_speed =
-            glm::pi<float>() / day_length_s;
+            2 * glm::pi<float>() / day_length_s;
+        static constexpr float tilt = glm::radians<float>(23.5f);
+        const glm::vec3 rotation_axis = glm::vec3(glm::sin(tilt), glm::cos(tilt), 0.f);
+
+        /*
+         * Relative to the terrain, the skybox spins around it. We draw a sun
+         * on the skybox in its model space so that it rotates with it with an
+         * elevation angle above the orbital plane.
+         */
+        static constexpr float sun_angular_radius = glm::radians<float>(5.f);
+        const float sun_radius_skybox_model_space = glm::sin(sun_angular_radius);
+        static constexpr float sun_orbital_elevation_angle = glm::radians<float>(10.f);
+        const glm::vec4 sun_position_skybox_model_space =
+            glm::vec4(0.f,
+                      glm::sin(sun_orbital_elevation_angle),
+                      glm::cos(sun_orbital_elevation_angle),
+                      0.f);
+        skybox_shader.use();
+        ASSERT_RET_IF_NOT(skybox_shader.set_Uniform1f("u_sun_angular_radius",
+                                                      sun_angular_radius),
+                          false);
+        ASSERT_RET_IF_NOT(skybox_shader.set_Uniform3f("u_sun_position",
+                                                      sun_position_skybox_model_space),
+                          false);
 
         /*
          * Loop until the user closes the window or state gets set to QUIT by the
@@ -1452,38 +1475,7 @@ namespace Engine
                 const glm::mat4 view =
                     glm::lookAt(player_position, player_position + direction, head);
 
-                /*
-                 * First, draw the skybox.
-                 */
-                {
-                    glDisable(GL_DEPTH_TEST);
-                    glDisable(GL_CULL_FACE);
-
-                    skybox_texture.use();
-
-                    /*
-                     * Use the player's view but remove translation and add rotation to
-                     * emulate the planet rotating.
-                     */
-                    const glm::mat4 view_rotational = glm::mat4(glm::mat3(view));
-                    const float c =
-                        glm::cos(rotational_angular_speed * time_since_start);
-                    const float s =
-                        glm::sin(rotational_angular_speed * time_since_start);
-                    glm::mat4 view_skybox = view_rotational;
-                    view_skybox[0] = view_rotational[0] * c + view_rotational[1] * s;
-                    view_skybox[1] = -view_rotational[0] * s + view_rotational[1] * c;
-
-                    skybox_shader.use();
-                    skybox_shader.set_UniformMatrix4fv("u_view", &view_skybox[0][0]);
-                    skybox_shader.set_UniformMatrix4fv("u_projection",
-                                                       &projection[0][0]);
-
-                    skybox_vertex_array.draw();
-
-                    glEnable(GL_DEPTH_TEST);
-                    glEnable(GL_CULL_FACE);
-                }
+                const float orbital_angle = rotational_angular_speed * time_since_start;
 
                 /*
                  * Draw the chasers.
@@ -1586,43 +1578,102 @@ namespace Engine
                 }
 
                 /*
-                 * Update directional light direction. Let it rise from the -X axis
-                 * and set over the +X axis.
-                 */
-                directional_light_direction.x =
-                    glm::cos(rotational_angular_speed * time_since_start);
-                directional_light_direction.y =
-                    -glm::sin(rotational_angular_speed * time_since_start);
-
-                /*
                  * Draw the terrain.
                  */
+                {
+                    /*
+                     * Compute the directional light direction relative to the terrain
+                     * by converting the sun's position from skybox model space to the
+                     * terrain model space.
+                     */
+                    const glm::mat4 terrain_model_matrix = glm::mat4(1.0f);
 
-                terrain_vertex_array.bind();
-                terrain_shader.use();
+                    const glm::mat4 terrain_model_matrix_rotated =
+                        glm::rotate(terrain_model_matrix, orbital_angle, rotation_axis);
 
-                const glm::mat4 model = glm::mat4(1.0f);
+                    const glm::vec3 sun_position_terrain_model_space = glm::vec3(
+                        terrain_model_matrix_rotated * sun_position_skybox_model_space);
 
-                ASSERT_RET_IF_NOT(terrain_shader.set_UniformMatrix4fv("u_model",
-                                                                      &model[0][0]),
-                                  false);
-                ASSERT_RET_IF_NOT(
-                    terrain_shader.set_UniformMatrix4fv("u_view", &view[0][0]), false);
-                ASSERT_RET_IF_NOT(terrain_shader.set_UniformMatrix4fv(
-                                      "u_projection", &projection[0][0]),
-                                  false);
-                ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("u_point_light.position",
-                                                               point_light_position),
-                                  false);
-                ASSERT_RET_IF_NOT(
-                    terrain_shader.set_Uniform3f("u_directional_light.direction",
-                                                 directional_light_direction),
-                    false);
-                ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("u_camera_position",
-                                                               player_position),
-                                  false);
+                    const glm::vec3 directional_light_direction =
+                        -glm::normalize(sun_position_terrain_model_space);
 
-                terrain_index_buffer.draw();
+                    terrain_vertex_array.bind();
+                    terrain_shader.use();
+
+                    /*
+                     * Compute sun brightness based on its elevation angle.
+                     */
+
+                    const float sun_top_y = sun_position_terrain_model_space.y +
+                                            sun_radius_skybox_model_space;
+                    const float sun_distance_xz =
+                        glm::sqrt(sun_position_terrain_model_space.x *
+                                      sun_position_terrain_model_space.x +
+                                  sun_position_terrain_model_space.z *
+                                      sun_position_terrain_model_space.z);
+                    const float sine_of_elevation_angle = sun_top_y / sun_distance_xz;
+
+                    static constexpr float brightness_falloff_factor = 0.1f;
+                    const float sun_brightness =
+                        sine_of_elevation_angle <= 0.f
+                            ? 0.f
+                            : glm::exp(-brightness_falloff_factor /
+                                       sine_of_elevation_angle);
+                    const glm::vec3 directional_light_color =
+                        (light_color_rgb / 255.f) * sun_brightness;
+
+                    ASSERT_RET_IF_NOT(terrain_shader.set_UniformMatrix4fv(
+                                          "u_model", &terrain_model_matrix[0][0]),
+                                      false);
+                    ASSERT_RET_IF_NOT(terrain_shader.set_UniformMatrix4fv("u_view",
+                                                                          &view[0][0]),
+                                      false);
+                    ASSERT_RET_IF_NOT(terrain_shader.set_UniformMatrix4fv(
+                                          "u_projection", &projection[0][0]),
+                                      false);
+                    ASSERT_RET_IF_NOT(
+                        terrain_shader.set_Uniform3f("u_point_light.position",
+                                                     point_light_position),
+                        false);
+                    ASSERT_RET_IF_NOT(
+                        terrain_shader.set_Uniform3f("u_directional_light.direction",
+                                                     directional_light_direction),
+                        false);
+                    ASSERT_RET_IF_NOT(
+                        terrain_shader.set_Uniform3f("u_directional_light.color",
+                                                     directional_light_color),
+                        false);
+                    ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("u_camera_position",
+                                                                   player_position),
+                                      false);
+
+                    terrain_index_buffer.draw();
+                }
+
+                /*
+                 * Lastly, draw the skybox.
+                 */
+                {
+                    glDepthFunc(GL_LEQUAL);
+
+                    skybox_texture.use();
+
+                    /*
+                     * Use the player's view but remove translation and add rotation to
+                     * emulate the planet rotating.
+                     */
+                    const glm::mat4 view_skybox = glm::rotate(
+                        glm::mat4(glm::mat3(view)), orbital_angle, rotation_axis);
+
+                    skybox_shader.use();
+                    skybox_shader.set_UniformMatrix4fv("u_view", &view_skybox[0][0]);
+                    skybox_shader.set_UniformMatrix4fv("u_projection",
+                                                       &projection[0][0]);
+
+                    skybox_vertex_array.draw();
+
+                    glDepthFunc(GL_LESS);
+                }
             }
 
             /*
