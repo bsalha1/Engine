@@ -63,7 +63,7 @@ vec3 compute_directional_component(DirectionalLight light, vec3 normal, vec3 cam
     /*
      * Compute ambient light component.
      */
-    const float ambient_light_strength = 0.1;
+    const float ambient_light_strength = 0.01;
     const vec3 ambient_light = ambient_light_strength * light.color;
 
     /*
@@ -104,14 +104,15 @@ vec3 compute_point_component(PointLight light, vec3 normal, vec3 frag_pos, vec3 
     /*
      * Compute ambient light component.
      */
-    const float ambient_light_strength = 0.1;
+    const float ambient_light_strength = 0.00001;
     const vec3 ambient_light = ambient_light_strength * light.color;
 
     /*
      * Compute diffuse light component.
      */
+    const float diffuse_light_strength = 1.0;
     const float diff = max(dot(normal, light_direction), 0.0);
-    const vec3 diffuse_light = diff * light.color;
+    const vec3 diffuse_light = diffuse_light_strength * diff * light.color;
 
     /*
      * Compute specular light component.
@@ -128,7 +129,7 @@ vec3 compute_point_component(PointLight light, vec3 normal, vec3 frag_pos, vec3 
     const float distance = length(light.position - frag_pos);
     const float constant = 1.0;
     const float linear = 0.007;
-    const float quadratic = 0.0002;
+    const float quadratic = 0.002;
     const float attenuation = 1.0 / (constant + linear * distance + quadratic * (distance * distance));
 
     return attenuation * (ambient_light + diffuse_light + specular_light);

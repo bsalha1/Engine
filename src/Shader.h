@@ -24,14 +24,28 @@ namespace Engine
          */
         bool compile(const std::string &name)
         {
+            /*
+             * Get source code of vertex shader.
+             */
+            const std::string vertex_shader_file_name = "shaders/" + name + ".vert";
             std::string vertex_shader_src;
             ASSERT_RET_IF_NOT(
-                get_shader_src("shaders/" + name + ".vert", vertex_shader_src), false);
-            std::string fragment_shader_src;
-            ASSERT_RET_IF_NOT(get_shader_src("shaders/" + name + ".frag",
-                                             fragment_shader_src),
-                              false);
+                get_shader_src(vertex_shader_file_name, vertex_shader_src), false);
 
+            /*
+             * Get source code of fragment shader.
+             */
+            const std::string fragment_shader_file_name = "shaders/" + name + ".frag";
+            std::string fragment_shader_src;
+            ASSERT_RET_IF_NOT(
+                get_shader_src(fragment_shader_file_name, fragment_shader_src), false);
+
+            /*
+             * Compile shader.
+             */
+            LOG("Creating shader from %s and %s\n",
+                vertex_shader_file_name.c_str(),
+                fragment_shader_file_name.c_str());
             ASSERT_RET_IF_NOT(create_shader(vertex_shader_src, fragment_shader_src),
                               false);
 
@@ -247,6 +261,17 @@ namespace Engine
             glAttachShader(shader_id, vertex_shader_id);
             glAttachShader(shader_id, fragment_shader_id);
             glLinkProgram(shader_id);
+
+            GLint linked = 0;
+            glGetProgramiv(shader_id, GL_LINK_STATUS, &linked);
+            if (!linked)
+            {
+                char message[4096];
+                glGetProgramInfoLog(shader_id, sizeof(message), nullptr, message);
+                LOG_ERROR("Program link error: %s\n", message);
+                return false;
+            }
+
             glValidateProgram(shader_id);
 
             glDeleteShader(vertex_shader_id);

@@ -18,7 +18,7 @@ if [ "$ID" = debian ]; then
     # GLEW dependencies.
     sudo apt install libtool
 
-elif [ "$ID" = "arch" ]; then
+elif [ "$ID" = arch ]; then
     echo "Detected Arch Linux"
     sudo pacman -Sy clang
 fi

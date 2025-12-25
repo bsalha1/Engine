@@ -1,4 +1,5 @@
 
+#include "TextureSlot.h"
 #include "assert_util.h"
 
 #include <GL/glew.h>
@@ -8,21 +9,50 @@
 
 namespace Engine
 {
+    extern uint8_t next_texture_slot;
+
     class Texture
     {
     public:
+        Texture(): slot(TextureSlot::next_texture_slot())
+        {}
+
+        /**
+         * @brief Create a texture to be used as a framebuffer color attachment.
+         *
+         * @param width Texture width in pixels.
+         * @param height Texture height in pixels.
+         */
+        void create_framebuffer_texture(const GLsizei width, const GLsizei height)
+        {
+            glGenTextures(1, &texture_id);
+            glBindTexture(GL_TEXTURE_2D, texture_id);
+            glTexImage2D(GL_TEXTURE_2D,
+                         0,
+                         GL_RGBA16F,
+                         width,
+                         height,
+                         0,
+                         GL_RGBA,
+                         GL_UNSIGNED_BYTE,
+                         nullptr);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glBindTexture(GL_TEXTURE_2D, slot);
+
+            glFramebufferTexture2D(
+                GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture_id, 0);
+        }
+
         /**
          * @brief Load texture from file into the given slot.
          *
          * @param file_name Path to the texture file.
-         * @param _slot Texture slot to load the texture into.
          *
          * @return True on success, otherwise false.
          */
-        bool load_from_file(const std::string &file_name, const uint8_t _slot)
+        bool create_from_file(const std::string &file_name)
         {
-            slot = _slot;
-
             glGenTextures(1, &texture_id);
             glBindTexture(GL_TEXTURE_2D, texture_id);
 
@@ -62,7 +92,7 @@ namespace Engine
 
             glGenerateMipmap(GL_TEXTURE_2D);
 
-            glActiveTexture(GL_TEXTURE0 + _slot);
+            glActiveTexture(GL_TEXTURE0 + slot);
 
             return true;
         }
@@ -102,7 +132,7 @@ namespace Engine
 
     private:
         GLuint texture_id;
-        uint8_t slot;
+        const uint8_t slot;
         int width;
         int height;
     };

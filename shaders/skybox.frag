@@ -31,10 +31,10 @@ void main()
      * inner edge which is interpolated smoothly to the outer edge.
      */
     const float sun_disk = smoothstep(
-        cos(u_sun_angular_radius + 0.04), /* inner edge */
+        cos(u_sun_angular_radius * 1.5), /* inner edge */
         cos(u_sun_angular_radius), /* outer edge */
         sun_presence               /* value */);
 
-    const vec3 sun_color = vec3(1.0, 0.95, 0.85);
+    const vec3 sun_color = vec3(1.0, 0.95, 0.85) * 10.0;
     color = vec4(sky_color + sun_disk * sun_color, 1.0);
 }

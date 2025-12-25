@@ -1,4 +1,5 @@
 
+#include "TextureSlot.h"
 #include "assert_util.h"
 
 #include <GL/glew.h>
@@ -12,6 +13,9 @@ namespace Engine
     class CubemapTexture
     {
     public:
+        CubemapTexture(): slot(TextureSlot::next_texture_slot())
+        {}
+
         /**
          * @brief Load texture from file into the given slot.
          *
@@ -30,8 +34,8 @@ namespace Engine
          *
          * @return True on success, otherwise false.
          */
-        bool load_from_file(const std::string &file_name_prefix,
-                            const std::string &file_name_suffix)
+        bool create_from_file(const std::string &file_name_prefix,
+                              const std::string &file_name_suffix)
         {
             glGenTextures(1, &texture_id);
             glBindTexture(GL_TEXTURE_CUBE_MAP, texture_id);
@@ -83,10 +87,21 @@ namespace Engine
          */
         void use() const
         {
+            glActiveTexture(GL_TEXTURE0 + slot);
             glBindTexture(GL_TEXTURE_CUBE_MAP, texture_id);
+        }
+
+        /**
+         * @return The texture slot.
+         */
+        uint8_t get_slot() const
+        {
+            return slot;
         }
 
     private:
         GLuint texture_id;
+
+        const uint8_t slot;
     };
 }

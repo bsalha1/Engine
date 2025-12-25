@@ -9,6 +9,8 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <chrono>
+#include <glm/mat4x4.hpp>
+#include <glm/trigonometric.hpp>
 #include <glm/vec3.hpp>
 #include <map>
 #include <memory>
@@ -51,13 +53,19 @@ namespace Engine
 
         float get_terrain_height(const float x, const float z) const;
 
-        void process_menu();
+        bool process_menu();
 
         void update_view();
 
         bool update_player_state_grounded(const bool fly_key_pressed);
 
         void update_player_position();
+
+        bool draw(const glm::mat4 &chaser_model,
+                  const glm::mat4 &terrain_model,
+                  const glm::vec3 &directional_light_direction,
+                  const float orbital_angle,
+                  const float sun_brightness);
 
         /**
          * Window handle.
@@ -97,6 +105,8 @@ namespace Engine
          * Coordinate of window center on Y axis.
          */
         int window_center_y;
+
+        glm::mat4 projection;
 
         PlayerState player_state;
 
@@ -225,6 +235,21 @@ namespace Engine
          */
 
         /**
+         * Screen buffer.
+         * @{
+         */
+        float exposure;
+        float gamma;
+        float sharpness;
+        Shader screen_shader;
+        VertexArray quad_textured_vertex_array;
+        GLuint frame_buffer;
+        Texture screen_texture;
+        /**
+         * @}
+         */
+
+        /**
          * Chaser entity.
          * @{
          */
@@ -259,6 +284,9 @@ namespace Engine
         VertexArray skybox_vertex_array;
         Shader skybox_shader;
         CubemapTexture skybox_texture;
+
+        static constexpr float tilt = glm::radians<float>(23.5f);
+        const glm::vec3 rotation_axis = glm::vec3(glm::sin(tilt), glm::cos(tilt), 0.f);
         /**
          * @}
          */
@@ -267,7 +295,9 @@ namespace Engine
          * Lighting.
          * @{
          */
+        static constexpr glm::vec3 light_color_rgb = glm::vec3(0xFF, 0xDF, 0x22);
         Shader light_shader;
+        glm::vec3 point_light_position;
         /**
          * @}
          */

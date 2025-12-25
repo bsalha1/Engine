@@ -34,6 +34,13 @@ namespace Engine
     };
     static_assert(sizeof(TexturedVertex3d) == 5 * sizeof(float));
 
+    struct TexturedVertex2d
+    {
+        glm::vec2 position;
+        glm::vec2 texture;
+    };
+    static_assert(sizeof(TexturedVertex2d) == 4 * sizeof(float));
+
     /**
      * A vertex with a position and a normal vector.
      */
@@ -113,6 +120,7 @@ namespace Engine
         player_position(0.f, player_height, 0.f),
         player_velocity(0.f, 0.f, 0.f),
         last_crouch_time(std::chrono::steady_clock::now()),
+        time_since_start(0.0),
         escape_pressed_prev(false),
         mouse_prev_set(false),
         mouse_x_prev(0.0),
@@ -123,7 +131,11 @@ namespace Engine
         right(0.f, 0.f, 0.f),
         forwards(0.f, 0.f, 0.f),
         head(0.f, 0.f, 0.f),
-        chaser_position(0.f, 0.f, 0.f)
+        exposure(3.0f),
+        gamma(1.0f),
+        sharpness(500.0f),
+        chaser_position(0.f, 0.f, 0.f),
+        point_light_position(150.f, 100.f, 120.f)
     {}
 
     /**
@@ -228,6 +240,16 @@ namespace Engine
         window_center_y = window_height / 2;
 
         /*
+         * Now that we know the aspect ratio, set up the projection matrix.
+         */
+        static constexpr float fov_deg = 75.f;
+        static constexpr const float far_clip = 5000.f;
+        const float aspect = static_cast<float>(window_width) / window_height;
+        const float near_clip = 0.001f;
+        projection =
+            glm::perspective(glm::radians(fov_deg), aspect, near_clip, far_clip);
+
+        /*
          * Hide the cursor and move it to the center of the window.
          */
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -238,6 +260,11 @@ namespace Engine
          */
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glEnable(GL_BLEND);
+
+        /*
+         * Enable anti-aliasing.
+         */
+        glEnable(GL_MULTISAMPLE);
 
         LOG("Initializing GLEW\n");
         ASSERT_RET_IF_GLEW_NOT_OK(glewInit(), false);
@@ -256,108 +283,117 @@ namespace Engine
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LESS);
 
-        LOG("Creating entity buffers\n");
+        /*
+         * Create screen frame buffer.
+         */
+        LOG("Creating screen buffer\n");
+        {
+            /* clang-format off */
+            const std::array<TexturedVertex2d, 6> vertices = {{
+            /*                  position,              texture */
+                {glm::vec2(-1.0f,  1.0f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec2(-1.0f, -1.0f), glm::vec2(0.0f, 0.0f)},
+                {glm::vec2( 1.0f, -1.0f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec2(-1.0f,  1.0f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec2( 1.0f, -1.0f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec2( 1.0f,  1.0f), glm::vec2(1.0f, 1.0f)},
+            }};
+            /* clang-format on */
+
+            quad_textured_vertex_array.create(vertices.data(), vertices.size());
+            quad_textured_vertex_array.setup_vertex_attrib(0,
+                                                           &TexturedVertex2d::position);
+            quad_textured_vertex_array.setup_vertex_attrib(1,
+                                                           &TexturedVertex2d::texture);
+
+            glGenFramebuffers(1, &frame_buffer);
+            glBindFramebuffer(GL_FRAMEBUFFER, frame_buffer);
+
+            /*
+             * Create a texture to hold the color buffer.
+             */
+            screen_texture.create_framebuffer_texture(window_width, window_height);
+
+            /*
+             * Create a render buffer to hold the depth and stencil buffer.
+             */
+            GLuint render_buffer;
+            glGenRenderbuffers(1, &render_buffer);
+            glBindRenderbuffer(GL_RENDERBUFFER, render_buffer);
+            glRenderbufferStorage(
+                GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, window_width, window_height);
+            glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER,
+                                      GL_DEPTH_STENCIL_ATTACHMENT,
+                                      GL_RENDERBUFFER,
+                                      render_buffer);
+
+            ASSERT_RET_IF_NOT(glCheckFramebufferStatus(GL_FRAMEBUFFER) ==
+                                  GL_FRAMEBUFFER_COMPLETE,
+                              false);
+
+            /*
+             * Unbind so we use the default frame buffer for now.
+             */
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        }
 
         /*
          * Create chaser buffers.
          */
+        LOG("Creating entity buffers\n");
         {
             /* clang-format off */
             const std::array<TexturedVertex3d, 36> vertices = {{
             /*                         position,              texture */
-                {glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec2(0.0f, 0.0f)},
-                {glm::vec3( 0.5f, -0.5f, -0.5f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3( 0.5f,  0.5f, -0.5f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3( 0.5f,  0.5f, -0.5f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3(-0.5f,  0.5f, -0.5f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec2(0.0f, 0.0f)},
+                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec2(0.0f, 0.0f)},
+                {glm::vec3( 1.0f, -1.0f, -1.0f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3( 1.0f,  1.0f, -1.0f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3( 1.0f,  1.0f, -1.0f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3(-1.0f,  1.0f, -1.0f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec2(0.0f, 0.0f)},
 
-                {glm::vec3(-0.5f, -0.5f,  0.5f), glm::vec2(0.0f, 0.0f)},
-                {glm::vec3( 0.5f, -0.5f,  0.5f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3( 0.5f,  0.5f,  0.5f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3( 0.5f,  0.5f,  0.5f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3(-0.5f,  0.5f,  0.5f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3(-0.5f, -0.5f,  0.5f), glm::vec2(0.0f, 0.0f)},
+                {glm::vec3(-1.0f, -1.0f,  1.0f), glm::vec2(0.0f, 0.0f)},
+                {glm::vec3( 1.0f, -1.0f,  1.0f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3(-1.0f,  1.0f,  1.0f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3(-1.0f, -1.0f,  1.0f), glm::vec2(0.0f, 0.0f)},
 
-                {glm::vec3(-0.5f,  0.5f,  0.5f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3(-0.5f,  0.5f, -0.5f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3(-0.5f, -0.5f,  0.5f), glm::vec2(0.0f, 0.0f)},
-                {glm::vec3(-0.5f,  0.5f,  0.5f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3(-1.0f,  1.0f,  1.0f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3(-1.0f,  1.0f, -1.0f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3(-1.0f, -1.0f,  1.0f), glm::vec2(0.0f, 0.0f)},
+                {glm::vec3(-1.0f,  1.0f,  1.0f), glm::vec2(1.0f, 0.0f)},
 
-                {glm::vec3( 0.5f,  0.5f,  0.5f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3( 0.5f,  0.5f, -0.5f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3( 0.5f, -0.5f, -0.5f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3( 0.5f, -0.5f, -0.5f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3( 0.5f, -0.5f,  0.5f), glm::vec2(0.0f, 0.0f)},
-                {glm::vec3( 0.5f,  0.5f,  0.5f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3( 1.0f,  1.0f, -1.0f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3( 1.0f, -1.0f, -1.0f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3( 1.0f, -1.0f, -1.0f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3( 1.0f, -1.0f,  1.0f), glm::vec2(0.0f, 0.0f)},
+                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec2(1.0f, 0.0f)},
 
-                {glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3( 0.5f, -0.5f, -0.5f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3( 0.5f, -0.5f,  0.5f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3( 0.5f, -0.5f,  0.5f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3(-0.5f, -0.5f,  0.5f), glm::vec2(0.0f, 0.0f)},
-                {glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3( 1.0f, -1.0f, -1.0f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3( 1.0f, -1.0f,  1.0f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3( 1.0f, -1.0f,  1.0f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3(-1.0f, -1.0f,  1.0f), glm::vec2(0.0f, 0.0f)},
+                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec2(0.0f, 1.0f)},
 
-                {glm::vec3(-0.5f,  0.5f, -0.5f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3( 0.5f,  0.5f, -0.5f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3( 0.5f,  0.5f,  0.5f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3( 0.5f,  0.5f,  0.5f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3(-0.5f,  0.5f,  0.5f), glm::vec2(0.0f, 0.0f)},
-                {glm::vec3(-0.5f,  0.5f, -0.5f), glm::vec2(0.0f, 1.0f)}
+                {glm::vec3(-1.0f,  1.0f, -1.0f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3( 1.0f,  1.0f, -1.0f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3(-1.0f,  1.0f,  1.0f), glm::vec2(0.0f, 0.0f)},
+                {glm::vec3(-1.0f,  1.0f, -1.0f), glm::vec2(0.0f, 1.0f)}
             }};
             /* clang-format on */
 
-            chaser_vertex_array.create(vertices.size());
-            chaser_vertex_array.bind();
-
-            GLuint chaser_buffer_obj;
-            glGenBuffers(1, &chaser_buffer_obj);
-            glBindBuffer(GL_ARRAY_BUFFER, chaser_buffer_obj);
-            glBufferData(
-                GL_ARRAY_BUFFER, sizeof(vertices), vertices.data(), GL_STATIC_DRAW);
-
-            /*
-             * Position coordinate attribute.
-             */
-            static constexpr GLuint position_coord_attrib_index = 0;
-            static constexpr GLuint position_coord_attrib_start_offset =
-                offsetof(TexturedVertex3d, position);
-            static constexpr GLuint position_coord_attrib_end_offset =
-                position_coord_attrib_start_offset + sizeof(TexturedVertex3d::position);
-            static constexpr GLuint position_coord_attrib_size = sizeof(float);
-            static constexpr GLuint position_coord_attrib_count =
-                (position_coord_attrib_end_offset -
-                 position_coord_attrib_start_offset) /
-                position_coord_attrib_size;
-            glVertexAttribPointer(position_coord_attrib_index,
-                                  position_coord_attrib_count,
-                                  GL_FLOAT,
-                                  GL_FALSE,
-                                  sizeof(TexturedVertex3d),
-                                  (GLvoid *)position_coord_attrib_start_offset);
-            glEnableVertexAttribArray(position_coord_attrib_index);
-
-            /*
-             * Texture coordinate attribute.
-             */
-            static constexpr GLuint texture_coord_attrib_index = 1;
-            static constexpr GLuint texture_coord_attrib_start_offset =
-                offsetof(TexturedVertex3d, texture);
-            static constexpr GLuint texture_coord_attrib_end_offset =
-                texture_coord_attrib_start_offset + sizeof(TexturedVertex3d::texture);
-            static constexpr GLuint texture_coord_attrib_size = sizeof(float);
-            static constexpr GLuint texture_coord_attrib_count =
-                (texture_coord_attrib_end_offset - texture_coord_attrib_start_offset) /
-                texture_coord_attrib_size;
-            glVertexAttribPointer(texture_coord_attrib_index,
-                                  texture_coord_attrib_count,
-                                  GL_FLOAT,
-                                  GL_FALSE,
-                                  sizeof(TexturedVertex3d),
-                                  (GLvoid *)texture_coord_attrib_start_offset);
-            glEnableVertexAttribArray(texture_coord_attrib_index);
+            chaser_vertex_array.create(vertices.data(), vertices.size());
+            chaser_vertex_array.setup_vertex_attrib(0, &TexturedVertex3d::position);
+            chaser_vertex_array.setup_vertex_attrib(1, &TexturedVertex3d::texture);
         }
 
         LOG("Compiling shaders\n");
@@ -365,11 +401,11 @@ namespace Engine
         ASSERT_RET_IF_NOT(terrain_shader.compile("terrain"), false);
         ASSERT_RET_IF_NOT(skybox_shader.compile("skybox"), false);
         ASSERT_RET_IF_NOT(light_shader.compile("light"), false);
+        ASSERT_RET_IF_NOT(screen_shader.compile("screen"), false);
 
         LOG("Loading textures\n");
-        ASSERT_RET_IF_NOT(chaser_texture.load_from_file("textures/obama.png", 0),
-                          false);
-        ASSERT_RET_IF_NOT(dirt_texture.load_from_file("textures/dirt.jpg", 1), false);
+        ASSERT_RET_IF_NOT(chaser_texture.create_from_file("textures/obama.png"), false);
+        ASSERT_RET_IF_NOT(dirt_texture.create_from_file("textures/dirt.jpg"), false);
 
         LOG("Loading terrain heightmaps\n");
         {
@@ -552,160 +588,68 @@ namespace Engine
                 vertex.norm = glm::normalize(vertex.norm);
             }
 
-            terrain_vertex_array.create(vertices.size());
-            terrain_vertex_array.bind();
-
-            GLuint terrain_vertex_buffer_array_obj;
-            glGenBuffers(1, &terrain_vertex_buffer_array_obj);
-            glBindBuffer(GL_ARRAY_BUFFER, terrain_vertex_buffer_array_obj);
-            glBufferData(GL_ARRAY_BUFFER,
-                         vertices.size() * sizeof(TexturedVector3dNormal),
-                         vertices.data(),
-                         GL_STATIC_DRAW);
-
-            /*
-             * Position coordinate attribute.
-             */
-            static constexpr GLuint position_attrib_index = 0;
-            static constexpr GLuint position_attrib_start_offset =
-                offsetof(TexturedVector3dNormal, position);
-            static constexpr GLuint position_attrib_end_offset =
-                position_attrib_start_offset + sizeof(TexturedVector3dNormal::position);
-            static constexpr GLuint position_attrib_size = sizeof(float);
-            static constexpr GLuint position_attrib_count =
-                (position_attrib_end_offset - position_attrib_start_offset) /
-                position_attrib_size;
-            glVertexAttribPointer(position_attrib_index,
-                                  position_attrib_count,
-                                  GL_FLOAT,
-                                  GL_FALSE,
-                                  sizeof(TexturedVector3dNormal),
-                                  (GLvoid *)position_attrib_start_offset);
-            glEnableVertexAttribArray(position_attrib_index);
-
-            /*
-             * Normal vector attribute.
-             */
-            static constexpr GLuint norm_attrib_index = 1;
-            static constexpr GLuint norm_attrib_start_offset =
-                offsetof(TexturedVector3dNormal, norm);
-            static constexpr GLuint norm_attrib_end_offset =
-                norm_attrib_start_offset + sizeof(TexturedVector3dNormal::norm);
-            static constexpr GLuint norm_attrib_size = sizeof(float);
-            static constexpr GLuint norm_attrib_count =
-                (norm_attrib_end_offset - norm_attrib_start_offset) / norm_attrib_size;
-            glVertexAttribPointer(norm_attrib_index,
-                                  norm_attrib_count,
-                                  GL_FLOAT,
-                                  GL_FALSE,
-                                  sizeof(TexturedVector3dNormal),
-                                  (GLvoid *)norm_attrib_start_offset);
-            glEnableVertexAttribArray(norm_attrib_index);
-
-            /*
-             * Texture coordinate attribute.
-             */
-            static constexpr GLuint texture_attrib_index = 2;
-            static constexpr GLuint texture_attrib_start_offset =
-                offsetof(TexturedVector3dNormal, texture);
-            static constexpr GLuint texture_attrib_end_offset =
-                texture_attrib_start_offset + sizeof(TexturedVector3dNormal::texture);
-            static constexpr GLuint texture_attrib_size = sizeof(float);
-            static constexpr GLuint texture_attrib_count =
-                (texture_attrib_end_offset - texture_attrib_start_offset) /
-                texture_attrib_size;
-            glVertexAttribPointer(texture_attrib_index,
-                                  texture_attrib_count,
-                                  GL_FLOAT,
-                                  GL_FALSE,
-                                  sizeof(TexturedVector3dNormal),
-                                  (GLvoid *)texture_attrib_start_offset);
-            glEnableVertexAttribArray(texture_attrib_index);
-
+            terrain_vertex_array.create(vertices.data(), vertices.size());
+            terrain_vertex_array.setup_vertex_attrib(0,
+                                                     &TexturedVector3dNormal::position);
+            terrain_vertex_array.setup_vertex_attrib(1, &TexturedVector3dNormal::norm);
+            terrain_vertex_array.setup_vertex_attrib(2,
+                                                     &TexturedVector3dNormal::texture);
             terrain_index_buffer.create(indices.data(), indices.size());
         }
 
         LOG("Loading skybox\n");
         {
-            ASSERT_RET_IF_NOT(skybox_texture.load_from_file("textures/skybox/", ".jpg"),
-                              false);
+            ASSERT_RET_IF_NOT(
+                skybox_texture.create_from_file("textures/skybox/", ".jpg"), false);
 
             static const std::array<Vertex3d, 36> skybox_vertices = {
                 /* clang-format off */
-                glm::vec3(-0.5f, -0.5f, -0.5f),
-                glm::vec3( 0.5f, -0.5f, -0.5f),
-                glm::vec3( 0.5f,  0.5f, -0.5f),
-                glm::vec3( 0.5f,  0.5f, -0.5f),
-                glm::vec3(-0.5f,  0.5f, -0.5f),
-                glm::vec3(-0.5f, -0.5f, -0.5f),
+                glm::vec3(-1.0f, -1.0f, -1.0f),
+                glm::vec3( 1.0f, -1.0f, -1.0f),
+                glm::vec3( 1.0f,  1.0f, -1.0f),
+                glm::vec3( 1.0f,  1.0f, -1.0f),
+                glm::vec3(-1.0f,  1.0f, -1.0f),
+                glm::vec3(-1.0f, -1.0f, -1.0f),
 
-                glm::vec3(-0.5f, -0.5f,  0.5f),
-                glm::vec3( 0.5f, -0.5f,  0.5f),
-                glm::vec3( 0.5f,  0.5f,  0.5f),
-                glm::vec3( 0.5f,  0.5f,  0.5f),
-                glm::vec3(-0.5f,  0.5f,  0.5f),
-                glm::vec3(-0.5f, -0.5f,  0.5f),
+                glm::vec3(-1.0f, -1.0f,  1.0f),
+                glm::vec3( 1.0f, -1.0f,  1.0f),
+                glm::vec3( 1.0f,  1.0f,  1.0f),
+                glm::vec3( 1.0f,  1.0f,  1.0f),
+                glm::vec3(-1.0f,  1.0f,  1.0f),
+                glm::vec3(-1.0f, -1.0f,  1.0f),
 
-                glm::vec3(-0.5f,  0.5f,  0.5f),
-                glm::vec3(-0.5f,  0.5f, -0.5f),
-                glm::vec3(-0.5f, -0.5f, -0.5f),
-                glm::vec3(-0.5f, -0.5f, -0.5f),
-                glm::vec3(-0.5f, -0.5f,  0.5f),
-                glm::vec3(-0.5f,  0.5f,  0.5f),
+                glm::vec3(-1.0f,  1.0f,  1.0f),
+                glm::vec3(-1.0f,  1.0f, -1.0f),
+                glm::vec3(-1.0f, -1.0f, -1.0f),
+                glm::vec3(-1.0f, -1.0f, -1.0f),
+                glm::vec3(-1.0f, -1.0f,  1.0f),
+                glm::vec3(-1.0f,  1.0f,  1.0f),
 
-                glm::vec3( 0.5f,  0.5f,  0.5f),
-                glm::vec3( 0.5f,  0.5f, -0.5f),
-                glm::vec3( 0.5f, -0.5f, -0.5f),
-                glm::vec3( 0.5f, -0.5f, -0.5f),
-                glm::vec3( 0.5f, -0.5f,  0.5f),
-                glm::vec3( 0.5f,  0.5f,  0.5f),
+                glm::vec3( 1.0f,  1.0f,  1.0f),
+                glm::vec3( 1.0f,  1.0f, -1.0f),
+                glm::vec3( 1.0f, -1.0f, -1.0f),
+                glm::vec3( 1.0f, -1.0f, -1.0f),
+                glm::vec3( 1.0f, -1.0f,  1.0f),
+                glm::vec3( 1.0f,  1.0f,  1.0f),
 
-                glm::vec3(-0.5f, -0.5f, -0.5f),
-                glm::vec3( 0.5f, -0.5f, -0.5f),
-                glm::vec3( 0.5f, -0.5f,  0.5f),
-                glm::vec3( 0.5f, -0.5f,  0.5f),
-                glm::vec3(-0.5f, -0.5f,  0.5f),
-                glm::vec3(-0.5f, -0.5f, -0.5f),
+                glm::vec3(-1.0f, -1.0f, -1.0f),
+                glm::vec3( 1.0f, -1.0f, -1.0f),
+                glm::vec3( 1.0f, -1.0f,  1.0f),
+                glm::vec3( 1.0f, -1.0f,  1.0f),
+                glm::vec3(-1.0f, -1.0f,  1.0f),
+                glm::vec3(-1.0f, -1.0f, -1.0f),
 
-                glm::vec3(-0.5f,  0.5f, -0.5f),
-                glm::vec3( 0.5f,  0.5f, -0.5f),
-                glm::vec3( 0.5f,  0.5f,  0.5f),
-                glm::vec3( 0.5f,  0.5f,  0.5f),
-                glm::vec3(-0.5f,  0.5f,  0.5f),
-                glm::vec3(-0.5f,  0.5f, -0.5f),
+                glm::vec3(-1.0f,  1.0f, -1.0f),
+                glm::vec3( 1.0f,  1.0f, -1.0f),
+                glm::vec3( 1.0f,  1.0f,  1.0f),
+                glm::vec3( 1.0f,  1.0f,  1.0f),
+                glm::vec3(-1.0f,  1.0f,  1.0f),
+                glm::vec3(-1.0f,  1.0f, -1.0f),
                 /* clang-format on */
             };
 
-            skybox_vertex_array.create(skybox_vertices.size());
-            skybox_vertex_array.bind();
-
-            GLuint skybox_buffer_obj;
-            glGenBuffers(1, &skybox_buffer_obj);
-            glBindBuffer(GL_ARRAY_BUFFER, skybox_buffer_obj);
-            glBufferData(GL_ARRAY_BUFFER,
-                         sizeof(skybox_vertices),
-                         skybox_vertices.data(),
-                         GL_STATIC_DRAW);
-
-            /*
-             * Position coordinate attribute.
-             */
-            static constexpr GLuint position_attrib_index = 0;
-            static constexpr GLuint position_attrib_start_offset =
-                offsetof(Vertex3d, position);
-            static constexpr GLuint position_attrib_end_offset =
-                position_attrib_start_offset + sizeof(Vertex3d::position);
-            static constexpr GLuint position_attrib_size = sizeof(float);
-            static constexpr GLuint position_attrib_count =
-                (position_attrib_end_offset - position_attrib_start_offset) /
-                position_attrib_size;
-            glVertexAttribPointer(position_attrib_index,
-                                  position_attrib_count,
-                                  GL_FLOAT,
-                                  GL_FALSE,
-                                  sizeof(Vertex3d),
-                                  (GLvoid *)position_attrib_start_offset);
-            glEnableVertexAttribArray(position_attrib_index);
+            skybox_vertex_array.create(skybox_vertices.data(), skybox_vertices.size());
+            skybox_vertex_array.setup_vertex_attrib(0, &Vertex3d::position);
         }
 
         LOG("Initializing GUI\n");
@@ -812,7 +756,7 @@ namespace Engine
     /**
      * Process menu input.
      */
-    void Game::process_menu()
+    bool Game::process_menu()
     {
         const bool escape_pressed = glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS;
         const bool escape_pressed_rising_edge = escape_pressed && !escape_pressed_prev;
@@ -890,6 +834,22 @@ namespace Engine
                 }
             }
 
+            screen_shader.use();
+
+            /*
+             * Add display settings.
+             */
+            ImGui::SliderFloat("exposure", &exposure, 0.0, 10.0);
+            ASSERT_RET_IF_NOT(screen_shader.set_Uniform1f("u_exposure", exposure),
+                              false);
+
+            ImGui::SliderFloat("gamma", &gamma, 0.0, 10.0);
+            ASSERT_RET_IF_NOT(screen_shader.set_Uniform1f("u_gamma", gamma), false);
+
+            ImGui::SliderFloat("sharpness", &sharpness, 1.0, 1000.0);
+            ASSERT_RET_IF_NOT(screen_shader.set_Uniform1f("u_sharpness", sharpness),
+                              false);
+
             /*
              * Add quit button.
              */
@@ -929,6 +889,8 @@ namespace Engine
         ImGui::Text("move_impulse: %.2f", player_move_impulse);
         ImGui::Text("friction_coeff: %.2f", friction_coeff);
         ImGui::End();
+
+        return true;
     }
 
     /**
@@ -1333,36 +1295,164 @@ namespace Engine
     }
 
     /**
+     * @brief Draw the scene.
+     *
+     * @param chaser_model Model matrix of the chasing chaser.
+     * @param terrain_model Model matrix of the terrain.
+     * @param directional_light_direction Directional light direction.
+     * @param orbital_angle Orbital angle of the skybox.
+     * @param sun_brightness Brightness of the sun.
+     *
+     * @return True on success, otherwise false.
+     */
+    bool Game::draw(const glm::mat4 &chaser_model,
+                    const glm::mat4 &terrain_model,
+                    const glm::vec3 &directional_light_direction,
+                    const float orbital_angle,
+                    const float sun_brightness)
+    {
+        /*
+         * Compute view looking at the direction our mouse is pointing.
+         */
+        const glm::mat4 view =
+            glm::lookAt(player_position, player_position + direction, head);
+
+        /*
+         * Draw the chasers.
+         */
+
+        basic_textured_shader.use();
+        chaser_texture.use();
+
+        /*
+         * Draw a stationary chaser at the origin.
+         */
+        {
+            const glm::mat4 model_view_projection = projection * view * glm::mat4(1.0f);
+            ASSERT_RET_IF_NOT(basic_textured_shader.set_UniformMatrix4fv(
+                                  "u_model_view_projection",
+                                  &model_view_projection[0][0]),
+                              false);
+
+            chaser_vertex_array.draw();
+        }
+
+        /*
+         * Draw chaser which chases.
+         */
+        {
+            const glm::mat4 model_view_projection = projection * view * chaser_model;
+            ASSERT_RET_IF_NOT(basic_textured_shader.set_UniformMatrix4fv(
+                                  "u_model_view_projection",
+                                  &model_view_projection[0][0]),
+                              false);
+
+            chaser_vertex_array.draw();
+        }
+
+        light_shader.use();
+
+        /*
+         * Draw point light.
+         */
+        {
+            const glm::mat4 point_light_model =
+                glm::translate(glm::mat4(1.f), point_light_position);
+
+            const glm::mat4 point_light_model_view_projection =
+                projection * view * point_light_model;
+
+            ASSERT_RET_IF_NOT(light_shader.set_UniformMatrix4fv(
+                                  "u_model_view_projection",
+                                  &point_light_model_view_projection[0][0]),
+                              false);
+
+            chaser_vertex_array.draw();
+        }
+
+        /*
+         * Draw the terrain.
+         */
+        {
+            terrain_vertex_array.bind();
+            terrain_shader.use();
+
+            const glm::vec3 directional_light_color =
+                (light_color_rgb / 255.f) * sun_brightness;
+
+            ASSERT_RET_IF_NOT(terrain_shader.set_UniformMatrix4fv("u_model",
+                                                                  &terrain_model[0][0]),
+                              false);
+            ASSERT_RET_IF_NOT(
+                terrain_shader.set_UniformMatrix4fv("u_view", &view[0][0]), false);
+            ASSERT_RET_IF_NOT(terrain_shader.set_UniformMatrix4fv("u_projection",
+                                                                  &projection[0][0]),
+                              false);
+            ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("u_point_light.position",
+                                                           point_light_position),
+                              false);
+            ASSERT_RET_IF_NOT(
+                terrain_shader.set_Uniform3f("u_directional_light.direction",
+                                             directional_light_direction),
+                false);
+            ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("u_directional_light.color",
+                                                           directional_light_color),
+                              false);
+            ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("u_camera_position",
+                                                           player_position),
+                              false);
+
+            terrain_index_buffer.draw();
+        }
+
+        /*
+         * Lastly, draw the skybox.
+         */
+        {
+            glDepthFunc(GL_LEQUAL);
+
+            skybox_texture.use();
+
+            /*
+             * Use the player's view but remove translation and add rotation to
+             * emulate the planet rotating.
+             */
+            const glm::mat4 view_skybox =
+                glm::rotate(glm::mat4(glm::mat3(view)), orbital_angle, rotation_axis);
+
+            skybox_shader.use();
+            skybox_shader.set_UniformMatrix4fv("u_view", &view_skybox[0][0]);
+            skybox_shader.set_UniformMatrix4fv("u_projection", &projection[0][0]);
+
+            skybox_vertex_array.draw();
+
+            glDepthFunc(GL_LESS);
+        }
+
+        return true;
+    }
+
+    /**
      * Run the game.
      */
     bool Game::run()
     {
         LOG("Entering main loop\n");
 
-        static constexpr float fov_deg = 90.f;
-        static constexpr const float far_clip = 5000.f;
-        const float aspect = static_cast<float>(window_width) / window_height;
-        const float near_clip = 0.001f;
-        const glm::mat4 projection =
-            glm::perspective(glm::radians(fov_deg), aspect, near_clip, far_clip);
-
         terrain_shader.use();
-
-        const glm::vec3 light_color_rgb = glm::vec3(0xFF, 0xDF, 0x22);
 
         /*
          * Initialize point light.
          */
-        glm::vec3 point_light_position = glm::vec3(150.f, 100.f, 120.f);
         ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("u_point_light.color",
                                                        light_color_rgb / 255.f),
                           false);
         /*
          * Initialize directional light.
          */
-        ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("u_directional_light.color",
-                                                       light_color_rgb / 255.f),
-                          false);
+        // ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("u_directional_light.color",
+        //                                                light_color_rgb / 255.f),
+        //                   false);
 
         /*
          * Assign texture samplers.
@@ -1376,7 +1466,24 @@ namespace Engine
         ASSERT_RET_IF_NOT(basic_textured_shader.set_Uniform1i(
                               "u_texture_sampler", chaser_texture.get_slot()),
                           false);
-        chaser_texture.use();
+
+        skybox_shader.use();
+        ASSERT_RET_IF_NOT(skybox_shader.set_Uniform1i("u_texture_sampler",
+                                                      skybox_texture.get_slot()),
+                          false);
+
+        screen_shader.use();
+        ASSERT_RET_IF_NOT(screen_shader.set_Uniform1f("u_sharpness", sharpness), false);
+        ASSERT_RET_IF_NOT(screen_shader.set_Uniform1i("u_texture_sampler",
+                                                      screen_texture.get_slot()),
+                          false);
+
+        /*
+         * Initialize screen shader uniforms.
+         */
+        ASSERT_RET_IF_NOT(screen_shader.set_Uniform1f("u_exposure", exposure), false);
+        ASSERT_RET_IF_NOT(screen_shader.set_Uniform1f("u_gamma", gamma), false);
+        ASSERT_RET_IF_NOT(screen_shader.set_Uniform1f("u_sharpness", sharpness), false);
 
         /*
          * Set day length and compute the rotational speed.
@@ -1384,8 +1491,6 @@ namespace Engine
         static constexpr float day_length_s = 10.f;
         static constexpr float rotational_angular_speed =
             2 * glm::pi<float>() / day_length_s;
-        static constexpr float tilt = glm::radians<float>(23.5f);
-        const glm::vec3 rotation_axis = glm::vec3(glm::sin(tilt), glm::cos(tilt), 0.f);
 
         /*
          * Relative to the terrain, the skybox spins around it. We draw a sun
@@ -1426,23 +1531,18 @@ namespace Engine
 
             frame_start_time = std::chrono::steady_clock::now();
 
-            time_since_start = (frame_start_time - start_time).count() / 1e9;
-
-            /*
-             * Clear both the color and depth buffers.
-             */
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
             /*
              * Process menu.
              */
-            process_menu();
+            ASSERT_RET_IF_NOT(process_menu(), false);
 
             /*
              * If not paused, run gameplay.
              */
             if (state != State::PAUSED)
             {
+                time_since_start += dt;
+
                 /*
                  * Cache variables used multiple times.
                  */
@@ -1469,211 +1569,114 @@ namespace Engine
                  */
                 update_player_position();
 
-                /*
-                 * Compute view looking at the direction our mouse is pointing.
-                 */
-                const glm::mat4 view =
-                    glm::lookAt(player_position, player_position + direction, head);
-
                 const float orbital_angle = rotational_angular_speed * time_since_start;
 
                 /*
-                 * Draw the chasers.
+                 * Update chaser position to move towards player position on X-Z
+                 * plane and face them.
                  */
+                const glm::vec3 direction_to_player_xz =
+                    glm::normalize(glm::vec3(player_position.x - chaser_position.x,
+                                             0.f,
+                                             player_position.z - chaser_position.z));
+                static constexpr float chaser_move_impulse = 1.f;
+                chaser_position += direction_to_player_xz * chaser_move_impulse *
+                                   static_cast<float>(dt);
 
-                basic_textured_shader.use();
+                glm::mat4 chaser_model =
+                    glm::translate(glm::mat4(1.f), chaser_position);
+
+                chaser_model = glm::rotate(chaser_model,
+                                           glm::radians<float>(180.f) +
+                                               std::atan2(direction_to_player_xz.x,
+                                                          direction_to_player_xz.z),
+                                           glm::vec3(0.f, 1.f, 0.f));
+
+                static float light_velocity = 20.f;
 
                 /*
-                 * Draw a chaser at the origin.
+                 * Update point light position.
                  */
+                if (point_light_position.y <
+                    get_terrain_height(point_light_position.x, point_light_position.z) +
+                        5.f)
                 {
-                    const glm::mat4 model_view_projection =
-                        projection * view * glm::mat4(1.0f);
-                    ASSERT_RET_IF_NOT(basic_textured_shader.set_UniformMatrix4fv(
-                                          "u_model_view_projection",
-                                          &model_view_projection[0][0]),
-                                      false);
-
-                    chaser_vertex_array.draw();
+                    light_velocity = 20.f;
                 }
+                if (point_light_position.y >
+                    get_terrain_height(point_light_position.x, point_light_position.z) +
+                        100.f)
+                {
+                    light_velocity = -20.f;
+                }
+                point_light_position.y += light_velocity * dt;
 
                 /*
-                 * Make this one chase the player.
+                 * Compute the directional light direction relative to the terrain
+                 * by converting the sun's position from skybox model space to the
+                 * terrain model space.
                  */
-                {
-                    /*
-                     * Update chaser position to move towards player position on X-Z
-                     * plane.
-                     */
-                    const glm::vec3 direction_to_player_xz = glm::normalize(
-                        glm::vec3(player_position.x - chaser_position.x,
-                                  0.f,
-                                  player_position.z - chaser_position.z));
-                    static constexpr float chaser_move_impulse = 1.f;
-                    chaser_position += direction_to_player_xz * chaser_move_impulse *
-                                       static_cast<float>(dt);
+                const glm::mat4 terrain_model = glm::mat4(1.0f);
 
-                    /*
-                     * Create model matrix for the chaser at its position.
-                     */
-                    glm::mat4 chaser_model =
-                        glm::translate(glm::mat4(1.f), chaser_position);
+                const glm::mat4 terrain_model_matrix_rotated =
+                    glm::rotate(terrain_model, orbital_angle, rotation_axis);
 
-                    /*
-                     * Set the chaser's angle to face us.
-                     */
-                    chaser_model = glm::rotate(chaser_model,
-                                               glm::radians<float>(180.f) +
-                                                   std::atan2(direction_to_player_xz.x,
-                                                              direction_to_player_xz.z),
-                                               glm::vec3(0.f, 1.f, 0.f));
+                const glm::vec3 sun_position_terrain_model_space = glm::vec3(
+                    terrain_model_matrix_rotated * sun_position_skybox_model_space);
 
-                    const glm::mat4 model_view_projection =
-                        projection * view * chaser_model;
-                    ASSERT_RET_IF_NOT(basic_textured_shader.set_UniformMatrix4fv(
-                                          "u_model_view_projection",
-                                          &model_view_projection[0][0]),
-                                      false);
-
-                    chaser_vertex_array.draw();
-                }
+                const glm::vec3 directional_light_direction =
+                    -glm::normalize(sun_position_terrain_model_space);
 
                 /*
-                 * Update and draw point light.
+                 * Compute sun brightness based on its elevation angle.
                  */
-                {
-                    static float light_velocity = 20.f;
+                const float sun_top_y =
+                    sun_position_terrain_model_space.y + sun_radius_skybox_model_space;
+                const float sun_distance =
+                    glm::sqrt(sun_top_y * sun_top_y +
+                              sun_position_terrain_model_space.x *
+                                  sun_position_terrain_model_space.x +
+                              sun_position_terrain_model_space.z *
+                                  sun_position_terrain_model_space.z);
+                const float sine_of_elevation_angle = sun_top_y / sun_distance;
 
-                    /*
-                     * Update point light position.
-                     */
-                    if (point_light_position.y <
-                        get_terrain_height(point_light_position.x,
-                                           point_light_position.z) +
-                            5.f)
-                    {
-                        light_velocity = 20.f;
-                    }
-                    if (point_light_position.y >
-                        get_terrain_height(point_light_position.x,
-                                           point_light_position.z) +
-                            100.f)
-                    {
-                        light_velocity = -20.f;
-                    }
-                    point_light_position.y += light_velocity * dt;
-
-                    const glm::mat4 point_light_model =
-                        glm::translate(glm::mat4(1.f), point_light_position);
-
-                    const glm::mat4 point_light_model_view_projection =
-                        projection * view * point_light_model;
-
-                    ASSERT_RET_IF_NOT(basic_textured_shader.set_UniformMatrix4fv(
-                                          "u_model_view_projection",
-                                          &point_light_model_view_projection[0][0]),
-                                      false);
-
-                    chaser_vertex_array.draw();
-                }
+                static constexpr float brightness_falloff_factor = 0.1f;
+                const float sun_brightness = sine_of_elevation_angle <= 0.f
+                                                 ? 0.f
+                                                 : glm::exp(-brightness_falloff_factor /
+                                                            sine_of_elevation_angle);
 
                 /*
-                 * Draw the terrain.
+                 * Draw scene into frame buffer.
                  */
-                {
-                    /*
-                     * Compute the directional light direction relative to the terrain
-                     * by converting the sun's position from skybox model space to the
-                     * terrain model space.
-                     */
-                    const glm::mat4 terrain_model_matrix = glm::mat4(1.0f);
-
-                    const glm::mat4 terrain_model_matrix_rotated =
-                        glm::rotate(terrain_model_matrix, orbital_angle, rotation_axis);
-
-                    const glm::vec3 sun_position_terrain_model_space = glm::vec3(
-                        terrain_model_matrix_rotated * sun_position_skybox_model_space);
-
-                    const glm::vec3 directional_light_direction =
-                        -glm::normalize(sun_position_terrain_model_space);
-
-                    terrain_vertex_array.bind();
-                    terrain_shader.use();
-
-                    /*
-                     * Compute sun brightness based on its elevation angle.
-                     */
-
-                    const float sun_top_y = sun_position_terrain_model_space.y +
-                                            sun_radius_skybox_model_space;
-                    const float sun_distance_xz =
-                        glm::sqrt(sun_position_terrain_model_space.x *
-                                      sun_position_terrain_model_space.x +
-                                  sun_position_terrain_model_space.z *
-                                      sun_position_terrain_model_space.z);
-                    const float sine_of_elevation_angle = sun_top_y / sun_distance_xz;
-
-                    static constexpr float brightness_falloff_factor = 0.1f;
-                    const float sun_brightness =
-                        sine_of_elevation_angle <= 0.f
-                            ? 0.f
-                            : glm::exp(-brightness_falloff_factor /
-                                       sine_of_elevation_angle);
-                    const glm::vec3 directional_light_color =
-                        (light_color_rgb / 255.f) * sun_brightness;
-
-                    ASSERT_RET_IF_NOT(terrain_shader.set_UniformMatrix4fv(
-                                          "u_model", &terrain_model_matrix[0][0]),
-                                      false);
-                    ASSERT_RET_IF_NOT(terrain_shader.set_UniformMatrix4fv("u_view",
-                                                                          &view[0][0]),
-                                      false);
-                    ASSERT_RET_IF_NOT(terrain_shader.set_UniformMatrix4fv(
-                                          "u_projection", &projection[0][0]),
-                                      false);
-                    ASSERT_RET_IF_NOT(
-                        terrain_shader.set_Uniform3f("u_point_light.position",
-                                                     point_light_position),
-                        false);
-                    ASSERT_RET_IF_NOT(
-                        terrain_shader.set_Uniform3f("u_directional_light.direction",
-                                                     directional_light_direction),
-                        false);
-                    ASSERT_RET_IF_NOT(
-                        terrain_shader.set_Uniform3f("u_directional_light.color",
-                                                     directional_light_color),
-                        false);
-                    ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("u_camera_position",
-                                                                   player_position),
-                                      false);
-
-                    terrain_index_buffer.draw();
-                }
+                glBindFramebuffer(GL_FRAMEBUFFER, frame_buffer);
+                glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+                glClear(GL_COLOR_BUFFER_BIT |
+                        GL_DEPTH_BUFFER_BIT);  // we're not using the stencil buffer now
+                glEnable(GL_DEPTH_TEST);
 
                 /*
-                 * Lastly, draw the skybox.
+                 * Draw the scene.
                  */
-                {
-                    glDepthFunc(GL_LEQUAL);
+                ASSERT_RET_IF_NOT(draw(chaser_model,
+                                       terrain_model,
+                                       directional_light_direction,
+                                       orbital_angle,
+                                       sun_brightness),
+                                  false);
 
-                    skybox_texture.use();
+                /*
+                 * Go back to default frame buffer and draw the screen texture over a quad.
+                 */
+                glBindFramebuffer(GL_FRAMEBUFFER, 0);
+                glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+                glClear(GL_COLOR_BUFFER_BIT);
 
-                    /*
-                     * Use the player's view but remove translation and add rotation to
-                     * emulate the planet rotating.
-                     */
-                    const glm::mat4 view_skybox = glm::rotate(
-                        glm::mat4(glm::mat3(view)), orbital_angle, rotation_axis);
-
-                    skybox_shader.use();
-                    skybox_shader.set_UniformMatrix4fv("u_view", &view_skybox[0][0]);
-                    skybox_shader.set_UniformMatrix4fv("u_projection",
-                                                       &projection[0][0]);
-
-                    skybox_vertex_array.draw();
-
-                    glDepthFunc(GL_LESS);
-                }
+                screen_shader.use();
+                quad_textured_vertex_array.bind();
+                screen_texture.use();
+                glDisable(GL_DEPTH_TEST);
+                quad_textured_vertex_array.draw();
             }
 
             /*
