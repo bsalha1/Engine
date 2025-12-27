@@ -5,6 +5,7 @@
 #include "IndexBuffer.h"
 #include "Shader.h"
 #include "Texture.h"
+#include "TexturedMaterial.h"
 #include "VertexArray.h"
 
 #include <GL/glew.h>
@@ -84,14 +85,9 @@ namespace Engine
         GLFWwindow *window;
 
         /**
-         * Basic textured shader program ID.
+         * Shader for an object which is textured and reacts to lighting.
          */
-        Shader basic_textured_shader;
-
-        /**
-         * Heightmap shader program ID.
-         */
-        Shader terrain_shader;
+        Shader lit_textured_shader;
 
         /**
          * Game state.
@@ -270,8 +266,13 @@ namespace Engine
          * @{
          */
         glm::vec3 chaser_position;
-        Texture chaser_texture;
         VertexArray chaser_vertex_array;
+        TexturedMaterial chaser_textured_material =
+            TexturedMaterial(glm::vec3(0.2f), /* ambient */
+                             glm::vec3(0.2f), /* diffuse */
+                             glm::vec3(8.f),  /* specular */
+                             512.f            /* shininess */
+            );
         /**
          * @}
          */
@@ -284,11 +285,17 @@ namespace Engine
         int terrain_num_cols;
         int terrain_x_middle;
         int terrain_z_middle;
-        Texture dirt_texture;
         IndexBuffer terrain_index_buffer;
         VertexArray terrain_vertex_array;
         float terrain_height;
         float on_ground_camera_y;
+
+        TexturedMaterial dirt_textured_material =
+            TexturedMaterial(glm::vec3(0.15f, 0.12f, 0.08f), /* ambient */
+                             glm::vec3(0.45f, 0.36f, 0.25f), /* diffuse */
+                             glm::vec3(0.02f, 0.02f, 0.02f), /* specular */
+                             4.f                             /* shininess */
+            );
         /**
          * @}
          */
@@ -312,8 +319,8 @@ namespace Engine
          * @{
          */
         static constexpr glm::vec3 point_light_color =
-            glm::vec3(0xFF, 0xDF, 0x22) / 255.f;
-        static constexpr glm::vec3 sun_color = glm::vec3(1.0f, 0.95f, 0.85f);
+            10.f * glm::vec3(0xFF, 0xDF, 0x22) / 255.f;
+        static constexpr glm::vec3 sun_color = 10.f * glm::vec3(1.0f, 0.95f, 0.85f);
         Shader light_shader;
         glm::vec3 point_light_position;
         /**

@@ -22,10 +22,9 @@ struct PointLight
      */
     vec3 position;
 
-    /**
-     * Color of the light.
-     */
-    vec3 color;
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
 };
 
 /**
@@ -38,14 +37,25 @@ struct DirectionalLight
      */
     vec3 direction;
 
-    /**
-     * Color of the light.
-     */
-    vec3 color;
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+};
+
+/**
+ * Material properties of a surface.
+ */
+struct Material
+{
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+    float shininess;
 };
 
 uniform PointLight u_point_light;
 uniform DirectionalLight u_directional_light;
+uniform Material u_material;
 
 /**
  * Computes the component of light contributed by a directional light source.
@@ -63,23 +73,20 @@ vec3 compute_directional_component(DirectionalLight light, vec3 normal, vec3 cam
     /*
      * Compute ambient light component.
      */
-    const float ambient_light_strength = 0.01;
-    const vec3 ambient_light = ambient_light_strength * light.color;
+    const vec3 ambient_light = light.ambient * u_material.ambient;
 
     /*
      * Compute diffuse light component.
      */
     const float diff = max(dot(normal, light_direction), 0.0);
-    const vec3 diffuse_light = diff * light.color;
+    const vec3 diffuse_light = diff * light.diffuse * u_material.diffuse;
 
     /*
      * Compute specular light component.
      */
-    const float specular_light_strength = 0.5;
-    const int shininess = 4;
     const vec3 reflect_direction = reflect(-light_direction, normal);
-    const float shine = pow(max(dot(camera_direction, reflect_direction), 0.0), shininess);
-    const vec3 specular_light = specular_light_strength * shine * light.color;
+    const float shine = pow(max(dot(camera_direction, reflect_direction), 0.0), u_material.shininess);
+    const vec3 specular_light = shine * light.specular * u_material.specular;
 
     return ambient_light + diffuse_light + specular_light;
 }
@@ -104,24 +111,20 @@ vec3 compute_point_component(PointLight light, vec3 normal, vec3 frag_pos, vec3 
     /*
      * Compute ambient light component.
      */
-    const float ambient_light_strength = 0.00001;
-    const vec3 ambient_light = ambient_light_strength * light.color;
+    const vec3 ambient_light = light.ambient * u_material.ambient;
 
     /*
      * Compute diffuse light component.
      */
-    const float diffuse_light_strength = 1.0;
     const float diff = max(dot(normal, light_direction), 0.0);
-    const vec3 diffuse_light = diffuse_light_strength * diff * light.color;
+    const vec3 diffuse_light = diff * light.diffuse * u_material.diffuse;
 
     /*
      * Compute specular light component.
      */
-    const float specular_light_strength = 0.5;
-    const int shininess = 4;
     const vec3 reflect_direction = reflect(-light_direction, normal);
-    const float shine = pow(max(dot(camera_direction, reflect_direction), 0.0), shininess);
-    const vec3 specular_light = specular_light_strength * shine * light.color;
+    const float shine = pow(max(dot(camera_direction, reflect_direction), 0.0), u_material.shininess);
+    const vec3 specular_light = shine * light.specular * u_material.specular;
 
     /*
      * Compute attenuation.
@@ -137,10 +140,10 @@ vec3 compute_point_component(PointLight light, vec3 normal, vec3 frag_pos, vec3 
 
 void main()
 {
-    const vec3 terrain_color = texture(u_texture_sampler, v_texture_coord).rgb;
+    const vec3 texture_color = texture(u_texture_sampler, v_texture_coord).rgb;
 
     vec3 result = compute_directional_component(u_directional_light, v_norm, v_camera_direction);
     result += compute_point_component(u_point_light, v_norm, v_position_world_coords, v_camera_direction);
 
-    color = vec4(result * terrain_color, 1.0);
+    color = vec4(result * texture_color, 1.0);
 }

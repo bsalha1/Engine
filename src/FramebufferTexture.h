@@ -54,7 +54,7 @@ namespace Engine
             LOG("Created framebuffer texture id: 0x%x, slot: %u, attachment: %u\n",
                 texture_id,
                 slot,
-                attachment);
+                attachment - GL_COLOR_ATTACHMENT0);
         }
 
         /**

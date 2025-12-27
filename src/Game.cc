@@ -44,13 +44,13 @@ namespace Engine
     /**
      * A vertex with a position and a normal vector.
      */
-    struct TexturedVector3dNormal
+    struct TexturedVertex3dNormal
     {
         glm::vec3 position;
         glm::vec3 norm = glm::vec3(0.f);
         glm::vec2 texture;
     };
-    static_assert(sizeof(TexturedVector3dNormal) == 8 * sizeof(float));
+    static_assert(sizeof(TexturedVertex3dNormal) == 8 * sizeof(float));
 
     static void gl_debug_message_callback(GLenum source,
                                           GLenum type,
@@ -134,7 +134,7 @@ namespace Engine
         exposure(1.0f),
         gamma(1.0f),
         sharpness(1.0f),
-        chaser_position(0.f, 0.f, 0.f),
+        chaser_position(0.f, 0.f, 10.f),
         point_light_position(150.f, 100.f, 120.f)
     {}
 
@@ -344,7 +344,7 @@ namespace Engine
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
             /*
-             * Create ping-pong frame buffers for blurring the brightness texture.
+             * Create ping-pong frame buffers for blurring the bloom texture.
              */
             for (uint8_t i = 0; i < ping_pong_frame_buffer.size(); i++)
             {
@@ -370,65 +370,70 @@ namespace Engine
         LOG("Creating entity buffers\n");
         {
             /* clang-format off */
-            const std::array<TexturedVertex3d, 36> vertices = {{
-            /*                         position,              texture */
-                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec2(0.0f, 0.0f)},
-                {glm::vec3( 1.0f, -1.0f, -1.0f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3( 1.0f,  1.0f, -1.0f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3( 1.0f,  1.0f, -1.0f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3(-1.0f,  1.0f, -1.0f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec2(0.0f, 0.0f)},
+            const std::array<TexturedVertex3dNormal, 36> vertices = {{
+            /*                         position,                         normal,               texture */
+                /* -Z */
+                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec2(0.0f, 0.0f)},
+                {glm::vec3( 1.0f, -1.0f, -1.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3( 1.0f,  1.0f, -1.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3( 1.0f,  1.0f, -1.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3(-1.0f,  1.0f, -1.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec2(0.0f, 0.0f)},
 
-                {glm::vec3(-1.0f, -1.0f,  1.0f), glm::vec2(0.0f, 0.0f)},
-                {glm::vec3( 1.0f, -1.0f,  1.0f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3(-1.0f,  1.0f,  1.0f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3(-1.0f, -1.0f,  1.0f), glm::vec2(0.0f, 0.0f)},
+                /* +Z */
+                {glm::vec3(-1.0f, -1.0f,  1.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec2(0.0f, 0.0f)},
+                {glm::vec3( 1.0f, -1.0f,  1.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3(-1.0f,  1.0f,  1.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3(-1.0f, -1.0f,  1.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec2(0.0f, 0.0f)},
 
-                {glm::vec3(-1.0f,  1.0f,  1.0f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3(-1.0f,  1.0f, -1.0f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3(-1.0f, -1.0f,  1.0f), glm::vec2(0.0f, 0.0f)},
-                {glm::vec3(-1.0f,  1.0f,  1.0f), glm::vec2(1.0f, 0.0f)},
+                /* -X */
+                {glm::vec3(-1.0f,  1.0f,  1.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3(-1.0f,  1.0f, -1.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3(-1.0f, -1.0f,  1.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec2(0.0f, 0.0f)},
+                {glm::vec3(-1.0f,  1.0f,  1.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec2(1.0f, 0.0f)},
 
-                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3( 1.0f,  1.0f, -1.0f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3( 1.0f, -1.0f, -1.0f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3( 1.0f, -1.0f, -1.0f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3( 1.0f, -1.0f,  1.0f), glm::vec2(0.0f, 0.0f)},
-                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec2(1.0f, 0.0f)},
+                /* +X */
+                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3( 1.0f,  1.0f, -1.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3( 1.0f, -1.0f, -1.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3( 1.0f, -1.0f, -1.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3( 1.0f, -1.0f,  1.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec2(0.0f, 0.0f)},
+                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec2(1.0f, 0.0f)},
 
-                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3( 1.0f, -1.0f, -1.0f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3( 1.0f, -1.0f,  1.0f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3( 1.0f, -1.0f,  1.0f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3(-1.0f, -1.0f,  1.0f), glm::vec2(0.0f, 0.0f)},
-                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec2(0.0f, 1.0f)},
+                /* -Y */
+                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3( 1.0f, -1.0f, -1.0f), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3( 1.0f, -1.0f,  1.0f), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3( 1.0f, -1.0f,  1.0f), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3(-1.0f, -1.0f,  1.0f), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec2(0.0f, 0.0f)},
+                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec2(0.0f, 1.0f)},
 
-                {glm::vec3(-1.0f,  1.0f, -1.0f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3( 1.0f,  1.0f, -1.0f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3(-1.0f,  1.0f,  1.0f), glm::vec2(0.0f, 0.0f)},
-                {glm::vec3(-1.0f,  1.0f, -1.0f), glm::vec2(0.0f, 1.0f)}
+                /* +Y */
+                {glm::vec3(-1.0f,  1.0f, -1.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3( 1.0f,  1.0f, -1.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec2(1.0f, 1.0f)},
+                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3(-1.0f,  1.0f,  1.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec2(0.0f, 0.0f)},
+                {glm::vec3(-1.0f,  1.0f, -1.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec2(0.0f, 1.0f)}
             }};
             /* clang-format on */
 
             chaser_vertex_array.create(vertices.data(), vertices.size());
-            chaser_vertex_array.setup_vertex_attrib(0, &TexturedVertex3d::position);
-            chaser_vertex_array.setup_vertex_attrib(1, &TexturedVertex3d::texture);
+            chaser_vertex_array.setup_vertex_attrib(0,
+                                                    &TexturedVertex3dNormal::position);
+            chaser_vertex_array.setup_vertex_attrib(1, &TexturedVertex3dNormal::norm);
+            chaser_vertex_array.setup_vertex_attrib(2,
+                                                    &TexturedVertex3dNormal::texture);
         }
 
         LOG("Compiling shaders\n");
-        ASSERT_RET_IF_NOT(basic_textured_shader.compile(
-                              {{"basic_textured.vert", GL_VERTEX_SHADER},
-                               {"basic_textured.frag", GL_FRAGMENT_SHADER}}),
-                          false);
-        ASSERT_RET_IF_NOT(terrain_shader.compile({
-                              {"terrain.vert", GL_VERTEX_SHADER},
-                              {"terrain.frag", GL_FRAGMENT_SHADER},
+        ASSERT_RET_IF_NOT(lit_textured_shader.compile({
+                              {"lit_textured.vert", GL_VERTEX_SHADER},
+                              {"lit_textured.frag", GL_FRAGMENT_SHADER},
                           }),
                           false);
         ASSERT_RET_IF_NOT(skybox_shader.compile({
@@ -453,10 +458,12 @@ namespace Engine
                           false);
 
         LOG("Loading textures\n");
-        ASSERT_RET_IF_NOT(
-            chaser_texture.create_from_file("textures/obama.png", 0 /* slot */), false);
-        ASSERT_RET_IF_NOT(
-            dirt_texture.create_from_file("textures/dirt.jpg", 0 /* slot */), false);
+        ASSERT_RET_IF_NOT(chaser_textured_material.create_from_file(
+                              "textures/obama.png", 0 /* slot */),
+                          false);
+        ASSERT_RET_IF_NOT(dirt_textured_material.create_from_file("textures/dirt.jpg",
+                                                                  0 /* slot */),
+                          false);
 
         LOG("Loading terrain heightmaps\n");
         {
@@ -528,12 +535,12 @@ namespace Engine
             /*
              * Draw one copy of the texture per cell.
              */
-            const float texture_col_scale =
-                1.f / static_cast<float>(terrain_num_cols) * dirt_texture.get_width();
-            const float texture_row_scale =
-                1.f / static_cast<float>(terrain_num_rows) * dirt_texture.get_height();
+            const float texture_col_scale = 1.f / static_cast<float>(terrain_num_cols) *
+                                            dirt_textured_material.get_width();
+            const float texture_row_scale = 1.f / static_cast<float>(terrain_num_rows) *
+                                            dirt_textured_material.get_height();
 
-            std::vector<TexturedVector3dNormal> vertices;
+            std::vector<TexturedVertex3dNormal> vertices;
             vertices.reserve(num_vertices);
 
             std::vector<unsigned int> indices;
@@ -552,7 +559,7 @@ namespace Engine
                     const uint8_t y =
                         heightmap[(terrain_num_cols * row + col) * terrain_channels];
 
-                    TexturedVector3dNormal &vertex = vertices.emplace_back();
+                    TexturedVertex3dNormal &vertex = vertices.emplace_back();
 
                     vertex.position = {
                         col - terrain_x_middle,
@@ -617,9 +624,9 @@ namespace Engine
                  * v1------------------v2
                  */
 
-                TexturedVector3dNormal &v0 = vertices[indices[i + 0]];
-                TexturedVector3dNormal &v1 = vertices[indices[i + 1]];
-                TexturedVector3dNormal &v2 = vertices[indices[i + 2]];
+                TexturedVertex3dNormal &v0 = vertices[indices[i + 0]];
+                TexturedVertex3dNormal &v1 = vertices[indices[i + 1]];
+                TexturedVertex3dNormal &v2 = vertices[indices[i + 2]];
 
                 const glm::vec3 e1 = v1.position - v0.position;
                 const glm::vec3 e2 = v2.position - v0.position;
@@ -634,17 +641,17 @@ namespace Engine
             /*
              * Normalize the normals to average them.
              */
-            for (TexturedVector3dNormal &vertex : vertices)
+            for (TexturedVertex3dNormal &vertex : vertices)
             {
                 vertex.norm = glm::normalize(vertex.norm);
             }
 
             terrain_vertex_array.create(vertices.data(), vertices.size());
             terrain_vertex_array.setup_vertex_attrib(0,
-                                                     &TexturedVector3dNormal::position);
-            terrain_vertex_array.setup_vertex_attrib(1, &TexturedVector3dNormal::norm);
+                                                     &TexturedVertex3dNormal::position);
+            terrain_vertex_array.setup_vertex_attrib(1, &TexturedVertex3dNormal::norm);
             terrain_vertex_array.setup_vertex_attrib(2,
-                                                     &TexturedVector3dNormal::texture);
+                                                     &TexturedVertex3dNormal::texture);
             terrain_index_buffer.create(indices.data(), indices.size());
         }
 
@@ -1373,20 +1380,52 @@ namespace Engine
         glDrawBuffers(buffers.size(), buffers.data());
 
         /*
+         * Set directional light color.
+         */
+        const glm::vec3 directional_light_color = sun_color * sun_brightness;
+
+        /*
+         * Set uniforms for lit textured shader.
+         */
+        lit_textured_shader.use();
+        ASSERT_RET_IF_NOT(
+            lit_textured_shader.set_UniformMatrix4fv("u_view", &view[0][0]), false);
+        ASSERT_RET_IF_NOT(lit_textured_shader.set_UniformMatrix4fv("u_projection",
+                                                                   &projection[0][0]),
+                          false);
+        ASSERT_RET_IF_NOT(lit_textured_shader.set_Uniform3f("u_point_light.position",
+                                                            point_light_position),
+                          false);
+        ASSERT_RET_IF_NOT(
+            lit_textured_shader.set_Uniform3f("u_directional_light.direction",
+                                              directional_light_direction),
+            false);
+        ASSERT_RET_IF_NOT(lit_textured_shader.set_Uniform3f(
+                              "u_directional_light.ambient", directional_light_color),
+                          false);
+        ASSERT_RET_IF_NOT(lit_textured_shader.set_Uniform3f(
+                              "u_directional_light.diffuse", directional_light_color),
+                          false);
+        ASSERT_RET_IF_NOT(lit_textured_shader.set_Uniform3f(
+                              "u_directional_light.specular", directional_light_color),
+                          false);
+        ASSERT_RET_IF_NOT(lit_textured_shader.set_Uniform3f("u_camera_position",
+                                                            player_position),
+                          false);
+
+        /*
          * Draw the chasers.
          */
-
-        basic_textured_shader.use();
-        chaser_texture.use();
+        ASSERT_RET_IF_NOT(chaser_textured_material.apply(lit_textured_shader), false);
 
         /*
          * Draw a stationary chaser at the origin.
          */
         {
-            const glm::mat4 model_view_projection = projection * view * glm::mat4(1.0f);
-            ASSERT_RET_IF_NOT(basic_textured_shader.set_UniformMatrix4fv(
-                                  "u_model_view_projection",
-                                  &model_view_projection[0][0]),
+            const glm::mat4 model =
+                glm::translate(glm::mat4(1.0f), glm::vec3(0.f, 10.f, 0.f));
+            ASSERT_RET_IF_NOT(lit_textured_shader.set_UniformMatrix4fv("u_model",
+                                                                       &model[0][0]),
                               false);
 
             chaser_vertex_array.draw();
@@ -1396,10 +1435,8 @@ namespace Engine
          * Draw chaser which chases.
          */
         {
-            const glm::mat4 model_view_projection = projection * view * chaser_model;
-            ASSERT_RET_IF_NOT(basic_textured_shader.set_UniformMatrix4fv(
-                                  "u_model_view_projection",
-                                  &model_view_projection[0][0]),
+            ASSERT_RET_IF_NOT(lit_textured_shader.set_UniformMatrix4fv(
+                                  "u_model", &chaser_model[0][0]),
                               false);
 
             chaser_vertex_array.draw();
@@ -1409,32 +1446,12 @@ namespace Engine
          * Draw the terrain.
          */
         {
+            ASSERT_RET_IF_NOT(dirt_textured_material.apply(lit_textured_shader), false);
+
             terrain_vertex_array.bind();
-            dirt_texture.use();
-            terrain_shader.use();
 
-            const glm::vec3 directional_light_color = sun_color * sun_brightness;
-
-            ASSERT_RET_IF_NOT(terrain_shader.set_UniformMatrix4fv("u_model",
-                                                                  &terrain_model[0][0]),
-                              false);
-            ASSERT_RET_IF_NOT(
-                terrain_shader.set_UniformMatrix4fv("u_view", &view[0][0]), false);
-            ASSERT_RET_IF_NOT(terrain_shader.set_UniformMatrix4fv("u_projection",
-                                                                  &projection[0][0]),
-                              false);
-            ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("u_point_light.position",
-                                                           point_light_position),
-                              false);
-            ASSERT_RET_IF_NOT(
-                terrain_shader.set_Uniform3f("u_directional_light.direction",
-                                             directional_light_direction),
-                false);
-            ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("u_directional_light.color",
-                                                           directional_light_color),
-                              false);
-            ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("u_camera_position",
-                                                           player_position),
+            ASSERT_RET_IF_NOT(lit_textured_shader.set_UniformMatrix4fv(
+                                  "u_model", &terrain_model[0][0]),
                               false);
 
             terrain_index_buffer.draw();
@@ -1592,20 +1609,18 @@ namespace Engine
         /*
          * Initialize terrain shader uniforms.
          */
-        terrain_shader.use();
-        ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("u_point_light.color",
-                                                       point_light_color),
+        lit_textured_shader.use();
+        ASSERT_RET_IF_NOT(lit_textured_shader.set_Uniform3f("u_point_light.ambient",
+                                                            point_light_color),
                           false);
-        ASSERT_RET_IF_NOT(terrain_shader.set_Uniform1i("u_texture_sampler",
-                                                       dirt_texture.get_slot()),
+        ASSERT_RET_IF_NOT(lit_textured_shader.set_Uniform3f("u_point_light.diffuse",
+                                                            point_light_color),
                           false);
-
-        /*
-         * Initialize basic textured shader uniforms.
-         */
-        basic_textured_shader.use();
-        ASSERT_RET_IF_NOT(basic_textured_shader.set_Uniform1i(
-                              "u_texture_sampler", chaser_texture.get_slot()),
+        ASSERT_RET_IF_NOT(lit_textured_shader.set_Uniform3f("u_point_light.specular",
+                                                            point_light_color),
+                          false);
+        ASSERT_RET_IF_NOT(lit_textured_shader.set_Uniform1i(
+                              "u_texture_sampler", dirt_textured_material.get_slot()),
                           false);
 
         /*
@@ -1634,7 +1649,7 @@ namespace Engine
         /*
          * Set day length and compute the rotational speed.
          */
-        static constexpr float day_length_s = 10.f;
+        static constexpr float day_length_s = 60.f;
         static constexpr float rotational_angular_speed =
             2 * glm::pi<float>() / day_length_s;
 
@@ -1723,19 +1738,35 @@ namespace Engine
                  */
                 update_player_position();
 
-                const float orbital_angle = rotational_angular_speed * time_since_start;
+                /*
+                 * Update orbital angle. Offset by -pi so that at time 0, the sun is
+                 * rising from the horizon.
+                 */
+                const float orbital_angle =
+                    rotational_angular_speed * time_since_start - glm::pi<float>();
 
                 /*
                  * Update chaser position to move towards player position on X-Z
                  * plane and face them.
                  */
-                const glm::vec3 direction_to_player_xz =
-                    glm::normalize(glm::vec3(player_position.x - chaser_position.x,
-                                             0.f,
-                                             player_position.z - chaser_position.z));
-                static constexpr float chaser_move_impulse = 1.f;
-                chaser_position += direction_to_player_xz * chaser_move_impulse *
-                                   static_cast<float>(dt);
+                glm::vec3 direction_to_player_xz;
+                if (player_position.x != chaser_position.x ||
+                    player_position.z != chaser_position.z)
+                {
+                    direction_to_player_xz = glm::normalize(
+                        glm::vec3(player_position.x - chaser_position.x,
+                                  0.f,
+                                  player_position.z - chaser_position.z));
+                    static constexpr float chaser_move_impulse = 5.f;
+                    chaser_position += direction_to_player_xz * chaser_move_impulse *
+                                       static_cast<float>(dt);
+                    chaser_position.y =
+                        get_terrain_height(chaser_position.x, chaser_position.z) + 1.f;
+                }
+                else
+                {
+                    direction_to_player_xz = glm::vec3(1.f, 0.f, 0.f);
+                }
 
                 glm::mat4 chaser_model =
                     glm::translate(glm::mat4(1.f), chaser_position);
@@ -1753,13 +1784,14 @@ namespace Engine
                  */
                 if (point_light_position.y <
                     get_terrain_height(point_light_position.x, point_light_position.z) +
-                        5.f)
+                        1.f)
                 {
                     light_velocity = 20.f;
                 }
-                if (point_light_position.y >
-                    get_terrain_height(point_light_position.x, point_light_position.z) +
-                        100.f)
+                else if (point_light_position.y >
+                         get_terrain_height(point_light_position.x,
+                                            point_light_position.z) +
+                             100.f)
                 {
                     light_velocity = -20.f;
                 }
@@ -1806,7 +1838,7 @@ namespace Engine
                 glBindFramebuffer(GL_FRAMEBUFFER, screen_frame_buffer);
 
                 /*
-                 * Draw scene into color buffer and brightness buffers.
+                 * Draw scene into color buffer and bloom buffers.
                  */
                 ASSERT_RET_IF_NOT(draw(chaser_model,
                                        terrain_model,
@@ -1816,11 +1848,11 @@ namespace Engine
                                   false);
 
                 /*
-                 * Apply a gaussian blur to the brightness texture to simulate bloom.
+                 * Apply a gaussian blur to the bloom texture.
                  */
                 uint8_t horizontal = 1;
                 bool first_iteration = true;
-                uint8_t passes = 10;
+                static constexpr uint8_t passes = 10;
                 gaussian_blur_shader.use();
                 for (uint8_t i = 0; i < passes; ++i)
                 {
@@ -1855,7 +1887,6 @@ namespace Engine
                  * quad.
                  */
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
-                glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
                 screen_shader.use();
