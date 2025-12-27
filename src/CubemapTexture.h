@@ -1,5 +1,5 @@
+#pragma once
 
-#include "TextureSlot.h"
 #include "assert_util.h"
 
 #include <GL/glew.h>
@@ -13,7 +13,7 @@ namespace Engine
     class CubemapTexture
     {
     public:
-        CubemapTexture(): slot(TextureSlot::next_texture_slot())
+        CubemapTexture()
         {}
 
         /**
@@ -35,8 +35,11 @@ namespace Engine
          * @return True on success, otherwise false.
          */
         bool create_from_file(const std::string &file_name_prefix,
-                              const std::string &file_name_suffix)
+                              const std::string &file_name_suffix,
+                              const size_t _slot)
         {
+            slot = _slot;
+
             glGenTextures(1, &texture_id);
             glBindTexture(GL_TEXTURE_CUBE_MAP, texture_id);
 
@@ -102,6 +105,6 @@ namespace Engine
     private:
         GLuint texture_id;
 
-        const uint8_t slot;
+        uint8_t slot;
     };
 }

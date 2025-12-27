@@ -1,8 +1,10 @@
 #version 460 core
 
-out vec4 color;
+layout (location = 0) out vec4 o_color;
+layout (location = 1) out vec4 o_bloom;
 
 void main()
 {
-    color = vec4(100.0, 100.0, 100.0, 1.0);
+    o_color = vec4(1.0, 1.0, 1.0, 1.0);
+    o_bloom = vec4(5.0 * o_color.rgb, 1.0);
 }

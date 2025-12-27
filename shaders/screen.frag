@@ -1,10 +1,12 @@
 #version 460 core
 
-out vec4 color;
+out vec4 o_color;
 
 in vec2 v_texture_coord;
 
-uniform sampler2D u_texture_sampler;
+uniform sampler2D u_color_texture_sampler;
+uniform sampler2D u_bloom_texture_sampler;
+
 uniform float u_sharpness;
 uniform float u_exposure;
 uniform float u_gamma;
@@ -44,7 +46,7 @@ vec3 sharpen_filter()
     vec3 sample_texture[9];
     for(int i = 0; i < 9; i++)
     {
-        sample_texture[i] = vec3(texture(u_texture_sampler, v_texture_coord.st + offsets[i]));
+        sample_texture[i] = vec3(texture(u_color_texture_sampler, v_texture_coord.st + offsets[i]));
     }
     vec3 col = vec3(0.0);
     for(int i = 0; i < 9; i++)
@@ -58,9 +60,12 @@ vec3 sharpen_filter()
 
 void main()
 {
-    const vec3 sharpened = sharpen_filter();
-    vec3 mapped = vec3(1.0) - exp(-sharpened * u_exposure);
+    const vec3 color = sharpen_filter();
+    // const vec3 color = texture(u_color_texture_sampler, v_texture_coord).rgb;
+    const vec3 bloom = texture(u_bloom_texture_sampler, v_texture_coord).rgb;
+
+    vec3 mapped = vec3(1.0) - exp(-(color + bloom) * u_exposure);
     mapped = pow(mapped, vec3(1.0 / u_gamma));
-  
-    color = vec4(mapped, 1.0);
+
+    o_color = vec4(mapped, 1.0);
 }

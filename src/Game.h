@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CubemapTexture.h"
+#include "FramebufferTexture.h"
 #include "IndexBuffer.h"
 #include "Shader.h"
 #include "Texture.h"
@@ -60,6 +61,16 @@ namespace Engine
         bool update_player_state_grounded(const bool fly_key_pressed);
 
         void update_player_position();
+
+        bool draw_non_blooming_objects(const glm::mat4 view,
+                                       const glm::mat4 &chaser_model,
+                                       const glm::mat4 &terrain_model,
+                                       const glm::vec3 &directional_light_direction,
+                                       const float sun_brightness);
+
+        bool draw_blooming_objects(const glm::mat4 view);
+
+        bool draw_skybox(const glm::mat4 view, const float orbital_angle);
 
         bool draw(const glm::mat4 &chaser_model,
                   const glm::mat4 &terrain_model,
@@ -243,8 +254,13 @@ namespace Engine
         float sharpness;
         Shader screen_shader;
         VertexArray quad_textured_vertex_array;
-        GLuint frame_buffer;
-        Texture screen_texture;
+        GLuint screen_frame_buffer;
+        FramebufferTexture screen_color_texture;
+        FramebufferTexture screen_bloom_texture;
+
+        Shader gaussian_blur_shader;
+        std::array<GLuint, 2> ping_pong_frame_buffer;
+        std::array<FramebufferTexture, 2> ping_pong_texture;
         /**
          * @}
          */
@@ -295,7 +311,9 @@ namespace Engine
          * Lighting.
          * @{
          */
-        static constexpr glm::vec3 light_color_rgb = glm::vec3(0xFF, 0xDF, 0x22);
+        static constexpr glm::vec3 point_light_color =
+            glm::vec3(0xFF, 0xDF, 0x22) / 255.f;
+        static constexpr glm::vec3 sun_color = glm::vec3(1.0f, 0.95f, 0.85f);
         Shader light_shader;
         glm::vec3 point_light_position;
         /**

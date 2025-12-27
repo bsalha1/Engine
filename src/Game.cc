@@ -131,9 +131,9 @@ namespace Engine
         right(0.f, 0.f, 0.f),
         forwards(0.f, 0.f, 0.f),
         head(0.f, 0.f, 0.f),
-        exposure(3.0f),
+        exposure(1.0f),
         gamma(1.0f),
-        sharpness(500.0f),
+        sharpness(1.0f),
         chaser_position(0.f, 0.f, 0.f),
         point_light_position(150.f, 100.f, 120.f)
     {}
@@ -306,20 +306,29 @@ namespace Engine
             quad_textured_vertex_array.setup_vertex_attrib(1,
                                                            &TexturedVertex2d::texture);
 
-            glGenFramebuffers(1, &frame_buffer);
-            glBindFramebuffer(GL_FRAMEBUFFER, frame_buffer);
+            glGenFramebuffers(1, &screen_frame_buffer);
+            glBindFramebuffer(GL_FRAMEBUFFER, screen_frame_buffer);
 
             /*
-             * Create a texture to hold the color buffer.
+             * Create textures to hold the color and brightness buffers.
              */
-            screen_texture.create_framebuffer_texture(window_width, window_height);
+            screen_color_texture.create(window_width,
+                                        window_height,
+                                        GL_COLOR_ATTACHMENT0,
+                                        0 /* slot */,
+                                        GL_REPEAT);
+            screen_bloom_texture.create(window_width,
+                                        window_height,
+                                        GL_COLOR_ATTACHMENT1,
+                                        1 /* slot */,
+                                        GL_CLAMP_TO_EDGE);
 
             /*
              * Create a render buffer to hold the depth and stencil buffer.
              */
-            GLuint render_buffer;
-            glGenRenderbuffers(1, &render_buffer);
-            glBindRenderbuffer(GL_RENDERBUFFER, render_buffer);
+            GLuint depth_stencil_render_buffer;
+            glGenRenderbuffers(1, &depth_stencil_render_buffer);
+            glBindRenderbuffer(GL_RENDERBUFFER, depth_stencil_render_buffer);
             glRenderbufferStorage(
                 GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, window_width, window_height);
             glBindRenderbuffer(GL_RENDERBUFFER, 0);
@@ -327,15 +336,31 @@ namespace Engine
             glFramebufferRenderbuffer(GL_FRAMEBUFFER,
                                       GL_DEPTH_STENCIL_ATTACHMENT,
                                       GL_RENDERBUFFER,
-                                      render_buffer);
+                                      depth_stencil_render_buffer);
 
             ASSERT_RET_IF_NOT(glCheckFramebufferStatus(GL_FRAMEBUFFER) ==
                                   GL_FRAMEBUFFER_COMPLETE,
                               false);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
             /*
-             * Unbind so we use the default frame buffer for now.
+             * Create ping-pong frame buffers for blurring the brightness texture.
              */
+            for (uint8_t i = 0; i < ping_pong_frame_buffer.size(); i++)
+            {
+                glGenFramebuffers(1, &ping_pong_frame_buffer[i]);
+                glBindFramebuffer(GL_FRAMEBUFFER, ping_pong_frame_buffer[i]);
+
+                ping_pong_texture[i].create(screen_bloom_texture.get_width(),
+                                            screen_bloom_texture.get_height(),
+                                            GL_COLOR_ATTACHMENT0,
+                                            screen_bloom_texture.get_slot(),
+                                            GL_CLAMP_TO_EDGE);
+
+                ASSERT_RET_IF_NOT(glCheckFramebufferStatus(GL_FRAMEBUFFER) ==
+                                      GL_FRAMEBUFFER_COMPLETE,
+                                  false);
+            }
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
         }
 
@@ -397,15 +422,41 @@ namespace Engine
         }
 
         LOG("Compiling shaders\n");
-        ASSERT_RET_IF_NOT(basic_textured_shader.compile("basic_textured"), false);
-        ASSERT_RET_IF_NOT(terrain_shader.compile("terrain"), false);
-        ASSERT_RET_IF_NOT(skybox_shader.compile("skybox"), false);
-        ASSERT_RET_IF_NOT(light_shader.compile("light"), false);
-        ASSERT_RET_IF_NOT(screen_shader.compile("screen"), false);
+        ASSERT_RET_IF_NOT(basic_textured_shader.compile(
+                              {{"basic_textured.vert", GL_VERTEX_SHADER},
+                               {"basic_textured.frag", GL_FRAGMENT_SHADER}}),
+                          false);
+        ASSERT_RET_IF_NOT(terrain_shader.compile({
+                              {"terrain.vert", GL_VERTEX_SHADER},
+                              {"terrain.frag", GL_FRAGMENT_SHADER},
+                          }),
+                          false);
+        ASSERT_RET_IF_NOT(skybox_shader.compile({
+                              {"skybox.vert", GL_VERTEX_SHADER},
+                              {"skybox.frag", GL_FRAGMENT_SHADER},
+                          }),
+                          false);
+        ASSERT_RET_IF_NOT(light_shader.compile({
+                              {"light.vert", GL_VERTEX_SHADER},
+                              {"light.frag", GL_FRAGMENT_SHADER},
+                          }),
+                          false);
+        ASSERT_RET_IF_NOT(screen_shader.compile({
+                              {"screen.vert", GL_VERTEX_SHADER},
+                              {"screen.frag", GL_FRAGMENT_SHADER},
+                          }),
+                          false);
+        ASSERT_RET_IF_NOT(gaussian_blur_shader.compile({
+                              {"gaussian_blur.vert", GL_VERTEX_SHADER},
+                              {"gaussian_blur.frag", GL_FRAGMENT_SHADER},
+                          }),
+                          false);
 
         LOG("Loading textures\n");
-        ASSERT_RET_IF_NOT(chaser_texture.create_from_file("textures/obama.png"), false);
-        ASSERT_RET_IF_NOT(dirt_texture.create_from_file("textures/dirt.jpg"), false);
+        ASSERT_RET_IF_NOT(
+            chaser_texture.create_from_file("textures/obama.png", 0 /* slot */), false);
+        ASSERT_RET_IF_NOT(
+            dirt_texture.create_from_file("textures/dirt.jpg", 0 /* slot */), false);
 
         LOG("Loading terrain heightmaps\n");
         {
@@ -599,8 +650,10 @@ namespace Engine
 
         LOG("Loading skybox\n");
         {
-            ASSERT_RET_IF_NOT(
-                skybox_texture.create_from_file("textures/skybox/", ".jpg"), false);
+            ASSERT_RET_IF_NOT(skybox_texture.create_from_file("textures/skybox/",
+                                                              ".jpg",
+                                                              0 /* slot */),
+                              false);
 
             static const std::array<Vertex3d, 36> skybox_vertices = {
                 /* clang-format off */
@@ -1295,27 +1348,29 @@ namespace Engine
     }
 
     /**
-     * @brief Draw the scene.
+     * @brief Draw objects which only contribute to color, not bloom.
      *
+     * @param view View matrix.
      * @param chaser_model Model matrix of the chasing chaser.
      * @param terrain_model Model matrix of the terrain.
      * @param directional_light_direction Directional light direction.
-     * @param orbital_angle Orbital angle of the skybox.
      * @param sun_brightness Brightness of the sun.
      *
      * @return True on success, otherwise false.
      */
-    bool Game::draw(const glm::mat4 &chaser_model,
-                    const glm::mat4 &terrain_model,
-                    const glm::vec3 &directional_light_direction,
-                    const float orbital_angle,
-                    const float sun_brightness)
+    bool Game::draw_non_blooming_objects(const glm::mat4 view,
+                                         const glm::mat4 &chaser_model,
+                                         const glm::mat4 &terrain_model,
+                                         const glm::vec3 &directional_light_direction,
+                                         const float sun_brightness)
     {
         /*
-         * Compute view looking at the direction our mouse is pointing.
+         * Draw things that only contribute to color, not bloom.
          */
-        const glm::mat4 view =
-            glm::lookAt(player_position, player_position + direction, head);
+        const std::array<GLenum, 1> buffers = {
+            screen_color_texture.get_attachment(),
+        };
+        glDrawBuffers(buffers.size(), buffers.data());
 
         /*
          * Draw the chasers.
@@ -1350,35 +1405,15 @@ namespace Engine
             chaser_vertex_array.draw();
         }
 
-        light_shader.use();
-
-        /*
-         * Draw point light.
-         */
-        {
-            const glm::mat4 point_light_model =
-                glm::translate(glm::mat4(1.f), point_light_position);
-
-            const glm::mat4 point_light_model_view_projection =
-                projection * view * point_light_model;
-
-            ASSERT_RET_IF_NOT(light_shader.set_UniformMatrix4fv(
-                                  "u_model_view_projection",
-                                  &point_light_model_view_projection[0][0]),
-                              false);
-
-            chaser_vertex_array.draw();
-        }
-
         /*
          * Draw the terrain.
          */
         {
             terrain_vertex_array.bind();
+            dirt_texture.use();
             terrain_shader.use();
 
-            const glm::vec3 directional_light_color =
-                (light_color_rgb / 255.f) * sun_brightness;
+            const glm::vec3 directional_light_color = sun_color * sun_brightness;
 
             ASSERT_RET_IF_NOT(terrain_shader.set_UniformMatrix4fv("u_model",
                                                                   &terrain_model[0][0]),
@@ -1405,29 +1440,144 @@ namespace Engine
             terrain_index_buffer.draw();
         }
 
+        return true;
+    }
+
+    /**
+     * @brief Draw objects which contribute to both color and bloom.
+     *
+     * @param view View matrix.
+     *
+     * @return True on success, otherwise false.
+     */
+    bool Game::draw_blooming_objects(const glm::mat4 view)
+    {
+        /*
+         * Draw things which contribute both color and bloom.
+         */
+        const std::array<GLenum, 2> buffers = {
+            screen_color_texture.get_attachment(),
+            screen_bloom_texture.get_attachment(),
+        };
+        glDrawBuffers(buffers.size(), buffers.data());
+
+        light_shader.use();
+
+        /*
+         * Draw point light.
+         */
+        const glm::mat4 point_light_model =
+            glm::translate(glm::mat4(1.f), point_light_position);
+
+        const glm::mat4 point_light_model_view_projection =
+            projection * view * point_light_model;
+
+        ASSERT_RET_IF_NOT(
+            light_shader.set_UniformMatrix4fv("u_model_view_projection",
+                                              &point_light_model_view_projection[0][0]),
+            false);
+
+        chaser_vertex_array.draw();
+
+        return true;
+    }
+
+    /**
+     * @brief Draw the skybox.
+     *
+     * @param view View matrix.
+     * @param orbital_angle Orbital angle of the skybox.
+     *
+     * @return True on success, otherwise false.
+     */
+    bool Game::draw_skybox(const glm::mat4 view, const float orbital_angle)
+    {
+        /*
+         * Draw to both color and bloom buffers.
+         */
+        const std::array<GLenum, 2> buffers = {
+            screen_color_texture.get_attachment(),
+            screen_bloom_texture.get_attachment(),
+        };
+        glDrawBuffers(buffers.size(), buffers.data());
+
+        glDepthFunc(GL_LEQUAL);
+
+        skybox_texture.use();
+
+        /*
+         * Use the player's view but remove translation and add rotation to
+         * emulate the planet rotating.
+         */
+        const glm::mat4 view_skybox =
+            glm::rotate(glm::mat4(glm::mat3(view)), orbital_angle, rotation_axis);
+
+        skybox_shader.use();
+        ASSERT_RET_IF_NOT(
+            skybox_shader.set_UniformMatrix4fv("u_view", &view_skybox[0][0]), false);
+        ASSERT_RET_IF_NOT(skybox_shader.set_UniformMatrix4fv("u_projection",
+                                                             &projection[0][0]),
+                          false);
+
+        skybox_vertex_array.draw();
+
+        glDepthFunc(GL_LESS);
+
+        return true;
+    }
+
+    /**
+     * @brief Draw the scene.
+     *
+     * @param chaser_model Model matrix of the chasing chaser.
+     * @param terrain_model Model matrix of the terrain.
+     * @param directional_light_direction Directional light direction.
+     * @param orbital_angle Orbital angle of the skybox.
+     * @param sun_brightness Brightness of the sun.
+     *
+     * @return True on success, otherwise false.
+     */
+    bool Game::draw(const glm::mat4 &chaser_model,
+                    const glm::mat4 &terrain_model,
+                    const glm::vec3 &directional_light_direction,
+                    const float orbital_angle,
+                    const float sun_brightness)
+    {
+        /*
+         * Compute view looking at the direction our mouse is pointing.
+         */
+        const glm::mat4 view =
+            glm::lookAt(player_position, player_position + direction, head);
+
+        /*
+         * Clear both the color and bloom buffers.
+         */
+        const std::array<GLenum, 2> buffers = {
+            screen_color_texture.get_attachment(),
+            screen_bloom_texture.get_attachment(),
+        };
+        glDrawBuffers(buffers.size(), buffers.data());
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        /*
+         * Draw objects which do not contribute to bloom.
+         */
+        ASSERT_RET_IF_NOT(draw_non_blooming_objects(view,
+                                                    chaser_model,
+                                                    terrain_model,
+                                                    directional_light_direction,
+                                                    sun_brightness),
+                          false);
+
+        /*
+         * Draw objects which contribute to bloom.
+         */
+        ASSERT_RET_IF_NOT(draw_blooming_objects(view), false);
+
         /*
          * Lastly, draw the skybox.
          */
-        {
-            glDepthFunc(GL_LEQUAL);
-
-            skybox_texture.use();
-
-            /*
-             * Use the player's view but remove translation and add rotation to
-             * emulate the planet rotating.
-             */
-            const glm::mat4 view_skybox =
-                glm::rotate(glm::mat4(glm::mat3(view)), orbital_angle, rotation_axis);
-
-            skybox_shader.use();
-            skybox_shader.set_UniformMatrix4fv("u_view", &view_skybox[0][0]);
-            skybox_shader.set_UniformMatrix4fv("u_projection", &projection[0][0]);
-
-            skybox_vertex_array.draw();
-
-            glDepthFunc(GL_LESS);
-        }
+        ASSERT_RET_IF_NOT(draw_skybox(view, orbital_angle), false);
 
         return true;
     }
@@ -1439,48 +1589,44 @@ namespace Engine
     {
         LOG("Entering main loop\n");
 
+        /*
+         * Initialize terrain shader uniforms.
+         */
         terrain_shader.use();
-
-        /*
-         * Initialize point light.
-         */
         ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("u_point_light.color",
-                                                       light_color_rgb / 255.f),
+                                                       point_light_color),
                           false);
-        /*
-         * Initialize directional light.
-         */
-        // ASSERT_RET_IF_NOT(terrain_shader.set_Uniform3f("u_directional_light.color",
-        //                                                light_color_rgb / 255.f),
-        //                   false);
-
-        /*
-         * Assign texture samplers.
-         */
         ASSERT_RET_IF_NOT(terrain_shader.set_Uniform1i("u_texture_sampler",
                                                        dirt_texture.get_slot()),
                           false);
-        dirt_texture.use();
 
+        /*
+         * Initialize basic textured shader uniforms.
+         */
         basic_textured_shader.use();
         ASSERT_RET_IF_NOT(basic_textured_shader.set_Uniform1i(
                               "u_texture_sampler", chaser_texture.get_slot()),
                           false);
 
-        skybox_shader.use();
-        ASSERT_RET_IF_NOT(skybox_shader.set_Uniform1i("u_texture_sampler",
-                                                      skybox_texture.get_slot()),
-                          false);
-
-        screen_shader.use();
-        ASSERT_RET_IF_NOT(screen_shader.set_Uniform1f("u_sharpness", sharpness), false);
-        ASSERT_RET_IF_NOT(screen_shader.set_Uniform1i("u_texture_sampler",
-                                                      screen_texture.get_slot()),
+        /*
+         * Assign gaussian blur shader texture sampler. This is the same as
+         * ping_pong_texture so we don't need to spend time switching slots.
+         */
+        gaussian_blur_shader.use();
+        ASSERT_RET_IF_NOT(gaussian_blur_shader.set_Uniform1i(
+                              "u_texture_sampler", screen_bloom_texture.get_slot()),
                           false);
 
         /*
          * Initialize screen shader uniforms.
          */
+        screen_shader.use();
+        ASSERT_RET_IF_NOT(screen_shader.set_Uniform1i("u_color_texture_sampler",
+                                                      screen_color_texture.get_slot()),
+                          false);
+        ASSERT_RET_IF_NOT(screen_shader.set_Uniform1i("u_bloom_texture_sampler",
+                                                      screen_bloom_texture.get_slot()),
+                          false);
         ASSERT_RET_IF_NOT(screen_shader.set_Uniform1f("u_exposure", exposure), false);
         ASSERT_RET_IF_NOT(screen_shader.set_Uniform1f("u_gamma", gamma), false);
         ASSERT_RET_IF_NOT(screen_shader.set_Uniform1f("u_sharpness", sharpness), false);
@@ -1505,12 +1651,20 @@ namespace Engine
                       glm::sin(sun_orbital_elevation_angle),
                       glm::cos(sun_orbital_elevation_angle),
                       0.f);
+
+        /*
+         * Initialize skybox shader uniforms.
+         */
         skybox_shader.use();
         ASSERT_RET_IF_NOT(skybox_shader.set_Uniform1f("u_sun_angular_radius",
                                                       sun_angular_radius),
                           false);
         ASSERT_RET_IF_NOT(skybox_shader.set_Uniform3f("u_sun_position",
                                                       sun_position_skybox_model_space),
+                          false);
+        ASSERT_RET_IF_NOT(skybox_shader.set_Uniform3f("u_sun_color", sun_color), false);
+        ASSERT_RET_IF_NOT(skybox_shader.set_Uniform1i("u_texture_sampler",
+                                                      skybox_texture.get_slot()),
                           false);
 
         /*
@@ -1647,16 +1801,12 @@ namespace Engine
                                                             sine_of_elevation_angle);
 
                 /*
-                 * Draw scene into frame buffer.
+                 * Set frame buffer to the screen frame buffer.
                  */
-                glBindFramebuffer(GL_FRAMEBUFFER, frame_buffer);
-                glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-                glClear(GL_COLOR_BUFFER_BIT |
-                        GL_DEPTH_BUFFER_BIT);  // we're not using the stencil buffer now
-                glEnable(GL_DEPTH_TEST);
+                glBindFramebuffer(GL_FRAMEBUFFER, screen_frame_buffer);
 
                 /*
-                 * Draw the scene.
+                 * Draw scene into color buffer and brightness buffers.
                  */
                 ASSERT_RET_IF_NOT(draw(chaser_model,
                                        terrain_model,
@@ -1666,16 +1816,54 @@ namespace Engine
                                   false);
 
                 /*
-                 * Go back to default frame buffer and draw the screen texture over a quad.
+                 * Apply a gaussian blur to the brightness texture to simulate bloom.
+                 */
+                uint8_t horizontal = 1;
+                bool first_iteration = true;
+                uint8_t passes = 10;
+                gaussian_blur_shader.use();
+                for (uint8_t i = 0; i < passes; ++i)
+                {
+                    glBindFramebuffer(GL_FRAMEBUFFER,
+                                      ping_pong_frame_buffer[horizontal]);
+                    ASSERT_RET_IF_NOT(gaussian_blur_shader.set_Uniform1i("u_horizontal",
+                                                                         horizontal),
+                                      false);
+
+                    horizontal = 1 ^ horizontal;
+
+                    if (first_iteration)
+                    {
+                        screen_bloom_texture.use();
+                    }
+                    else
+                    {
+                        ping_pong_texture[horizontal].use();
+                    }
+
+                    quad_textured_vertex_array.bind();
+                    quad_textured_vertex_array.draw();
+
+                    if (first_iteration)
+                    {
+                        first_iteration = false;
+                    }
+                }
+
+                /*
+                 * Go back to default frame buffer and draw the screen texture over a
+                 * quad.
                  */
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
-                glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-                glClear(GL_COLOR_BUFFER_BIT);
+                glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
                 screen_shader.use();
                 quad_textured_vertex_array.bind();
-                screen_texture.use();
-                glDisable(GL_DEPTH_TEST);
+                ping_pong_texture[horizontal].use();
+                screen_shader.set_Uniform1i("u_bloom_texture_sampler",
+                                            ping_pong_texture[horizontal].get_slot());
+                screen_color_texture.use();
                 quad_textured_vertex_array.draw();
             }
 

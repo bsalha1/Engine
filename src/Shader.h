@@ -15,6 +15,12 @@ namespace Engine
     class Shader
     {
     public:
+        struct Descriptor
+        {
+            const char *file_name;
+            const GLuint type;
+        };
+
         /**
          * @brief Compile shader program and import into OpenGL.
          *
@@ -22,32 +28,40 @@ namespace Engine
          *
          * @return True on success, otherwise false.
          */
-        bool compile(const std::string &name)
+        bool compile(const std::initializer_list<Descriptor> descriptors)
         {
-            /*
-             * Get source code of vertex shader.
-             */
-            const std::string vertex_shader_file_name = "shaders/" + name + ".vert";
-            std::string vertex_shader_src;
-            ASSERT_RET_IF_NOT(
-                get_shader_src(vertex_shader_file_name, vertex_shader_src), false);
+            shader_id = glCreateProgram();
+            ASSERT_RET_IF(shader_id == 0, false);
 
-            /*
-             * Get source code of fragment shader.
-             */
-            const std::string fragment_shader_file_name = "shaders/" + name + ".frag";
-            std::string fragment_shader_src;
-            ASSERT_RET_IF_NOT(
-                get_shader_src(fragment_shader_file_name, fragment_shader_src), false);
+            for (const Descriptor &descriptor : descriptors)
+            {
+                std::string src;
+                const std::string file_name =
+                    "shaders/" + std::string(descriptor.file_name);
+                LOG("Compiling shader: %s\n", file_name.c_str());
+                ASSERT_RET_IF_NOT(get_shader_src(file_name, src), false);
 
-            /*
-             * Compile shader.
-             */
-            LOG("Creating shader from %s and %s\n",
-                vertex_shader_file_name.c_str(),
-                fragment_shader_file_name.c_str());
-            ASSERT_RET_IF_NOT(create_shader(vertex_shader_src, fragment_shader_src),
-                              false);
+                GLuint shader_type_id;
+                ASSERT_RET_IF_NOT(compile_shader(shader_type_id, descriptor.type, src),
+                                  false);
+
+                glAttachShader(shader_id, shader_type_id);
+                glDeleteShader(shader_type_id);
+            }
+
+            glLinkProgram(shader_id);
+
+            GLint linked = 0;
+            glGetProgramiv(shader_id, GL_LINK_STATUS, &linked);
+            if (!linked)
+            {
+                char message[4096];
+                glGetProgramInfoLog(shader_id, sizeof(message), nullptr, message);
+                LOG_ERROR("Program link error: %s\n", message);
+                return false;
+            }
+
+            glValidateProgram(shader_id);
 
             return true;
         }
@@ -229,53 +243,6 @@ namespace Engine
 
                 return false;
             }
-
-            return true;
-        }
-
-        /**
-         * @brief Create shader program from vertex and fragment shader source code.
-         *
-         * @param vertex_shader_src Vertex shader source code.
-         * @param fragment_shader_src Fragment shader source code.
-         *
-         * @return True on success, otherwise false.
-         */
-        bool create_shader(const std::string &vertex_shader_src,
-                           const std::string &fragment_shader_src)
-        {
-            shader_id = glCreateProgram();
-            ASSERT_RET_IF(shader_id == 0, false);
-
-            GLuint vertex_shader_id;
-            ASSERT_RET_IF_NOT(
-                compile_shader(vertex_shader_id, GL_VERTEX_SHADER, vertex_shader_src),
-                false);
-
-            GLuint fragment_shader_id;
-            ASSERT_RET_IF_NOT(compile_shader(fragment_shader_id,
-                                             GL_FRAGMENT_SHADER,
-                                             fragment_shader_src),
-                              false);
-
-            glAttachShader(shader_id, vertex_shader_id);
-            glAttachShader(shader_id, fragment_shader_id);
-            glLinkProgram(shader_id);
-
-            GLint linked = 0;
-            glGetProgramiv(shader_id, GL_LINK_STATUS, &linked);
-            if (!linked)
-            {
-                char message[4096];
-                glGetProgramInfoLog(shader_id, sizeof(message), nullptr, message);
-                LOG_ERROR("Program link error: %s\n", message);
-                return false;
-            }
-
-            glValidateProgram(shader_id);
-
-            glDeleteShader(vertex_shader_id);
-            glDeleteShader(fragment_shader_id);
 
             return true;
         }
