@@ -110,13 +110,14 @@ namespace Engine
         window_center_x(0),
         window_center_y(0),
         is_on_ground(true),
-        time_on_ground(0.f),
         friction_coeff(friction_coeff_ground),
-        player_state(PlayerState::WALKING),
+        player_movement_state(PlayerMovementState::WALKING),
         player_move_impulse(move_impulse_walking),
         player_height(height_standing),
         fly_key_pressed_prev(false),
-        crouch_button_pressed_prev(false),
+        crouch_key_pressed_prev(false),
+        sprint_key_pressed_prev(false),
+        jump_key_pressed_prev(false),
         player_position(0.f, player_height, 0.f),
         player_velocity(0.f, 0.f, 0.f),
         last_crouch_time(std::chrono::steady_clock::now()),
@@ -936,11 +937,14 @@ namespace Engine
                          ImGuiWindowFlags_NoSavedSettings);
         ImGui::Text("%.3f ms (%.0f FPS)", 1000.f / io.Framerate, io.Framerate);
         ImGui::Text("state: %s", state_to_string(state));
-        ImGui::Text("player_state: %s", player_state_to_string(player_state));
+        ImGui::Text("player_movement_state: %s",
+                    player_movement_state_to_string(player_movement_state));
         ImGui::Text("player_position: (%.2f, %.2f, %.2f)",
                     player_position.x,
                     player_position.y,
                     player_position.z);
+        ImGui::Text("on_ground_camera_y: %.2f", on_ground_camera_y);
+        ImGui::Text("altitude: %.2f", player_position.y - on_ground_camera_y);
         ImGui::Text("player_velocity: (%.2f, %.2f, %.2f) (%.2f m/s)",
                     player_velocity.x,
                     player_velocity.y,
@@ -1028,38 +1032,62 @@ namespace Engine
     }
 
     /**
-     * Update a grounded player's state.
+     * @brief Update a grounded player's state.
      *
      * @param fly_key_pressed Whether the fly key is currently pressed.
      *
      * @return True if the player state was changed, otherwise false.
      */
-    bool Game::update_player_state_grounded(const bool fly_key_pressed)
+    bool Game::update_player_movement_state_grounded(const bool fly_key_pressed,
+                                                     const bool jump_key_pressed)
     {
-        if (!is_on_ground)
-        {
-            player_state = PlayerState::MIDAIR;
-            return true;
-        }
-
         if (fly_key_pressed && !fly_key_pressed_prev)
         {
-            player_state = PlayerState::FLYING;
+            player_movement_state = PlayerMovementState::FLYING;
             return true;
         }
 
-        static constexpr float time_on_ground_to_jump = 0.1f;
-        const bool can_jump = time_on_ground >= time_on_ground_to_jump;
-        const bool jump_button_pressed =
-            glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
-        if (can_jump && jump_button_pressed)
+        const bool can_jump = player_position.y - on_ground_camera_y <= 0.2f;
+        if (can_jump && jump_key_pressed && !jump_key_pressed_prev)
         {
             player_velocity.y += move_impulse_jump * dt;
-            player_state = PlayerState::MIDAIR;
+
+            /*
+             * If the player jumps from a crouch, stand them up.
+             */
+            if (player_movement_state == PlayerMovementState::CROUCHING)
+            {
+                player_movement_state = PlayerMovementState::WALKING;
+            }
             return true;
         }
 
         return false;
+    }
+
+    /**
+     * @brief Apply grounded movement state effects to a player on the ground.
+     */
+    void Game::apply_player_movement_state_grounded()
+    {
+        /*
+         * If in the air, apply gravity and set the move impulse and friction to that of
+         * air.
+         */
+        if (player_position.y > on_ground_camera_y)
+        {
+            friction_coeff = friction_coeff_air;
+
+            player_move_impulse = move_impulse_midair;
+            player_velocity.y -= acceleration_gravity * dt;
+        }
+        /*
+         * Otherwise set friction to that of ground.
+         */
+        else
+        {
+            friction_coeff = friction_coeff_ground;
+        }
     }
 
     /**
@@ -1090,23 +1118,25 @@ namespace Engine
         }
 
         /*
-         * Get next player state.
+         * Get next player movement state.
          */
-        const bool crouch_button_pressed =
+        const bool crouch_key_pressed =
             glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
         const bool fly_key_pressed = glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS;
+        const bool sprint_key_pressed =
+            glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
+        const bool jump_key_pressed = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
 
-        switch (player_state)
+        switch (player_movement_state)
         {
-        case PlayerState::WALKING:
+        case PlayerMovementState::WALKING:
         {
-            if (update_player_state_grounded(fly_key_pressed))
+            if (update_player_movement_state_grounded(fly_key_pressed,
+                                                      jump_key_pressed))
             {
                 break;
             }
 
-            const bool sprint_button_pressed =
-                glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
             const bool in_sprintable_direction =
                 move_direction.x * forwards.x + move_direction.z * forwards.z > 0.f;
 
@@ -1114,25 +1144,27 @@ namespace Engine
              * While sprint button is being pressed and the player is on the ground,
              * set them to sprinting.
              */
-            if (sprint_button_pressed && in_sprintable_direction)
+            if (sprint_key_pressed && !sprint_key_pressed_prev &&
+                in_sprintable_direction)
             {
-                player_state = PlayerState::SPRINTING;
+                player_movement_state = PlayerMovementState::SPRINTING;
             }
 
             /*
              * Crouch if crouch button is pressed.
              */
-            else if (crouch_button_pressed && !crouch_button_pressed_prev)
+            else if (crouch_key_pressed && !crouch_key_pressed_prev)
             {
-                player_state = PlayerState::CROUCHING;
+                player_movement_state = PlayerMovementState::CROUCHING;
             }
 
             break;
         }
 
-        case PlayerState::SPRINTING:
+        case PlayerMovementState::SPRINTING:
         {
-            if (update_player_state_grounded(fly_key_pressed))
+            if (update_player_movement_state_grounded(fly_key_pressed,
+                                                      jump_key_pressed))
             {
                 break;
             }
@@ -1142,102 +1174,105 @@ namespace Engine
              * player is no longer moving in a sprintable direction, restore the player
              * to walking.
              */
-            const bool sprint_button_pressed =
-                glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
             const bool in_sprintable_direction =
                 move_direction.x * forwards.x + move_direction.z * forwards.z > 0.f;
-            if (!sprint_button_pressed || !in_sprintable_direction)
+            if (sprint_key_pressed && !sprint_key_pressed_prev ||
+                !in_sprintable_direction)
             {
-                player_state = PlayerState::WALKING;
+                player_movement_state = PlayerMovementState::WALKING;
+            }
+
+            /*
+             * Crouch if crouch button is pressed.
+             */
+            else if (crouch_key_pressed && !crouch_key_pressed_prev)
+            {
+                player_movement_state = PlayerMovementState::CROUCHING;
             }
 
             break;
         }
 
-        case PlayerState::CROUCHING:
+        case PlayerMovementState::CROUCHING:
         {
-            if (update_player_state_grounded(fly_key_pressed))
+            if (update_player_movement_state_grounded(fly_key_pressed,
+                                                      jump_key_pressed))
             {
                 break;
+            }
+
+            /*
+             * Sprint if sprint button is pressed while crouching.
+             */
+            const bool in_sprintable_direction =
+                move_direction.x * forwards.x + move_direction.z * forwards.z > 0.f;
+            if (sprint_key_pressed && !sprint_key_pressed_prev &&
+                in_sprintable_direction)
+            {
+                player_movement_state = PlayerMovementState::SPRINTING;
             }
 
             /*
              * Uncrouch if crouch button is pressed again.
              */
-            const bool crouch_button_pressed =
-                glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
-            if (crouch_button_pressed && !crouch_button_pressed_prev)
+            else if (crouch_key_pressed && !crouch_key_pressed_prev)
             {
-                player_state = PlayerState::WALKING;
+                player_movement_state = PlayerMovementState::WALKING;
             }
-            crouch_button_pressed_prev = crouch_button_pressed;
 
             break;
         }
 
-        case PlayerState::FLYING:
+        case PlayerMovementState::FLYING:
             if (fly_key_pressed && !fly_key_pressed_prev)
             {
-                player_state =
-                    is_on_ground ? PlayerState::WALKING : PlayerState::MIDAIR;
-                break;
-            }
-
-            break;
-
-        case PlayerState::MIDAIR:
-            if (is_on_ground)
-            {
-                player_state = PlayerState::WALKING;
-                break;
-            }
-
-            if (fly_key_pressed && !fly_key_pressed_prev)
-            {
-                player_state = PlayerState::FLYING;
-                break;
+                player_movement_state = PlayerMovementState::WALKING;
             }
 
             break;
 
         default:
-            LOG_ERROR("Unknown player state: %u\n", player_state);
+            LOG_ERROR("Unknown player state: %u\n", player_movement_state);
         }
 
-        crouch_button_pressed_prev = crouch_button_pressed;
+        crouch_key_pressed_prev = crouch_key_pressed;
         fly_key_pressed_prev = fly_key_pressed;
+        sprint_key_pressed_prev = sprint_key_pressed;
+        jump_key_pressed_prev = jump_key_pressed;
 
         /*
          * Set player parameters based on current state.
          */
-        switch (player_state)
+        switch (player_movement_state)
         {
-        case PlayerState::WALKING:
+        case PlayerMovementState::WALKING:
             player_height = height_standing;
+            on_ground_camera_y = player_height + terrain_height;
+
             player_move_impulse = move_impulse_walking;
-            friction_coeff = friction_coeff_ground;
+            apply_player_movement_state_grounded();
             break;
 
-        case PlayerState::SPRINTING:
+        case PlayerMovementState::SPRINTING:
             player_height = height_standing;
+            on_ground_camera_y = player_height + terrain_height;
+
             player_move_impulse = move_impulse_sprinting;
-            friction_coeff = friction_coeff_ground;
+            apply_player_movement_state_grounded();
             break;
 
-        case PlayerState::CROUCHING:
+        case PlayerMovementState::CROUCHING:
             player_height = height_crouching;
-            player_move_impulse = move_impulse_crouching;
-            friction_coeff = friction_coeff_ground;
+            on_ground_camera_y = player_height + terrain_height;
 
-            /*
-             * Snap the player's Y position to the crouching position
-             * so it doesn't count as being MIDAIR.
-             */
-            player_position.y = terrain_height + height_crouching;
+            player_move_impulse = move_impulse_crouching;
+            apply_player_movement_state_grounded();
             break;
 
-        case PlayerState::FLYING:
+        case PlayerMovementState::FLYING:
             player_height = height_standing;
+            on_ground_camera_y = player_height + terrain_height;
+
             player_move_impulse = move_impulse_flying;
             friction_coeff = friction_coeff_flying;
 
@@ -1259,26 +1294,9 @@ namespace Engine
 
             break;
 
-        case PlayerState::MIDAIR:
-            player_height = height_standing;
-            player_move_impulse = move_impulse_midair;
-            friction_coeff = friction_coeff_air;
-
-            /*
-             * Apply gravity.
-             */
-            player_velocity.y -= acceleration_gravity * dt;
-
-            break;
-
         default:
-            LOG_ERROR("Unknown player state: %u\n", player_state);
+            LOG_ERROR("Unknown player_movement_state: %u\n", player_movement_state);
         }
-
-        /*
-         * Cache the camera Y position when on the ground.
-         */
-        on_ground_camera_y = player_height + terrain_height;
 
         /*
          * Add player move impulse.
@@ -1304,9 +1322,28 @@ namespace Engine
         /*
          * Don't let the player go outside the world.
          */
+
         if (player_position.y < on_ground_camera_y)
         {
             player_position.y = on_ground_camera_y;
+        }
+
+        if (player_position.x < -terrain_x_middle + 1.f)
+        {
+            player_position.x = -terrain_x_middle + 1.f;
+        }
+        else if (player_position.x > terrain_x_middle - 1.f)
+        {
+            player_position.x = terrain_x_middle - 1.f;
+        }
+
+        if (player_position.z < -terrain_z_middle + 1.f)
+        {
+            player_position.z = -terrain_z_middle + 1.f;
+        }
+        else if (player_position.z > terrain_z_middle - 1.f)
+        {
+            player_position.z = terrain_z_middle - 1.f;
         }
     }
 
@@ -1335,20 +1372,18 @@ namespace Engine
      *
      * @return String representation of the state.
      */
-    const char *Game::player_state_to_string(const PlayerState state)
+    const char *Game::player_movement_state_to_string(const PlayerMovementState state)
     {
         switch (state)
         {
-        case PlayerState::WALKING:
+        case PlayerMovementState::WALKING:
             return "WALKING";
-        case PlayerState::CROUCHING:
+        case PlayerMovementState::CROUCHING:
             return "CROUCHING";
-        case PlayerState::SPRINTING:
+        case PlayerMovementState::SPRINTING:
             return "SPRINTING";
-        case PlayerState::FLYING:
+        case PlayerMovementState::FLYING:
             return "FLYING";
-        case PlayerState::MIDAIR:
-            return "MIDAIR";
         default:
             return "UNKNOWN";
         }
@@ -1649,7 +1684,7 @@ namespace Engine
         /*
          * Set day length and compute the rotational speed.
          */
-        static constexpr float day_length_s = 60.f;
+        static constexpr float day_length_s = 5.f;
         static constexpr float rotational_angular_speed =
             2 * glm::pi<float>() / day_length_s;
 
@@ -1722,11 +1757,6 @@ namespace Engine
                  * Cache whether player is on the ground.
                  */
                 is_on_ground = player_position.y <= on_ground_camera_y;
-
-                /*
-                 * Update time the player has been on the ground.
-                 */
-                time_on_ground = is_on_ground ? time_on_ground + dt : 0.f;
 
                 /*
                  * Update view based on mouse movement.

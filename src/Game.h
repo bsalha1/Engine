@@ -36,13 +36,12 @@ namespace Engine
             QUIT,
         };
 
-        enum class PlayerState : uint8_t
+        enum class PlayerMovementState : uint8_t
         {
             WALKING,
             CROUCHING,
             SPRINTING,
             FLYING,
-            MIDAIR,
         };
 
         Game();
@@ -59,7 +58,10 @@ namespace Engine
 
         void update_view();
 
-        bool update_player_state_grounded(const bool fly_key_pressed);
+        bool update_player_movement_state_grounded(const bool fly_key_pressed,
+                                                   const bool jump_key_pressed);
+
+        void apply_player_movement_state_grounded();
 
         void update_player_position();
 
@@ -95,7 +97,8 @@ namespace Engine
         State state;
         State state_prev;
         static const char *state_to_string(const State state);
-        static const char *player_state_to_string(const PlayerState state);
+        static const char *
+        player_movement_state_to_string(const PlayerMovementState state);
 
         /**
          * Window dimensions in pixels.
@@ -115,7 +118,7 @@ namespace Engine
 
         glm::mat4 projection;
 
-        PlayerState player_state;
+        PlayerMovementState player_movement_state;
 
         /**
          * Player movement.
@@ -135,11 +138,6 @@ namespace Engine
         float player_move_impulse;
 
         /**
-         * Time on ground in seconds.
-         */
-        float time_on_ground;
-
-        /**
          * Player height.
          */
         static constexpr float height_standing = 1.78f;
@@ -150,7 +148,9 @@ namespace Engine
          * Rising edge detectors.
          */
         bool fly_key_pressed_prev;
-        bool crouch_button_pressed_prev;
+        bool crouch_key_pressed_prev;
+        bool sprint_key_pressed_prev;
+        bool jump_key_pressed_prev;
 
         /**
          * Player position.
