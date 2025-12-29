@@ -3,6 +3,7 @@
 #include "CubemapTexture.h"
 #include "FramebufferTexture.h"
 #include "IndexBuffer.h"
+#include "Renderer.h"
 #include "Shader.h"
 #include "Texture.h"
 #include "TexturedMaterial.h"
@@ -65,22 +66,6 @@ namespace Engine
 
         void update_player_position();
 
-        bool draw_non_blooming_objects(const glm::mat4 view,
-                                       const glm::mat4 &chaser_model,
-                                       const glm::mat4 &terrain_model,
-                                       const glm::vec3 &directional_light_direction,
-                                       const float sun_brightness);
-
-        bool draw_blooming_objects(const glm::mat4 view);
-
-        bool draw_skybox(const glm::mat4 view, const float orbital_angle);
-
-        bool draw(const glm::mat4 &chaser_model,
-                  const glm::mat4 &terrain_model,
-                  const glm::vec3 &directional_light_direction,
-                  const float orbital_angle,
-                  const float sun_brightness);
-
         /**
          * Window handle.
          */
@@ -116,13 +101,10 @@ namespace Engine
          */
         int window_center_y;
 
-        glm::mat4 projection;
-
-        PlayerMovementState player_movement_state;
-
         /**
          * Player movement.
          */
+        PlayerMovementState player_movement_state;
         static constexpr float acceleration_gravity = 10.f;
         bool is_on_ground;
         static constexpr float friction_coeff_ground = 10.f;
@@ -242,24 +224,9 @@ namespace Engine
          */
 
         /**
-         * Screen buffer.
-         * @{
+         * Renderer.
          */
-        float exposure;
-        float gamma;
-        float sharpness;
-        Shader screen_shader;
-        VertexArray quad_textured_vertex_array;
-        GLuint screen_frame_buffer;
-        FramebufferTexture screen_color_texture;
-        FramebufferTexture screen_bloom_texture;
-
-        Shader gaussian_blur_shader;
-        std::array<GLuint, 2> ping_pong_frame_buffer;
-        std::array<FramebufferTexture, 2> ping_pong_texture;
-        /**
-         * @}
-         */
+        Renderer renderer;
 
         /**
          * Chaser entity.
@@ -285,8 +252,8 @@ namespace Engine
         int terrain_num_cols;
         int terrain_x_middle;
         int terrain_z_middle;
-        IndexBuffer terrain_index_buffer;
         VertexArray terrain_vertex_array;
+        IndexBuffer terrain_index_buffer = IndexBuffer(terrain_vertex_array);
         float terrain_height;
         float on_ground_camera_y;
 
@@ -304,10 +271,6 @@ namespace Engine
          * Skybox.
          * @{
          */
-        VertexArray skybox_vertex_array;
-        Shader skybox_shader;
-        CubemapTexture skybox_texture;
-
         static constexpr float tilt = glm::radians<float>(23.5f);
         const glm::vec3 rotation_axis = glm::vec3(glm::sin(tilt), glm::cos(tilt), 0.f);
         /**
@@ -318,10 +281,6 @@ namespace Engine
          * Lighting.
          * @{
          */
-        static constexpr glm::vec3 point_light_color =
-            10.f * glm::vec3(0xFF, 0xDF, 0x22) / 255.f;
-        static constexpr glm::vec3 sun_color = 10.f * glm::vec3(1.0f, 0.95f, 0.85f);
-        Shader light_shader;
         glm::vec3 point_light_position;
         /**
          * @}

@@ -5,6 +5,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <fstream>
+#include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 #include <sstream>
 #include <string>
@@ -115,12 +116,12 @@ namespace Engine
          *
          * @return True on success, otherwise false.
          */
-        bool set_UniformMatrix4fv(const std::string &uniform_name, const GLfloat *value)
+        bool
+        set_UniformMatrix4fv(const std::string &uniform_name, const glm::mat4 &value)
         {
             GLint location;
             ASSERT_RET_IF_NOT(get_uniform_location(uniform_name, location), false);
-            glUniformMatrix4fv(location, 1, GL_FALSE, value);
-
+            glUniformMatrix4fv(location, 1, GL_FALSE, &value[0][0]);
             return true;
         }
 

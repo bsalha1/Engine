@@ -1,11 +1,13 @@
 #pragma once
 
+#include "Renderer.h"
+
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
 namespace Engine
 {
-    class VertexArray
+    class VertexArray: public Renderer::Drawable
     {
     public:
         VertexArray(): vertex_array_id(0)
@@ -81,7 +83,7 @@ namespace Engine
         /**
          * @brief Draw the vertex array.
          */
-        void draw()
+        void draw() override
         {
             bind();
             glDrawArrays(GL_TRIANGLES, 0, num_vertices);

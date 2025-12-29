@@ -1,11 +1,14 @@
 #pragma once
 
+#include "Renderer.h"
+#include "VertexArray.h"
+
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
 namespace Engine
 {
-    class IndexBuffer
+    class IndexBuffer: public Renderer::Drawable
     {
     public:
         /**
@@ -18,7 +21,8 @@ namespace Engine
          */
         static constexpr GLenum IndexGLtype = GL_UNSIGNED_INT;
 
-        IndexBuffer(): index_buffer_obj(0), count(0)
+        IndexBuffer(const VertexArray &_vertex_array):
+            vertex_array(_vertex_array), index_buffer_obj(0), count(0)
         {}
 
         /**
@@ -40,14 +44,16 @@ namespace Engine
         }
 
         /**
-         * @brief Draw the index buffer.
+         * @brief Draw the vertices using this buffer together with the vertex buffer.
          */
-        void draw() const
+        void draw() override
         {
+            vertex_array.bind();
             glDrawElements(GL_TRIANGLES, count, IndexGLtype, nullptr);
         }
 
     private:
+        const VertexArray &vertex_array;
         GLuint index_buffer_obj;
         size_t count;
     };

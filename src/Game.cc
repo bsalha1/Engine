@@ -1,5 +1,6 @@
 #include "Game.h"
 
+#include "Vertex.h"
 #include "assert_util.h"
 #include "log.h"
 
@@ -21,37 +22,6 @@ using namespace std::chrono_literals;
 
 namespace Engine
 {
-    struct Vertex3d
-    {
-        glm::vec3 position;
-    };
-    static_assert(sizeof(Vertex3d) == 3 * sizeof(float));
-
-    struct TexturedVertex3d
-    {
-        glm::vec3 position;
-        glm::vec2 texture;
-    };
-    static_assert(sizeof(TexturedVertex3d) == 5 * sizeof(float));
-
-    struct TexturedVertex2d
-    {
-        glm::vec2 position;
-        glm::vec2 texture;
-    };
-    static_assert(sizeof(TexturedVertex2d) == 4 * sizeof(float));
-
-    /**
-     * A vertex with a position and a normal vector.
-     */
-    struct TexturedVertex3dNormal
-    {
-        glm::vec3 position;
-        glm::vec3 norm = glm::vec3(0.f);
-        glm::vec2 texture;
-    };
-    static_assert(sizeof(TexturedVertex3dNormal) == 8 * sizeof(float));
-
     static void gl_debug_message_callback(GLenum source,
                                           GLenum type,
                                           GLuint id,
@@ -132,9 +102,6 @@ namespace Engine
         right(0.f, 0.f, 0.f),
         forwards(0.f, 0.f, 0.f),
         head(0.f, 0.f, 0.f),
-        exposure(1.0f),
-        gamma(1.0f),
-        sharpness(1.0f),
         chaser_position(0.f, 0.f, 10.f),
         point_light_position(150.f, 100.f, 120.f)
     {}
@@ -241,16 +208,6 @@ namespace Engine
         window_center_y = window_height / 2;
 
         /*
-         * Now that we know the aspect ratio, set up the projection matrix.
-         */
-        static constexpr float fov_deg = 75.f;
-        static constexpr const float far_clip = 5000.f;
-        const float aspect = static_cast<float>(window_width) / window_height;
-        const float near_clip = 0.001f;
-        projection =
-            glm::perspective(glm::radians(fov_deg), aspect, near_clip, far_clip);
-
-        /*
          * Hide the cursor and move it to the center of the window.
          */
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -287,83 +244,8 @@ namespace Engine
         /*
          * Create screen frame buffer.
          */
-        LOG("Creating screen buffer\n");
-        {
-            /* clang-format off */
-            const std::array<TexturedVertex2d, 6> vertices = {{
-            /*                  position,              texture */
-                {glm::vec2(-1.0f,  1.0f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec2(-1.0f, -1.0f), glm::vec2(0.0f, 0.0f)},
-                {glm::vec2( 1.0f, -1.0f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec2(-1.0f,  1.0f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec2( 1.0f, -1.0f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec2( 1.0f,  1.0f), glm::vec2(1.0f, 1.0f)},
-            }};
-            /* clang-format on */
-
-            quad_textured_vertex_array.create(vertices.data(), vertices.size());
-            quad_textured_vertex_array.setup_vertex_attrib(0,
-                                                           &TexturedVertex2d::position);
-            quad_textured_vertex_array.setup_vertex_attrib(1,
-                                                           &TexturedVertex2d::texture);
-
-            glGenFramebuffers(1, &screen_frame_buffer);
-            glBindFramebuffer(GL_FRAMEBUFFER, screen_frame_buffer);
-
-            /*
-             * Create textures to hold the color and brightness buffers.
-             */
-            screen_color_texture.create(window_width,
-                                        window_height,
-                                        GL_COLOR_ATTACHMENT0,
-                                        0 /* slot */,
-                                        GL_REPEAT);
-            screen_bloom_texture.create(window_width,
-                                        window_height,
-                                        GL_COLOR_ATTACHMENT1,
-                                        1 /* slot */,
-                                        GL_CLAMP_TO_EDGE);
-
-            /*
-             * Create a render buffer to hold the depth and stencil buffer.
-             */
-            GLuint depth_stencil_render_buffer;
-            glGenRenderbuffers(1, &depth_stencil_render_buffer);
-            glBindRenderbuffer(GL_RENDERBUFFER, depth_stencil_render_buffer);
-            glRenderbufferStorage(
-                GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, window_width, window_height);
-            glBindRenderbuffer(GL_RENDERBUFFER, 0);
-
-            glFramebufferRenderbuffer(GL_FRAMEBUFFER,
-                                      GL_DEPTH_STENCIL_ATTACHMENT,
-                                      GL_RENDERBUFFER,
-                                      depth_stencil_render_buffer);
-
-            ASSERT_RET_IF_NOT(glCheckFramebufferStatus(GL_FRAMEBUFFER) ==
-                                  GL_FRAMEBUFFER_COMPLETE,
-                              false);
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-            /*
-             * Create ping-pong frame buffers for blurring the bloom texture.
-             */
-            for (uint8_t i = 0; i < ping_pong_frame_buffer.size(); i++)
-            {
-                glGenFramebuffers(1, &ping_pong_frame_buffer[i]);
-                glBindFramebuffer(GL_FRAMEBUFFER, ping_pong_frame_buffer[i]);
-
-                ping_pong_texture[i].create(screen_bloom_texture.get_width(),
-                                            screen_bloom_texture.get_height(),
-                                            GL_COLOR_ATTACHMENT0,
-                                            screen_bloom_texture.get_slot(),
-                                            GL_CLAMP_TO_EDGE);
-
-                ASSERT_RET_IF_NOT(glCheckFramebufferStatus(GL_FRAMEBUFFER) ==
-                                      GL_FRAMEBUFFER_COMPLETE,
-                                  false);
-            }
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        }
+        LOG("Initializing renderer\n");
+        renderer.init(window_width, window_height);
 
         /*
          * Create chaser buffers.
@@ -431,40 +313,15 @@ namespace Engine
                                                     &TexturedVertex3dNormal::texture);
         }
 
-        LOG("Compiling shaders\n");
-        ASSERT_RET_IF_NOT(lit_textured_shader.compile({
-                              {"lit_textured.vert", GL_VERTEX_SHADER},
-                              {"lit_textured.frag", GL_FRAGMENT_SHADER},
-                          }),
-                          false);
-        ASSERT_RET_IF_NOT(skybox_shader.compile({
-                              {"skybox.vert", GL_VERTEX_SHADER},
-                              {"skybox.frag", GL_FRAGMENT_SHADER},
-                          }),
-                          false);
-        ASSERT_RET_IF_NOT(light_shader.compile({
-                              {"light.vert", GL_VERTEX_SHADER},
-                              {"light.frag", GL_FRAGMENT_SHADER},
-                          }),
-                          false);
-        ASSERT_RET_IF_NOT(screen_shader.compile({
-                              {"screen.vert", GL_VERTEX_SHADER},
-                              {"screen.frag", GL_FRAGMENT_SHADER},
-                          }),
-                          false);
-        ASSERT_RET_IF_NOT(gaussian_blur_shader.compile({
-                              {"gaussian_blur.vert", GL_VERTEX_SHADER},
-                              {"gaussian_blur.frag", GL_FRAGMENT_SHADER},
-                          }),
-                          false);
-
         LOG("Loading textures\n");
-        ASSERT_RET_IF_NOT(chaser_textured_material.create_from_file(
-                              "textures/obama.png", 0 /* slot */),
-                          false);
-        ASSERT_RET_IF_NOT(dirt_textured_material.create_from_file("textures/dirt.jpg",
-                                                                  0 /* slot */),
-                          false);
+        {
+            ASSERT_RET_IF_NOT(chaser_textured_material.create_from_file(
+                                  "textures/obama.png", 0 /* slot */),
+                              false);
+            ASSERT_RET_IF_NOT(dirt_textured_material.create_from_file(
+                                  "textures/dirt.jpg", 0 /* slot */),
+                              false);
+        }
 
         LOG("Loading terrain heightmaps\n");
         {
@@ -656,63 +513,6 @@ namespace Engine
             terrain_index_buffer.create(indices.data(), indices.size());
         }
 
-        LOG("Loading skybox\n");
-        {
-            ASSERT_RET_IF_NOT(skybox_texture.create_from_file("textures/skybox/",
-                                                              ".jpg",
-                                                              0 /* slot */),
-                              false);
-
-            static const std::array<Vertex3d, 36> skybox_vertices = {
-                /* clang-format off */
-                glm::vec3(-1.0f, -1.0f, -1.0f),
-                glm::vec3( 1.0f, -1.0f, -1.0f),
-                glm::vec3( 1.0f,  1.0f, -1.0f),
-                glm::vec3( 1.0f,  1.0f, -1.0f),
-                glm::vec3(-1.0f,  1.0f, -1.0f),
-                glm::vec3(-1.0f, -1.0f, -1.0f),
-
-                glm::vec3(-1.0f, -1.0f,  1.0f),
-                glm::vec3( 1.0f, -1.0f,  1.0f),
-                glm::vec3( 1.0f,  1.0f,  1.0f),
-                glm::vec3( 1.0f,  1.0f,  1.0f),
-                glm::vec3(-1.0f,  1.0f,  1.0f),
-                glm::vec3(-1.0f, -1.0f,  1.0f),
-
-                glm::vec3(-1.0f,  1.0f,  1.0f),
-                glm::vec3(-1.0f,  1.0f, -1.0f),
-                glm::vec3(-1.0f, -1.0f, -1.0f),
-                glm::vec3(-1.0f, -1.0f, -1.0f),
-                glm::vec3(-1.0f, -1.0f,  1.0f),
-                glm::vec3(-1.0f,  1.0f,  1.0f),
-
-                glm::vec3( 1.0f,  1.0f,  1.0f),
-                glm::vec3( 1.0f,  1.0f, -1.0f),
-                glm::vec3( 1.0f, -1.0f, -1.0f),
-                glm::vec3( 1.0f, -1.0f, -1.0f),
-                glm::vec3( 1.0f, -1.0f,  1.0f),
-                glm::vec3( 1.0f,  1.0f,  1.0f),
-
-                glm::vec3(-1.0f, -1.0f, -1.0f),
-                glm::vec3( 1.0f, -1.0f, -1.0f),
-                glm::vec3( 1.0f, -1.0f,  1.0f),
-                glm::vec3( 1.0f, -1.0f,  1.0f),
-                glm::vec3(-1.0f, -1.0f,  1.0f),
-                glm::vec3(-1.0f, -1.0f, -1.0f),
-
-                glm::vec3(-1.0f,  1.0f, -1.0f),
-                glm::vec3( 1.0f,  1.0f, -1.0f),
-                glm::vec3( 1.0f,  1.0f,  1.0f),
-                glm::vec3( 1.0f,  1.0f,  1.0f),
-                glm::vec3(-1.0f,  1.0f,  1.0f),
-                glm::vec3(-1.0f,  1.0f, -1.0f),
-                /* clang-format on */
-            };
-
-            skybox_vertex_array.create(skybox_vertices.data(), skybox_vertices.size());
-            skybox_vertex_array.setup_vertex_attrib(0, &Vertex3d::position);
-        }
-
         LOG("Initializing GUI\n");
         ImGui::CreateContext();
         ImGui::StyleColorsDark();
@@ -895,21 +695,20 @@ namespace Engine
                 }
             }
 
-            screen_shader.use();
-
             /*
              * Add display settings.
              */
+            float exposure = renderer.get_exposure();
             ImGui::SliderFloat("exposure", &exposure, 0.0, 10.0);
-            ASSERT_RET_IF_NOT(screen_shader.set_Uniform1f("u_exposure", exposure),
-                              false);
+            ASSERT_RET_IF_NOT(renderer.set_exposure(exposure), false);
 
+            float gamma = renderer.get_gamma();
             ImGui::SliderFloat("gamma", &gamma, 0.0, 10.0);
-            ASSERT_RET_IF_NOT(screen_shader.set_Uniform1f("u_gamma", gamma), false);
+            ASSERT_RET_IF_NOT(renderer.set_gamma(gamma), false);
 
-            ImGui::SliderFloat("sharpness", &sharpness, 1.0, 1000.0);
-            ASSERT_RET_IF_NOT(screen_shader.set_Uniform1f("u_sharpness", sharpness),
-                              false);
+            float sharpness = renderer.get_sharpness();
+            ImGui::SliderFloat("sharpness", &sharpness, 0.0, 1000.0);
+            ASSERT_RET_IF_NOT(renderer.set_sharpness(sharpness), false);
 
             /*
              * Add quit button.
@@ -1390,296 +1189,11 @@ namespace Engine
     }
 
     /**
-     * @brief Draw objects which only contribute to color, not bloom.
-     *
-     * @param view View matrix.
-     * @param chaser_model Model matrix of the chasing chaser.
-     * @param terrain_model Model matrix of the terrain.
-     * @param directional_light_direction Directional light direction.
-     * @param sun_brightness Brightness of the sun.
-     *
-     * @return True on success, otherwise false.
-     */
-    bool Game::draw_non_blooming_objects(const glm::mat4 view,
-                                         const glm::mat4 &chaser_model,
-                                         const glm::mat4 &terrain_model,
-                                         const glm::vec3 &directional_light_direction,
-                                         const float sun_brightness)
-    {
-        /*
-         * Draw things that only contribute to color, not bloom.
-         */
-        const std::array<GLenum, 1> buffers = {
-            screen_color_texture.get_attachment(),
-        };
-        glDrawBuffers(buffers.size(), buffers.data());
-
-        /*
-         * Set directional light color.
-         */
-        const glm::vec3 directional_light_color = sun_color * sun_brightness;
-
-        /*
-         * Set uniforms for lit textured shader.
-         */
-        lit_textured_shader.use();
-        ASSERT_RET_IF_NOT(
-            lit_textured_shader.set_UniformMatrix4fv("u_view", &view[0][0]), false);
-        ASSERT_RET_IF_NOT(lit_textured_shader.set_UniformMatrix4fv("u_projection",
-                                                                   &projection[0][0]),
-                          false);
-        ASSERT_RET_IF_NOT(lit_textured_shader.set_Uniform3f("u_point_light.position",
-                                                            point_light_position),
-                          false);
-        ASSERT_RET_IF_NOT(
-            lit_textured_shader.set_Uniform3f("u_directional_light.direction",
-                                              directional_light_direction),
-            false);
-        ASSERT_RET_IF_NOT(lit_textured_shader.set_Uniform3f(
-                              "u_directional_light.ambient", directional_light_color),
-                          false);
-        ASSERT_RET_IF_NOT(lit_textured_shader.set_Uniform3f(
-                              "u_directional_light.diffuse", directional_light_color),
-                          false);
-        ASSERT_RET_IF_NOT(lit_textured_shader.set_Uniform3f(
-                              "u_directional_light.specular", directional_light_color),
-                          false);
-        ASSERT_RET_IF_NOT(lit_textured_shader.set_Uniform3f("u_camera_position",
-                                                            player_position),
-                          false);
-
-        /*
-         * Draw the chasers.
-         */
-        ASSERT_RET_IF_NOT(chaser_textured_material.apply(lit_textured_shader), false);
-
-        /*
-         * Draw a stationary chaser at the origin.
-         */
-        {
-            const glm::mat4 model =
-                glm::translate(glm::mat4(1.0f), glm::vec3(0.f, 10.f, 0.f));
-            ASSERT_RET_IF_NOT(lit_textured_shader.set_UniformMatrix4fv("u_model",
-                                                                       &model[0][0]),
-                              false);
-
-            chaser_vertex_array.draw();
-        }
-
-        /*
-         * Draw chaser which chases.
-         */
-        {
-            ASSERT_RET_IF_NOT(lit_textured_shader.set_UniformMatrix4fv(
-                                  "u_model", &chaser_model[0][0]),
-                              false);
-
-            chaser_vertex_array.draw();
-        }
-
-        /*
-         * Draw the terrain.
-         */
-        {
-            ASSERT_RET_IF_NOT(dirt_textured_material.apply(lit_textured_shader), false);
-
-            terrain_vertex_array.bind();
-
-            ASSERT_RET_IF_NOT(lit_textured_shader.set_UniformMatrix4fv(
-                                  "u_model", &terrain_model[0][0]),
-                              false);
-
-            terrain_index_buffer.draw();
-        }
-
-        return true;
-    }
-
-    /**
-     * @brief Draw objects which contribute to both color and bloom.
-     *
-     * @param view View matrix.
-     *
-     * @return True on success, otherwise false.
-     */
-    bool Game::draw_blooming_objects(const glm::mat4 view)
-    {
-        /*
-         * Draw things which contribute both color and bloom.
-         */
-        const std::array<GLenum, 2> buffers = {
-            screen_color_texture.get_attachment(),
-            screen_bloom_texture.get_attachment(),
-        };
-        glDrawBuffers(buffers.size(), buffers.data());
-
-        light_shader.use();
-
-        /*
-         * Draw point light.
-         */
-        const glm::mat4 point_light_model =
-            glm::translate(glm::mat4(1.f), point_light_position);
-
-        const glm::mat4 point_light_model_view_projection =
-            projection * view * point_light_model;
-
-        ASSERT_RET_IF_NOT(
-            light_shader.set_UniformMatrix4fv("u_model_view_projection",
-                                              &point_light_model_view_projection[0][0]),
-            false);
-
-        chaser_vertex_array.draw();
-
-        return true;
-    }
-
-    /**
-     * @brief Draw the skybox.
-     *
-     * @param view View matrix.
-     * @param orbital_angle Orbital angle of the skybox.
-     *
-     * @return True on success, otherwise false.
-     */
-    bool Game::draw_skybox(const glm::mat4 view, const float orbital_angle)
-    {
-        /*
-         * Draw to both color and bloom buffers.
-         */
-        const std::array<GLenum, 2> buffers = {
-            screen_color_texture.get_attachment(),
-            screen_bloom_texture.get_attachment(),
-        };
-        glDrawBuffers(buffers.size(), buffers.data());
-
-        glDepthFunc(GL_LEQUAL);
-
-        skybox_texture.use();
-
-        /*
-         * Use the player's view but remove translation and add rotation to
-         * emulate the planet rotating.
-         */
-        const glm::mat4 view_skybox =
-            glm::rotate(glm::mat4(glm::mat3(view)), orbital_angle, rotation_axis);
-
-        skybox_shader.use();
-        ASSERT_RET_IF_NOT(
-            skybox_shader.set_UniformMatrix4fv("u_view", &view_skybox[0][0]), false);
-        ASSERT_RET_IF_NOT(skybox_shader.set_UniformMatrix4fv("u_projection",
-                                                             &projection[0][0]),
-                          false);
-
-        skybox_vertex_array.draw();
-
-        glDepthFunc(GL_LESS);
-
-        return true;
-    }
-
-    /**
-     * @brief Draw the scene.
-     *
-     * @param chaser_model Model matrix of the chasing chaser.
-     * @param terrain_model Model matrix of the terrain.
-     * @param directional_light_direction Directional light direction.
-     * @param orbital_angle Orbital angle of the skybox.
-     * @param sun_brightness Brightness of the sun.
-     *
-     * @return True on success, otherwise false.
-     */
-    bool Game::draw(const glm::mat4 &chaser_model,
-                    const glm::mat4 &terrain_model,
-                    const glm::vec3 &directional_light_direction,
-                    const float orbital_angle,
-                    const float sun_brightness)
-    {
-        /*
-         * Compute view looking at the direction our mouse is pointing.
-         */
-        const glm::mat4 view =
-            glm::lookAt(player_position, player_position + direction, head);
-
-        /*
-         * Clear both the color and bloom buffers.
-         */
-        const std::array<GLenum, 2> buffers = {
-            screen_color_texture.get_attachment(),
-            screen_bloom_texture.get_attachment(),
-        };
-        glDrawBuffers(buffers.size(), buffers.data());
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        /*
-         * Draw objects which do not contribute to bloom.
-         */
-        ASSERT_RET_IF_NOT(draw_non_blooming_objects(view,
-                                                    chaser_model,
-                                                    terrain_model,
-                                                    directional_light_direction,
-                                                    sun_brightness),
-                          false);
-
-        /*
-         * Draw objects which contribute to bloom.
-         */
-        ASSERT_RET_IF_NOT(draw_blooming_objects(view), false);
-
-        /*
-         * Lastly, draw the skybox.
-         */
-        ASSERT_RET_IF_NOT(draw_skybox(view, orbital_angle), false);
-
-        return true;
-    }
-
-    /**
      * Run the game.
      */
     bool Game::run()
     {
         LOG("Entering main loop\n");
-
-        /*
-         * Initialize terrain shader uniforms.
-         */
-        lit_textured_shader.use();
-        ASSERT_RET_IF_NOT(lit_textured_shader.set_Uniform3f("u_point_light.ambient",
-                                                            point_light_color),
-                          false);
-        ASSERT_RET_IF_NOT(lit_textured_shader.set_Uniform3f("u_point_light.diffuse",
-                                                            point_light_color),
-                          false);
-        ASSERT_RET_IF_NOT(lit_textured_shader.set_Uniform3f("u_point_light.specular",
-                                                            point_light_color),
-                          false);
-        ASSERT_RET_IF_NOT(lit_textured_shader.set_Uniform1i(
-                              "u_texture_sampler", dirt_textured_material.get_slot()),
-                          false);
-
-        /*
-         * Assign gaussian blur shader texture sampler. This is the same as
-         * ping_pong_texture so we don't need to spend time switching slots.
-         */
-        gaussian_blur_shader.use();
-        ASSERT_RET_IF_NOT(gaussian_blur_shader.set_Uniform1i(
-                              "u_texture_sampler", screen_bloom_texture.get_slot()),
-                          false);
-
-        /*
-         * Initialize screen shader uniforms.
-         */
-        screen_shader.use();
-        ASSERT_RET_IF_NOT(screen_shader.set_Uniform1i("u_color_texture_sampler",
-                                                      screen_color_texture.get_slot()),
-                          false);
-        ASSERT_RET_IF_NOT(screen_shader.set_Uniform1i("u_bloom_texture_sampler",
-                                                      screen_bloom_texture.get_slot()),
-                          false);
-        ASSERT_RET_IF_NOT(screen_shader.set_Uniform1f("u_exposure", exposure), false);
-        ASSERT_RET_IF_NOT(screen_shader.set_Uniform1f("u_gamma", gamma), false);
-        ASSERT_RET_IF_NOT(screen_shader.set_Uniform1f("u_sharpness", sharpness), false);
 
         /*
          * Set day length and compute the rotational speed.
@@ -1701,21 +1215,6 @@ namespace Engine
                       glm::sin(sun_orbital_elevation_angle),
                       glm::cos(sun_orbital_elevation_angle),
                       0.f);
-
-        /*
-         * Initialize skybox shader uniforms.
-         */
-        skybox_shader.use();
-        ASSERT_RET_IF_NOT(skybox_shader.set_Uniform1f("u_sun_angular_radius",
-                                                      sun_angular_radius),
-                          false);
-        ASSERT_RET_IF_NOT(skybox_shader.set_Uniform3f("u_sun_position",
-                                                      sun_position_skybox_model_space),
-                          false);
-        ASSERT_RET_IF_NOT(skybox_shader.set_Uniform3f("u_sun_color", sun_color), false);
-        ASSERT_RET_IF_NOT(skybox_shader.set_Uniform1i("u_texture_sampler",
-                                                      skybox_texture.get_slot()),
-                          false);
 
         /*
          * Loop until the user closes the window or state gets set to QUIT by the
@@ -1840,7 +1339,7 @@ namespace Engine
                 const glm::vec3 sun_position_terrain_model_space = glm::vec3(
                     terrain_model_matrix_rotated * sun_position_skybox_model_space);
 
-                const glm::vec3 directional_light_direction =
+                glm::vec3 directional_light_direction =
                     -glm::normalize(sun_position_terrain_model_space);
 
                 /*
@@ -1862,70 +1361,91 @@ namespace Engine
                                                  : glm::exp(-brightness_falloff_factor /
                                                             sine_of_elevation_angle);
 
-                /*
-                 * Set frame buffer to the screen frame buffer.
-                 */
-                glBindFramebuffer(GL_FRAMEBUFFER, screen_frame_buffer);
+                const glm::mat4 view =
+                    glm::lookAt(player_position, player_position + direction, head);
 
                 /*
-                 * Draw scene into color buffer and bloom buffers.
+                 * Submit chaser to renderer.
                  */
-                ASSERT_RET_IF_NOT(draw(chaser_model,
-                                       terrain_model,
-                                       directional_light_direction,
-                                       orbital_angle,
-                                       sun_brightness),
-                                  false);
+                Renderer::Transform chaser_transform = {
+                    .position = chaser_position,
+                    .rotation = glm::vec3(0.f,
+                                          glm::radians<float>(180.f) +
+                                              std::atan2(direction_to_player_xz.x,
+                                                         direction_to_player_xz.z),
+                                          0.f),
+                    .scale = glm::vec3(1.f, 1.f, 1.f),
+                };
+                renderer.add_regular_object({
+                    .material = chaser_textured_material,
+                    .transform = chaser_transform,
+                    .drawable = chaser_vertex_array,
+                });
 
                 /*
-                 * Apply a gaussian blur to the bloom texture.
+                 * Submit floating chaser to renderer.
                  */
-                uint8_t horizontal = 1;
-                bool first_iteration = true;
-                static constexpr uint8_t passes = 10;
-                gaussian_blur_shader.use();
-                for (uint8_t i = 0; i < passes; ++i)
-                {
-                    glBindFramebuffer(GL_FRAMEBUFFER,
-                                      ping_pong_frame_buffer[horizontal]);
-                    ASSERT_RET_IF_NOT(gaussian_blur_shader.set_Uniform1i("u_horizontal",
-                                                                         horizontal),
-                                      false);
-
-                    horizontal = 1 ^ horizontal;
-
-                    if (first_iteration)
-                    {
-                        screen_bloom_texture.use();
-                    }
-                    else
-                    {
-                        ping_pong_texture[horizontal].use();
-                    }
-
-                    quad_textured_vertex_array.bind();
-                    quad_textured_vertex_array.draw();
-
-                    if (first_iteration)
-                    {
-                        first_iteration = false;
-                    }
-                }
+                Renderer::Transform floating_chaser_transform = {
+                    .position = glm::vec3(0.f, 10.f, 0.f),
+                    .rotation = glm::vec3(0.f, 0.f, 0.f),
+                    .scale = glm::vec3(1.f, 1.f, 1.f),
+                };
+                renderer.add_regular_object({
+                    .material = chaser_textured_material,
+                    .transform = floating_chaser_transform,
+                    .drawable = chaser_vertex_array,
+                });
 
                 /*
-                 * Go back to default frame buffer and draw the screen texture over a
-                 * quad.
+                 * Submit point light to renderer.
                  */
-                glBindFramebuffer(GL_FRAMEBUFFER, 0);
-                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                glm::vec3 point_light_color =
+                    10.f * glm::vec3(0xFF, 0xDF, 0x22) / 255.f;
+                Renderer::Transform point_light_transform = {
+                    .position = point_light_position,
+                    .rotation = glm::vec3(0.f, 0.f, 0.f),
+                    .scale = glm::vec3(1.f, 1.f, 1.f),
+                };
+                renderer.add_point_light_object({
+                    .color = point_light_color,
+                    .transform = point_light_transform,
+                    .drawable = chaser_vertex_array,
+                });
 
-                screen_shader.use();
-                quad_textured_vertex_array.bind();
-                ping_pong_texture[horizontal].use();
-                screen_shader.set_Uniform1i("u_bloom_texture_sampler",
-                                            ping_pong_texture[horizontal].get_slot());
-                screen_color_texture.use();
-                quad_textured_vertex_array.draw();
+                /*
+                 * Submit sun to renderer.
+                 */
+                static constexpr glm::vec3 sun_color =
+                    10.f * glm::vec3(1.0f, 0.95f, 0.85f);
+                glm::vec3 directional_light_color = sun_color * sun_brightness;
+                renderer.add_directional_light_object({
+                    .direction = directional_light_direction,
+                    .color = directional_light_color,
+                });
+
+                /*
+                 * Submit terrain to renderer.
+                 */
+                Renderer::Transform terrain_transform = {
+                    .position = glm::vec3(0.f, 0.f, 0.f),
+                    .rotation = glm::vec3(0.f, 0.f, 0.f),
+                    .scale = glm::vec3(1.f, 1.f, 1.f),
+                };
+                renderer.add_regular_object({
+                    .material = dirt_textured_material,
+                    .transform = terrain_transform,
+                    .drawable = terrain_index_buffer,
+                });
+
+                /*
+                 * Use the player's view but remove translation and add rotation to
+                 * emulate the planet rotating.
+                 */
+                const glm::mat4 view_skybox = glm::rotate(glm::mat4(glm::mat3(view)),
+                                                          orbital_angle,
+                                                          rotation_axis);
+
+                renderer.render(view, view_skybox, player_position);
             }
 
             /*

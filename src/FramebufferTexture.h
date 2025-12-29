@@ -25,6 +25,10 @@ namespace Engine
                     const GLsizei _height,
                     const GLenum _attachment,
                     const GLenum _slot,
+                    const GLint internal_format,
+                    const GLint format,
+                    const GLenum min_filter,
+                    const GLenum max_filter,
                     const GLint wrap_mode)
         {
             width = _width;
@@ -36,15 +40,15 @@ namespace Engine
             glBindTexture(GL_TEXTURE_2D, texture_id);
             glTexImage2D(GL_TEXTURE_2D,
                          0,
-                         GL_RGBA16F,
+                         internal_format,
                          width,
                          height,
                          0,
-                         GL_RGBA,
+                         format,
                          GL_FLOAT,
                          nullptr);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, max_filter);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_mode);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_mode);
 
