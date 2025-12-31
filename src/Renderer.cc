@@ -12,14 +12,9 @@
 
 namespace Engine
 {
-    /*
-     * Set day length and compute the rotational speed.
-     */
-    static constexpr float day_length_s = 5.f;
-    static constexpr float rotational_angular_speed =
-        2 * glm::pi<float>() / day_length_s;
+    static constexpr GLsizei shadow_map_resolution = 2048;
 
-    /*
+    /**
      * Relative to the terrain, the skybox spins around it. We draw a sun
      * on the skybox in its model space so that it rotates with it with an
      * elevation angle above the orbital plane.
@@ -48,6 +43,14 @@ namespace Engine
             glm::rotate(model_matrix, rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
         model_matrix = glm::scale(model_matrix, scale);
         return model_matrix;
+    }
+
+    /**
+     * @return Model matrix for the transform.
+     */
+    glm::mat4 Renderer::TranslateTransform::model() const
+    {
+        return glm::translate(glm::mat4(1.0f), position);
     }
 
     /**
@@ -222,11 +225,11 @@ namespace Engine
                 /* clang-format on */
             };
 
-            std::unique_ptr<VertexArray> skybox_vertex_array =
+            std::unique_ptr<VertexArray> cube_vertex_array =
                 std::make_unique<VertexArray>();
-            skybox_vertex_array->create(skybox_vertices.data(), skybox_vertices.size());
-            skybox_vertex_array->setup_vertex_attrib(0, &Vertex3d::position);
-            skybox = std::move(skybox_vertex_array);
+            cube_vertex_array->create(skybox_vertices.data(), skybox_vertices.size());
+            cube_vertex_array->setup_vertex_attrib(0, &Vertex3d::position);
+            cube = std::move(cube_vertex_array);
         }
 
         /*
@@ -236,15 +239,15 @@ namespace Engine
         {
             glGenFramebuffers(1, &shadow_map_frame_buffer);
             glBindFramebuffer(GL_FRAMEBUFFER, shadow_map_frame_buffer);
-            shadow_map_texture.create(1024,
-                                      1024,
+            shadow_map_texture.create(shadow_map_resolution,
+                                      shadow_map_resolution,
                                       GL_DEPTH_ATTACHMENT,
-                                      0 /* slot */,
+                                      2 /* slot */,
                                       GL_DEPTH_COMPONENT /* internal_format */,
                                       GL_DEPTH_COMPONENT /* format */,
                                       GL_NEAREST /* min_filter */,
                                       GL_NEAREST /* max_filter */,
-                                      GL_REPEAT /* wrap_mode */);
+                                      GL_CLAMP_TO_BORDER /* wrap_mode */);
             glDrawBuffer(GL_NONE);
             glReadBuffer(GL_NONE);
 
@@ -287,7 +290,7 @@ namespace Engine
                           false);
 
         /*
-         * Initialize skybox shader.
+         * Initialize cube shader.
          */
         ASSERT_RET_IF_NOT(skybox_shader.compile({
                               {"skybox.vert", GL_VERTEX_SHADER},
@@ -295,6 +298,8 @@ namespace Engine
                           }),
                           false);
         skybox_shader.use();
+        ASSERT_RET_IF_NOT(
+            skybox_shader.set_UniformMatrix4fv("u_projection", projection), false);
         ASSERT_RET_IF_NOT(skybox_shader.set_Uniform1f("u_sun_angular_radius",
                                                       sun_angular_radius),
                           false);
@@ -305,15 +310,50 @@ namespace Engine
                                                       skybox_texture.get_slot()),
                           false);
 
+        /*
+         * Initialize regular object shader.
+         */
         ASSERT_RET_IF_NOT(regular_object_shader.compile({
                               {"regular_object.vert", GL_VERTEX_SHADER},
                               {"regular_object.frag", GL_FRAGMENT_SHADER},
                           }),
                           false);
+        regular_object_shader.use();
+        ASSERT_RET_IF_NOT(regular_object_shader.set_UniformMatrix4fv("u_projection",
+                                                                     projection),
+                          false);
+
+        /*
+         * Initialize point light shader.
+         */
         ASSERT_RET_IF_NOT(point_light_shader.compile({
                               {"point_light.vert", GL_VERTEX_SHADER},
                               {"point_light.frag", GL_FRAGMENT_SHADER},
                           }),
+                          false);
+        point_light_shader.use();
+        ASSERT_RET_IF_NOT(
+            point_light_shader.set_UniformMatrix4fv("u_projection", projection), false);
+
+        /*
+         * Initialize depth shader.
+         */
+        ASSERT_RET_IF_NOT(depth_shader.compile({
+                              {"depth.vert", GL_VERTEX_SHADER},
+                              {"depth.frag", GL_FRAGMENT_SHADER},
+                          }),
+                          false);
+
+        /*
+         * Initialize debug shader.
+         */
+        ASSERT_RET_IF_NOT(debug_shader.compile({
+                              {"debug.vert", GL_VERTEX_SHADER},
+                              {"debug.frag", GL_FRAGMENT_SHADER},
+                          }),
+                          false);
+        debug_shader.use();
+        ASSERT_RET_IF_NOT(debug_shader.set_UniformMatrix4fv("u_projection", projection),
                           false);
 
         return true;
@@ -350,6 +390,16 @@ namespace Engine
     }
 
     /**
+     * @brief Add a debug object to be rendered.
+     *
+     * @param object Debug object to add.
+     */
+    void Renderer::add_debug_object(const DebugObject &object)
+    {
+        debug_objects.push_back(object);
+    }
+
+    /**
      * @brief Render the scene.
      *
      * @param camera_view Camera view matrix.
@@ -360,29 +410,9 @@ namespace Engine
      */
     bool Renderer::render(const glm::mat4 &camera_view,
                           const glm::mat4 &skybox_view,
-                          const glm::vec3 &camera_position)
+                          const glm::vec3 &camera_position,
+                          const glm::vec3 &camera_direction)
     {
-        glBindFramebuffer(GL_FRAMEBUFFER, screen_frame_buffer);
-
-        // /*
-        //  * Draw scene into shadow map buffer.
-        //  */
-        // glViewport(0, 0, 1024, 1024);
-        // glBindFramebuffer(GL_FRAMEBUFFER, shadow_map_frame_buffer);
-        // glClear(GL_DEPTH_BUFFER_BIT);
-
-        /*
-         * Clear both the color and bloom buffers.
-         */
-        {
-            const std::array<GLenum, 2> buffers = {
-                screen_color_texture.get_attachment(),
-                screen_bloom_texture.get_attachment(),
-            };
-            glDrawBuffers(buffers.size(), buffers.data());
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        }
-
         /*
          * For now, only one directional and point light is supported.
          */
@@ -395,9 +425,6 @@ namespace Engine
         regular_object_shader.use();
         ASSERT_RET_IF_NOT(
             regular_object_shader.set_UniformMatrix4fv("u_view", camera_view), false);
-        ASSERT_RET_IF_NOT(regular_object_shader.set_UniformMatrix4fv("u_projection",
-                                                                     projection),
-                          false);
         ASSERT_RET_IF_NOT(regular_object_shader.set_Uniform3f(
                               "u_point_light.position",
                               point_light_objects[0].transform.position),
@@ -431,6 +458,150 @@ namespace Engine
                                                               camera_position),
                           false);
 
+        glm::mat4 light_view_projection;
+
+        /*
+         * If the directional light is shining, render the depth map. It is a bit more
+         * sensicle to make this a function of the light's position above the horizon,
+         * but for now we rely on the color already being a function of it.
+         */
+        if (directional_light_objects[0].color != glm::vec3(0.0f))
+        {
+            /*
+             * The directional light is infinitely far away, but we cannot afford
+             * to render an infinite area for the shadow map. Instead, we want to only
+             * render what the camera can see. We can accomplish this by picking a point
+             * in front of the camera, `light_target` and compute the `light_position`
+             * by moving back along the light's direction and draw an orthographic
+             * projection frustrum from the light, pointed at the `light_target`.
+             *
+             * There are a few settings that we must decide on:
+             * - `shadow_frustrum_start`: How close to the light the frustrum starts.
+             *   This should just start at the `light_position`, so 0.
+             *
+             * - `shadow_frustrum_end`: How far from the light the frustrum ends. This
+             *   should be long enough to reach the ground from the `light_position`. We
+             *   should eventually set this programmatically, but for now we just have a
+             *   large fixed value.
+             *
+             * - `shadow_frustrum_width`: How wide the frustrum is in each direction
+             *   from the center. This sets how much field of view resides in the
+             *   frustrum. We should also set this programmatically, but for now we just
+             *   make it the same as the `shadow_frustrum_end` (it is divided by 2
+             *   because it extends in both left and right directions).
+             *
+             * - `shadow_render_distance_from_camera`: How far in front of the camera we
+             *   should place the `light_target`. This should be set so that objects
+             *   near the camera are rendered with shadows. We set it to be half the
+             *   length of the frustrum so that it resides in the center of the
+             *   frustrum.
+             *
+             * - `shadow_render_distance_from_light`: How far back from the
+             *   `light_target` we place the `light_position`. To make it so
+             *   `light_target` is in the center of the frustrum we set it to be half
+             *   the length of the frustrum.
+             *
+             * Also important to note is that a big frustrum means more area will have
+             * shadows rendered, but the resolution of the shadow map will be spread
+             * thinner, leading to blocky shadows. A smaller frustrum means less area
+             * will have shadows rendered, but the resolution of the shadow map will be
+             * more dense, leading to sharper shadows.
+             */
+            static constexpr float shadow_frustrum_start = 0.f;
+            static constexpr float shadow_frustrum_end = 150.f;
+            static constexpr float shadow_frustrum_width = shadow_frustrum_end / 2.f;
+            static constexpr float shadow_render_distance_from_camera =
+                shadow_frustrum_end / 2.f;
+            const float shadow_render_distance_from_light = shadow_frustrum_end / 2.f;
+
+            const glm::vec3 light_target =
+                camera_position + camera_direction * shadow_render_distance_from_camera;
+
+            const glm::vec3 light_position =
+                light_target - directional_light_objects[0].direction *
+                                   shadow_render_distance_from_light;
+
+            const glm::mat4 light_projection = glm::ortho(-shadow_frustrum_width,
+                                                          shadow_frustrum_width,
+                                                          -shadow_frustrum_width,
+                                                          shadow_frustrum_width,
+                                                          shadow_frustrum_start,
+                                                          shadow_frustrum_end);
+
+            /*
+             * Get the light's view, starting at its position, looking at the target,
+             * with "up" being the y axis.
+             */
+            const glm::mat4 light_view =
+                glm::lookAt(light_position, light_target, glm::vec3(0.0f, 1.0f, 0.0f));
+
+            /*
+             * Get the light's view projection matrix which models can be multiplied by
+             * to transform from world space to light space. This rotates the
+             * orthographic projection box to emit from the light's point of view.
+             */
+            const glm::mat4 light_view_projection = light_projection * light_view;
+
+            glViewport(0, 0, shadow_map_resolution, shadow_map_resolution);
+            glBindFramebuffer(GL_FRAMEBUFFER, shadow_map_frame_buffer);
+            glClear(GL_DEPTH_BUFFER_BIT);
+
+            depth_shader.use();
+            ASSERT_RET_IF_NOT(depth_shader.set_UniformMatrix4fv(
+                                  "u_light_view_projection", light_view_projection),
+                              false);
+
+            glCullFace(GL_FRONT);
+            for (RegularObject &object : regular_objects)
+            {
+                ASSERT_RET_IF_NOT(depth_shader.set_UniformMatrix4fv(
+                                      "u_model", object.transform.model()),
+                                  false);
+                object.drawable.draw();
+            }
+            glCullFace(GL_BACK);
+        }
+        else
+        {
+            light_view_projection = glm::mat4(1.0f);
+        }
+
+        /*
+         * Render scene into the screen frame buffer.
+         */
+        glViewport(0, 0, window_width, window_height);
+        glBindFramebuffer(GL_FRAMEBUFFER, screen_frame_buffer);
+        {
+            const std::array<GLenum, 2> buffers = {
+                screen_color_texture.get_attachment(),
+                screen_bloom_texture.get_attachment(),
+            };
+            glDrawBuffers(buffers.size(), buffers.data());
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        }
+
+        /*
+         * Render debug objects.
+         */
+        {
+            const std::array<GLenum, 1> buffers = {
+                screen_color_texture.get_attachment(),
+            };
+            glDrawBuffers(buffers.size(), buffers.data());
+        }
+        debug_shader.use();
+        ASSERT_RET_IF_NOT(debug_shader.set_UniformMatrix4fv("u_view", camera_view),
+                          false);
+        for (const DebugObject &object : debug_objects)
+        {
+            ASSERT_RET_IF_NOT(
+                debug_shader.set_UniformMatrix4fv("u_model", object.transform.model()),
+                false);
+            ASSERT_RET_IF_NOT(debug_shader.set_Uniform3f("u_color", object.color),
+                              false);
+            object.drawable.draw();
+        }
+
         /*
          * Render regular objects.
          */
@@ -440,6 +611,14 @@ namespace Engine
             };
             glDrawBuffers(buffers.size(), buffers.data());
         }
+        regular_object_shader.use();
+        ASSERT_RET_IF_NOT(regular_object_shader.set_UniformMatrix4fv(
+                              "u_light_view_projection", light_view_projection),
+                          false);
+        ASSERT_RET_IF_NOT(regular_object_shader.set_Uniform1i(
+                              "u_shadow_map_sampler", shadow_map_texture.get_slot()),
+                          false);
+        shadow_map_texture.use();
         for (RegularObject &object : regular_objects)
         {
             ASSERT_RET_IF_NOT(regular_object_shader.set_UniformMatrix4fv(
@@ -462,8 +641,6 @@ namespace Engine
         point_light_shader.use();
         ASSERT_RET_IF_NOT(
             point_light_shader.set_UniformMatrix4fv("u_view", camera_view), false);
-        ASSERT_RET_IF_NOT(
-            point_light_shader.set_UniformMatrix4fv("u_projection", projection), false);
         for (PointLightObject &object : point_light_objects)
         {
             ASSERT_RET_IF_NOT(point_light_shader.set_UniformMatrix4fv(
@@ -482,12 +659,10 @@ namespace Engine
         skybox_shader.use();
         ASSERT_RET_IF_NOT(skybox_shader.set_UniformMatrix4fv("u_view", skybox_view),
                           false);
-        ASSERT_RET_IF_NOT(
-            skybox_shader.set_UniformMatrix4fv("u_projection", projection), false);
         ASSERT_RET_IF_NOT(skybox_shader.set_Uniform3f(
                               "u_sun_color", directional_light_objects[0].color),
                           false);
-        skybox->draw();
+        cube->draw();
 
         glDepthFunc(GL_LESS);
 
@@ -543,6 +718,7 @@ namespace Engine
         regular_objects.clear();
         point_light_objects.clear();
         directional_light_objects.clear();
+        debug_objects.clear();
 
         return true;
     }

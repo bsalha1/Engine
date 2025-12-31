@@ -83,7 +83,7 @@ namespace Engine
         /**
          * @brief Draw the vertex array.
          */
-        void draw() override
+        void draw() const override
         {
             bind();
             glDrawArrays(GL_TRIANGLES, 0, num_vertices);

@@ -25,7 +25,7 @@ CXXFLAGS += -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 ifdef DEBUG
 CXXFLAGS += -O0 -g
 else
-CXXFLAGS += -O3
+CXXFLAGS += -O3 -DNDEBUG
 LDFLAGS += -s
 endif
 

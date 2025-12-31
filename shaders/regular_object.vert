@@ -10,12 +10,14 @@ layout(location = 2) in vec2 l_texture_coord;
 out vec3 v_position_world_coords;
 out vec3 v_norm;
 out vec2 v_texture_coord;
-out vec3 v_camera_direction;
+out vec3 v_view_direction;
+out vec4 v_frag_pos_light_space;
 
 uniform mat4 u_model;
 uniform mat4 u_view;
 uniform mat4 u_projection;
 uniform vec3 u_camera_position;
+uniform mat4 u_light_view_projection;
 
 void main()
 {
@@ -39,5 +41,10 @@ void main()
      * Compute unit vector pointing from vertex to camera to pass to fragment
      * shader to do lighting.
      */
-    v_camera_direction = normalize(u_camera_position - v_position_world_coords);
+    v_view_direction = normalize(u_camera_position - v_position_world_coords);
+
+    /*
+     * Compute position of vertex in light space for shadow mapping.
+     */
+    v_frag_pos_light_space = u_light_view_projection * position_four_vector;
 }

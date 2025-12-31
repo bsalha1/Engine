@@ -22,6 +22,14 @@ using namespace std::chrono_literals;
 
 namespace Engine
 {
+    namespace
+    {
+        /**
+         * Debug flag to pause the sun movement.
+         */
+        bool sun_paused = false;
+    }
+
     static void gl_debug_message_callback(GLenum source,
                                           GLenum type,
                                           GLuint id,
@@ -103,7 +111,8 @@ namespace Engine
         forwards(0.f, 0.f, 0.f),
         head(0.f, 0.f, 0.f),
         chaser_position(0.f, 0.f, 10.f),
-        point_light_position(150.f, 100.f, 120.f)
+        point_light_position(150.f, 100.f, 120.f),
+        orbital_angle(glm::pi<float>())
     {}
 
     /**
@@ -710,6 +719,11 @@ namespace Engine
             ImGui::SliderFloat("sharpness", &sharpness, 0.0, 1000.0);
             ASSERT_RET_IF_NOT(renderer.set_sharpness(sharpness), false);
 
+            if (ImGui::Button("Pause Sun"))
+            {
+                sun_paused = !sun_paused;
+            }
+
             /*
              * Add quit button.
              */
@@ -1198,7 +1212,7 @@ namespace Engine
         /*
          * Set day length and compute the rotational speed.
          */
-        static constexpr float day_length_s = 5.f;
+        static constexpr float day_length_s = 10.f;
         static constexpr float rotational_angular_speed =
             2 * glm::pi<float>() / day_length_s;
 
@@ -1271,8 +1285,10 @@ namespace Engine
                  * Update orbital angle. Offset by -pi so that at time 0, the sun is
                  * rising from the horizon.
                  */
-                const float orbital_angle =
-                    rotational_angular_speed * time_since_start - glm::pi<float>();
+                if (!sun_paused)
+                {
+                    orbital_angle += rotational_angular_speed * dt;
+                }
 
                 /*
                  * Update chaser position to move towards player position on X-Z
@@ -1445,7 +1461,9 @@ namespace Engine
                                                           orbital_angle,
                                                           rotation_axis);
 
-                renderer.render(view, view_skybox, player_position);
+                ASSERT_RET_IF_NOT(
+                    renderer.render(view, view_skybox, player_position, direction),
+                    false);
             }
 
             /*

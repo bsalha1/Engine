@@ -46,7 +46,7 @@ namespace Engine
         /**
          * @brief Draw the vertices using this buffer together with the vertex buffer.
          */
-        void draw() override
+        void draw() const override
         {
             vertex_array.bind();
             glDrawElements(GL_TRIANGLES, count, IndexGLtype, nullptr);

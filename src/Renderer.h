@@ -23,7 +23,7 @@ namespace Engine
         public:
             virtual ~Drawable() = default;
 
-            virtual void draw() = 0;
+            virtual void draw() const = 0;
         };
 
         /**
@@ -34,6 +34,16 @@ namespace Engine
             glm::vec3 position;
             glm::vec3 rotation;
             glm::vec3 scale;
+
+            glm::mat4 model() const;
+        };
+
+        /**
+         * @brief Transform of an object with only translation.
+         */
+        struct TranslateTransform
+        {
+            glm::vec3 position;
 
             glm::mat4 model() const;
         };
@@ -68,6 +78,16 @@ namespace Engine
             glm::vec3 &color;
         };
 
+        /**
+         * @brief A debug object has a position and color.
+         */
+        struct DebugObject
+        {
+            const TranslateTransform &transform;
+            const glm::vec3 &color;
+            const Drawable &drawable;
+        };
+
         bool init(const int _window_width, const int _window_height);
 
         void add_regular_object(const RegularObject &object);
@@ -76,9 +96,12 @@ namespace Engine
 
         void add_directional_light_object(const DirectionalLightObject &object);
 
+        void add_debug_object(const DebugObject &object);
+
         bool render(const glm::mat4 &camera_view,
                     const glm::mat4 &skybox_view,
-                    const glm::vec3 &camera_position);
+                    const glm::vec3 &camera_position,
+                    const glm::vec3 &camera_direction);
 
         bool set_exposure(const float _exposure);
 
@@ -150,10 +173,14 @@ namespace Engine
          */
 
         /**
+         * Internal drawables.
+         */
+        std::unique_ptr<Drawable> cube;
+
+        /**
          * Skybox.
          * @{
          */
-        std::unique_ptr<Drawable> skybox;
         Shader skybox_shader;
         CubemapTexture skybox_texture;
         /**
@@ -164,8 +191,19 @@ namespace Engine
          * Shadows.
          * @{
          */
+        Shader depth_shader;
         FramebufferTexture shadow_map_texture;
         GLuint shadow_map_frame_buffer;
+        /**
+         * @}
+         */
+
+        /**
+         * Debugging.
+         * @{
+         */
+        Shader debug_shader;
+        std::vector<DebugObject> debug_objects;
         /**
          * @}
          */

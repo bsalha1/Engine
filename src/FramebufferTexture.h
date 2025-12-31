@@ -52,6 +52,12 @@ namespace Engine
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_mode);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_mode);
 
+            if (wrap_mode == GL_CLAMP_TO_BORDER)
+            {
+                float border_color[] = {1.0f, 1.0f, 1.0f, 1.0f};
+                glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border_color);
+            }
+
             glFramebufferTexture2D(
                 GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, texture_id, 0);
 

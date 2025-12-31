@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstring>
 
+#ifdef NDEBUG
 #define ASSERT_RET_IF_NOT(x, ret)                 \
     if (!(x))                                     \
     {                                             \
@@ -18,6 +19,11 @@
         LOG_ERROR("ASSERT_RET_IF(%s)\n", #x); \
         return ret;                           \
     }
+
+#else
+#define ASSERT_RET_IF_NOT(x, ret) (x)
+#define ASSERT_RET_IF(x, ret) (x)
+#endif
 
 #define ASSERT_RET_IF_GLEW_NOT_OK(x, ret)                    \
     {                                                        \
