@@ -3,6 +3,7 @@
 #include "Vertex.h"
 #include "assert_util.h"
 #include "log.h"
+#include "perf.h"
 
 #include <GLFW/glfw3.h>
 #include <array>
@@ -16,6 +17,7 @@
 #include <sstream>
 #include <stb/stb_image.h>
 #include <string>
+#include <sys/param.h>
 #include <unistd.h>
 
 using namespace std::chrono_literals;
@@ -112,7 +114,12 @@ namespace Engine
         head(0.f, 0.f, 0.f),
         chaser_position(0.f, 0.f, 10.f),
         point_light_position(150.f, 100.f, 120.f),
-        orbital_angle(glm::pi<float>())
+        orbital_angle(glm::pi<float>()),
+        stats_dt_buffer {},
+        stats_dt_buffer_idx(0),
+        stats_frames(0),
+        stats_dt_sum(0),
+        stats_dt_sq_sum(0)
     {}
 
     /**
@@ -741,7 +748,20 @@ namespace Engine
                      ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoFocusOnAppearing |
                          ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoInputs |
                          ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings);
-        ImGui::Text("%.3f ms (%.0f FPS)", 1000.f / io.Framerate, io.Framerate);
+        ImGui::Text("%.3f ms (%.0f FPS)", dt * 1000.0, 1.0 / dt);
+
+        const double dt_mean = stats_dt_sum / stats_frames;
+        const double fps_mean = 1.0 / dt_mean;
+        ImGui::Text("mean: %.3f ms (%.0f FPS)", dt_mean * 1000.0, fps_mean);
+
+        const double dt_variance = (stats_dt_sq_sum / stats_frames) - (dt_mean * dt_mean);
+        const double dt_stdev = sqrt(MAX(dt_variance, 0.0));
+        const double fps_stdev = dt_stdev / (dt_mean * dt_mean);
+        ImGui::Text("stdev: %.3f ms (%.0f FPS)", dt_stdev * 1000.0, fps_stdev);
+
+        // double minFPS = 1.0 / MAX(buffer);
+        // double maxFPS = 1.0 / MIN(buffer);
+
         ImGui::Text("state: %s", state_to_string(state));
         ImGui::Text("player_movement_state: %s",
                     player_movement_state_to_string(player_movement_state));
@@ -761,6 +781,36 @@ namespace Engine
         ImGui::End();
 
         return true;
+    }
+
+    /**
+     * @brief Update statistics used for performance monitoring.
+     */
+    void Game::update_stats()
+    {
+        /*
+         * While we have not filled the stats buffer yet, just accumulate values.
+         */
+        if (unlikely(stats_frames < num_stats_frames))
+        {
+            stats_dt_buffer[stats_dt_buffer_idx] = dt;
+            stats_dt_sum += dt;
+            stats_dt_sq_sum += dt * dt;
+            stats_frames++;
+        }
+
+        /*
+         * Replace the oldest value in the buffer.
+         */
+        else
+        {
+            const double dt_prev = stats_dt_buffer[stats_dt_buffer_idx];
+            stats_dt_buffer[stats_dt_buffer_idx] = dt;
+            stats_dt_sum += dt - dt_prev;
+            stats_dt_sq_sum += dt * dt - dt_prev * dt_prev;
+        }
+
+        stats_dt_buffer_idx = (stats_dt_buffer_idx + 1) % num_stats_frames;
     }
 
     /**
@@ -1234,6 +1284,11 @@ namespace Engine
             frame_start_time = std::chrono::steady_clock::now();
 
             /*
+             * Update stats.
+             */
+            update_stats();
+
+            /*
              * Process menu.
              */
             ASSERT_RET_IF_NOT(process_menu(), false);
@@ -1241,7 +1296,7 @@ namespace Engine
             /*
              * If not paused, run gameplay.
              */
-            if (state != State::PAUSED)
+            if (likely(state != State::PAUSED))
             {
                 time_since_start += dt;
 
@@ -1269,7 +1324,7 @@ namespace Engine
                  * Update orbital angle. Offset by -pi so that at time 0, the sun is
                  * rising from the horizon.
                  */
-                if (!sun_paused)
+                if (likely(!sun_paused))
                 {
                     orbital_angle += rotational_angular_speed * dt;
                 }
@@ -1279,8 +1334,8 @@ namespace Engine
                  * plane and face them.
                  */
                 glm::vec3 direction_to_player_xz;
-                if (player_position.x != chaser_position.x ||
-                    player_position.z != chaser_position.z)
+                if (likely(player_position.x != chaser_position.x ||
+                           player_position.z != chaser_position.z))
                 {
                     direction_to_player_xz =
                         glm::normalize(glm::vec3(player_position.x - chaser_position.x,

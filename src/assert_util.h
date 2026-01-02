@@ -1,22 +1,26 @@
 #pragma once
 
 #include "log.h"
+#include "perf.h"
 
 #include <cstdio>
 #include <cstring>
 
 #ifdef NDEBUG
-#define ASSERT_RET_IF_NOT(x, ret)                 \
-    if (!(x))                                     \
-    {                                             \
-        LOG_ERROR("ASSERT_RET_IF_NOT(%s)\n", #x); \
-        return ret;                               \
+
+__cold void assert_print(const char *msg, const char *file, const int line);
+
+#define ASSERT_RET_IF_NOT(x, ret)             \
+    if (unlikely(!(x)))                       \
+    {                                         \
+        assert_print(#x, __FILE__, __LINE__); \
+        return ret;                           \
     }
 
 #define ASSERT_RET_IF(x, ret)                 \
-    if (!!(x))                                \
+    if (unlikely(!!(x)))                      \
     {                                         \
-        LOG_ERROR("ASSERT_RET_IF(%s)\n", #x); \
+        assert_print(#x, __FILE__, __LINE__); \
         return ret;                           \
     }
 

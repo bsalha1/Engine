@@ -57,6 +57,8 @@ namespace Engine
 
         bool process_menu();
 
+        void update_stats();
+
         void update_view();
 
         bool update_player_movement_state_grounded(const bool fly_key_pressed,
@@ -284,6 +286,20 @@ namespace Engine
          */
         float orbital_angle;
         glm::vec3 point_light_position;
+        /**
+         * @}
+         */
+
+        /**
+         * Statistics.
+         * @{
+         */
+        static constexpr size_t num_stats_frames = 1024;
+        std::array<double, num_stats_frames> stats_dt_buffer;
+        size_t stats_dt_buffer_idx;
+        size_t stats_frames;
+        double stats_dt_sum;
+        double stats_dt_sq_sum;
         /**
          * @}
          */

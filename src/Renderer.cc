@@ -444,8 +444,11 @@ namespace Engine
          * If the directional light is shining, render the depth map. It is a bit more
          * sensicle to make this a function of the light's position above the horizon,
          * but for now we rely on the color already being a function of it.
+         *
+         * We place `likely` here since the shadow rendering code is the heaviest part
+         * so it saves cycles when the light is shining.
          */
-        if (directional_light_objects[0].color != glm::vec3(0.0f))
+        if (likely(directional_light_objects[0].color != glm::vec3(0.0f)))
         {
             /*
              * The directional light is infinitely far away, but we cannot afford
@@ -543,7 +546,7 @@ namespace Engine
             /*
              * Draw terrain into shadow map.
              */
-            if (terrain)
+            if (likely(terrain))
             {
                 ASSERT_RET_IF_NOT(depth_shader.set_mat4("u_model", glm::mat4(1)), false);
                 terrain->drawable.draw();
@@ -573,7 +576,7 @@ namespace Engine
         /*
          * Render debug objects.
          */
-        if (!debug_objects.empty())
+        if (unlikely(debug_objects.empty()))
         {
             {
                 const std::array<GLenum, 1> buffers = {
@@ -645,7 +648,7 @@ namespace Engine
         /*
          * Render terrain.
          */
-        if (terrain)
+        if (likely(terrain))
         {
             {
                 const std::array<GLenum, 1> buffers = {
@@ -737,9 +740,10 @@ namespace Engine
 
             horizontal = 1 ^ horizontal;
 
-            if (first_iteration)
+            if (unlikely(first_iteration))
             {
                 screen_bloom_texture.use();
+                first_iteration = false;
             }
             else
             {
@@ -747,11 +751,6 @@ namespace Engine
             }
 
             screen->draw();
-
-            if (first_iteration)
-            {
-                first_iteration = false;
-            }
         }
 
         /*

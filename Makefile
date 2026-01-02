@@ -9,7 +9,7 @@ INCLUDE_DIRS = glfw/include/ glew/include/ glu/include/ glm/ stb/include/ imgui/
 CXXFLAGS += $(addprefix -I,$(INCLUDE_DIRS))
 
 # Object files.
-OBJS = Shader.o Renderer.o Game.o log.o main.o
+OBJS = assert_util.o Shader.o Renderer.o Game.o log.o main.o
 
 PROGRAM_NAME = engine
 
@@ -22,11 +22,17 @@ BUILD_DEPS = $(patsubst %.o,%.d,$(BUILD_OBJS))
 GIT_COMMIT := $(shell git describe --dirty --always)
 CXXFLAGS += -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
+# Debug flag disables optimizations and enables debug info.
 ifdef DEBUG
 CXXFLAGS += -O0 -g
 else
 CXXFLAGS += -O3 -DNDEBUG
 LDFLAGS += -s
+endif
+
+# No performance flag disables certain performance optimizations.
+ifdef NO_PERF
+CXXFLAGS += -DNPERF
 endif
 
 # Disassembled program.
