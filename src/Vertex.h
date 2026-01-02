@@ -72,13 +72,10 @@ namespace Engine
 
         static void setup_vertex_array_attribs(VertexArray &vertex_array)
         {
-            vertex_array.setup_vertex_attrib(0,
-                                             &TexturedVertex3dNormalTangent::position);
+            vertex_array.setup_vertex_attrib(0, &TexturedVertex3dNormalTangent::position);
             vertex_array.setup_vertex_attrib(1, &TexturedVertex3dNormalTangent::norm);
-            vertex_array.setup_vertex_attrib(2,
-                                             &TexturedVertex3dNormalTangent::texture);
-            vertex_array.setup_vertex_attrib(3,
-                                             &TexturedVertex3dNormalTangent::tangent);
+            vertex_array.setup_vertex_attrib(2, &TexturedVertex3dNormalTangent::texture);
+            vertex_array.setup_vertex_attrib(3, &TexturedVertex3dNormalTangent::tangent);
         }
     };
     static_assert(sizeof(TexturedVertex3dNormalTangent) == 12 * sizeof(float));

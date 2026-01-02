@@ -38,15 +38,8 @@ namespace Engine
 
             glGenTextures(1, &texture_id);
             glBindTexture(GL_TEXTURE_2D, texture_id);
-            glTexImage2D(GL_TEXTURE_2D,
-                         0,
-                         internal_format,
-                         width,
-                         height,
-                         0,
-                         format,
-                         GL_FLOAT,
-                         nullptr);
+            glTexImage2D(
+                GL_TEXTURE_2D, 0, internal_format, width, height, 0, format, GL_FLOAT, nullptr);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, max_filter);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_mode);
@@ -58,8 +51,7 @@ namespace Engine
                 glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border_color);
             }
 
-            glFramebufferTexture2D(
-                GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, texture_id, 0);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, texture_id, 0);
 
             LOG("Created framebuffer texture id: 0x%x, slot: %u, attachment: %u\n",
                 texture_id,

@@ -42,8 +42,7 @@ namespace Engine
             LOG_DEBUG("Shader source:\n%s\n", src.c_str());
 
             GLuint shader_type_id;
-            ASSERT_RET_IF_NOT(compile_shader(shader_type_id, descriptor.type, src),
-                              false);
+            ASSERT_RET_IF_NOT(compile_shader(shader_type_id, descriptor.type, src), false);
 
             glAttachShader(shader_id, shader_type_id);
             glDeleteShader(shader_type_id);
@@ -208,8 +207,7 @@ namespace Engine
                 /*
                  * If we have already loaded this include, use the cached version.
                  */
-                if (shader_include_cache.find(include_path) !=
-                    shader_include_cache.end())
+                if (shader_include_cache.find(include_path) != shader_include_cache.end())
                 {
                     include_src = shader_include_cache.at(include_path);
                 }
@@ -218,8 +216,8 @@ namespace Engine
                  */
                 else
                 {
-                    ASSERT_RET_IF_NOT(
-                        get_shader_src_helper(include_path, include_src, true), false);
+                    ASSERT_RET_IF_NOT(get_shader_src_helper(include_path, include_src, true),
+                                      false);
                     shader_include_cache[include_path] = include_src;
                 }
 
@@ -261,8 +259,7 @@ namespace Engine
      *
      * @return True on success, otherwise false.
      */
-    bool
-    Shader::compile_shader(GLuint &shader_id, const GLuint type, const std::string &src)
+    bool Shader::compile_shader(GLuint &shader_id, const GLuint type, const std::string &src)
     {
         shader_id = glCreateShader(type);
         ASSERT_RET_IF(shader_id == 0, false);

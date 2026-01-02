@@ -55,8 +55,7 @@ namespace Engine
             int width, height, channels;
             for (uint8_t i = 0; i < faces.size(); i++)
             {
-                uint8_t *face =
-                    stbi_load(faces[i].c_str(), &width, &height, &channels, 0);
+                uint8_t *face = stbi_load(faces[i].c_str(), &width, &height, &channels, 0);
                 ASSERT_RET_IF_NOT(face, false);
                 LOG("Loading cubemap face %s (%d x %d x %d)\n",
                     faces[i].c_str(),

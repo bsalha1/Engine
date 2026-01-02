@@ -15,10 +15,7 @@ namespace Engine
                          const glm::vec3 &_diffuse,
                          const glm::vec3 &_specular,
                          const float _shininess):
-            ambient(_ambient),
-            diffuse(_diffuse),
-            specular(_specular),
-            shininess(_shininess)
+            ambient(_ambient), diffuse(_diffuse), specular(_specular), shininess(_shininess)
         {}
 
         /**
@@ -35,8 +32,7 @@ namespace Engine
             ASSERT_RET_IF_NOT(shader.set_vec3("u_material.ambient", ambient), false);
             ASSERT_RET_IF_NOT(shader.set_vec3("u_material.diffuse", diffuse), false);
             ASSERT_RET_IF_NOT(shader.set_vec3("u_material.specular", specular), false);
-            ASSERT_RET_IF_NOT(shader.set_float("u_material.shininess", shininess),
-                              false);
+            ASSERT_RET_IF_NOT(shader.set_float("u_material.shininess", shininess), false);
 
             return true;
         }

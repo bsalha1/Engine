@@ -35,12 +35,9 @@ namespace Engine
     {
         glm::mat4 model_matrix = glm::mat4(1.0f);
         model_matrix = glm::translate(model_matrix, position);
-        model_matrix =
-            glm::rotate(model_matrix, rotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
-        model_matrix =
-            glm::rotate(model_matrix, rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
-        model_matrix =
-            glm::rotate(model_matrix, rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
+        model_matrix = glm::rotate(model_matrix, rotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
+        model_matrix = glm::rotate(model_matrix, rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
+        model_matrix = glm::rotate(model_matrix, rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
         model_matrix = glm::scale(model_matrix, scale);
         return model_matrix;
     }
@@ -76,8 +73,7 @@ namespace Engine
         static constexpr const float far_clip = 5000.f;
         const float aspect = static_cast<float>(window_width) / window_height;
         const float near_clip = 0.001f;
-        projection =
-            glm::perspective(glm::radians(fov_deg), aspect, near_clip, far_clip);
+        projection = glm::perspective(glm::radians(fov_deg), aspect, near_clip, far_clip);
 
         LOG("Creating screen quad...\n");
         {
@@ -93,8 +89,7 @@ namespace Engine
             }};
             /* clang-format on */
 
-            std::unique_ptr<VertexArray> screen_vertex_array =
-                std::make_unique<VertexArray>();
+            std::unique_ptr<VertexArray> screen_vertex_array = std::make_unique<VertexArray>();
 
             screen_vertex_array->create(vertices.data(), vertices.size());
             screen_vertex_array->setup_vertex_attrib(0, &TexturedVertex2d::position);
@@ -132,8 +127,7 @@ namespace Engine
             GLuint depth_stencil_render_buffer;
             glGenRenderbuffers(1, &depth_stencil_render_buffer);
             glBindRenderbuffer(GL_RENDERBUFFER, depth_stencil_render_buffer);
-            glRenderbufferStorage(
-                GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, window_width, window_height);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, window_width, window_height);
             glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
             glFramebufferRenderbuffer(GL_FRAMEBUFFER,
@@ -141,8 +135,7 @@ namespace Engine
                                       GL_RENDERBUFFER,
                                       depth_stencil_render_buffer);
 
-            ASSERT_RET_IF_NOT(glCheckFramebufferStatus(GL_FRAMEBUFFER) ==
-                                  GL_FRAMEBUFFER_COMPLETE,
+            ASSERT_RET_IF_NOT(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE,
                               false);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -174,10 +167,8 @@ namespace Engine
 
         LOG("Loading skybox\n");
         {
-            ASSERT_RET_IF_NOT(skybox_texture.create_from_file("textures/skybox/",
-                                                              ".jpg",
-                                                              0 /* slot */),
-                              false);
+            ASSERT_RET_IF_NOT(
+                skybox_texture.create_from_file("textures/skybox/", ".jpg", 0 /* slot */), false);
 
             static const std::array<Vertex3d, 36> skybox_vertices = {
                 /* clang-format off */
@@ -225,8 +216,7 @@ namespace Engine
                 /* clang-format on */
             };
 
-            std::unique_ptr<VertexArray> cube_vertex_array =
-                std::make_unique<VertexArray>();
+            std::unique_ptr<VertexArray> cube_vertex_array = std::make_unique<VertexArray>();
             cube_vertex_array->create(skybox_vertices.data(), skybox_vertices.size());
             cube_vertex_array->setup_vertex_attrib(0, &Vertex3d::position);
             cube = std::move(cube_vertex_array);
@@ -251,8 +241,7 @@ namespace Engine
             glDrawBuffer(GL_NONE);
             glReadBuffer(GL_NONE);
 
-            ASSERT_RET_IF_NOT(glCheckFramebufferStatus(GL_FRAMEBUFFER) ==
-                                  GL_FRAMEBUFFER_COMPLETE,
+            ASSERT_RET_IF_NOT(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE,
                               false);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
         }
@@ -299,13 +288,11 @@ namespace Engine
                           false);
         skybox_shader.use();
         ASSERT_RET_IF_NOT(skybox_shader.set_mat4("u_projection", projection), false);
-        ASSERT_RET_IF_NOT(
-            skybox_shader.set_float("u_sun_angular_radius", sun_angular_radius), false);
-        ASSERT_RET_IF_NOT(skybox_shader.set_vec3("u_sun_position",
-                                                 sun_position_skybox_model_space),
+        ASSERT_RET_IF_NOT(skybox_shader.set_float("u_sun_angular_radius", sun_angular_radius),
                           false);
-        ASSERT_RET_IF_NOT(skybox_shader.set_int("u_texture_sampler",
-                                                skybox_texture.get_slot()),
+        ASSERT_RET_IF_NOT(skybox_shader.set_vec3("u_sun_position", sun_position_skybox_model_space),
+                          false);
+        ASSERT_RET_IF_NOT(skybox_shader.set_int("u_texture_sampler", skybox_texture.get_slot()),
                           false);
 
         /*
@@ -317,11 +304,9 @@ namespace Engine
                           }),
                           false);
         regular_object_shader.use();
-        ASSERT_RET_IF_NOT(regular_object_shader.set_mat4("u_projection", projection),
-                          false);
+        ASSERT_RET_IF_NOT(regular_object_shader.set_mat4("u_projection", projection), false);
         ASSERT_RET_IF_NOT(regular_object_shader.set_int("u_texture_sampler", 0), false);
-        ASSERT_RET_IF_NOT(regular_object_shader.set_int("u_normal_map_sampler", 1),
-                          false);
+        ASSERT_RET_IF_NOT(regular_object_shader.set_int("u_normal_map_sampler", 1), false);
         ASSERT_RET_IF_NOT(regular_object_shader.set_int("u_shadow_map_sampler",
                                                         shadow_map_texture.get_slot()),
                           false);
@@ -335,8 +320,7 @@ namespace Engine
                           }),
                           false);
         point_light_shader.use();
-        ASSERT_RET_IF_NOT(point_light_shader.set_mat4("u_projection", projection),
-                          false);
+        ASSERT_RET_IF_NOT(point_light_shader.set_mat4("u_projection", projection), false);
 
         /*
          * Initialize depth shader.
@@ -384,12 +368,10 @@ namespace Engine
     {
         terrain_shader.use();
         ASSERT_RET_IF_NOT(_terrain.material.apply(terrain_shader), false);
-        ASSERT_RET_IF_NOT(terrain_shader.set_int("u_normal_map_sampler",
-                                                 _terrain.normal_map.get_slot()),
-                          false);
-        ASSERT_RET_IF_NOT(terrain_shader.set_int("u_shadow_map_sampler",
-                                                 shadow_map_texture.get_slot()),
-                          false);
+        ASSERT_RET_IF_NOT(
+            terrain_shader.set_int("u_normal_map_sampler", _terrain.normal_map.get_slot()), false);
+        ASSERT_RET_IF_NOT(
+            terrain_shader.set_int("u_shadow_map_sampler", shadow_map_texture.get_slot()), false);
 
         terrain = std::make_unique<Terrain>(_terrain);
 
@@ -508,16 +490,14 @@ namespace Engine
             static constexpr float shadow_frustrum_start = 0.f;
             static constexpr float shadow_frustrum_end = 150.f;
             static constexpr float shadow_frustrum_width = shadow_frustrum_end / 2.f;
-            static constexpr float shadow_render_distance_from_camera =
-                shadow_frustrum_end / 2.f;
+            static constexpr float shadow_render_distance_from_camera = shadow_frustrum_end / 2.f;
             const float shadow_render_distance_from_light = shadow_frustrum_end / 2.f;
 
             const glm::vec3 light_target =
                 camera_position + camera_direction * shadow_render_distance_from_camera;
 
-            const glm::vec3 light_position =
-                light_target - directional_light_objects[0].direction *
-                                   shadow_render_distance_from_light;
+            const glm::vec3 light_position = light_target - directional_light_objects[0].direction *
+                                                                shadow_render_distance_from_light;
 
             const glm::mat4 light_projection = glm::ortho(-shadow_frustrum_width,
                                                           shadow_frustrum_width,
@@ -545,9 +525,8 @@ namespace Engine
             glClear(GL_DEPTH_BUFFER_BIT);
 
             depth_shader.use();
-            ASSERT_RET_IF_NOT(depth_shader.set_mat4("u_light_view_projection",
-                                                    light_view_projection),
-                              false);
+            ASSERT_RET_IF_NOT(
+                depth_shader.set_mat4("u_light_view_projection", light_view_projection), false);
 
             glCullFace(GL_FRONT);
 
@@ -556,8 +535,8 @@ namespace Engine
              */
             for (RegularObject &object : regular_objects)
             {
-                ASSERT_RET_IF_NOT(
-                    depth_shader.set_mat4("u_model", object.transform.model()), false);
+                ASSERT_RET_IF_NOT(depth_shader.set_mat4("u_model", object.transform.model()),
+                                  false);
                 object.drawable.draw();
             }
 
@@ -566,8 +545,7 @@ namespace Engine
              */
             if (terrain)
             {
-                ASSERT_RET_IF_NOT(depth_shader.set_mat4("u_model", glm::mat4(1)),
-                                  false);
+                ASSERT_RET_IF_NOT(depth_shader.set_mat4("u_model", glm::mat4(1)), false);
                 terrain->drawable.draw();
             }
 
@@ -607,10 +585,9 @@ namespace Engine
             ASSERT_RET_IF_NOT(debug_shader.set_mat4("u_view", camera_view), false);
             for (const DebugObject &object : debug_objects)
             {
-                ASSERT_RET_IF_NOT(
-                    debug_shader.set_mat4("u_model", object.transform.model()), false);
-                ASSERT_RET_IF_NOT(debug_shader.set_vec3("u_color", object.color),
+                ASSERT_RET_IF_NOT(debug_shader.set_mat4("u_model", object.transform.model()),
                                   false);
+                ASSERT_RET_IF_NOT(debug_shader.set_vec3("u_color", object.color), false);
                 object.drawable.draw();
             }
         }
@@ -626,16 +603,14 @@ namespace Engine
         }
         regular_object_shader.use();
         ASSERT_RET_IF_NOT(regular_object_shader.set_mat4("u_view", camera_view), false);
-        ASSERT_RET_IF_NOT(regular_object_shader.set_vec3("u_camera_position",
-                                                         camera_position),
+        ASSERT_RET_IF_NOT(regular_object_shader.set_vec3("u_camera_position", camera_position),
                           false);
         ASSERT_RET_IF_NOT(regular_object_shader.set_mat4("u_light_view_projection",
                                                          light_view_projection),
                           false);
-        ASSERT_RET_IF_NOT(
-            regular_object_shader.set_vec3("u_point_light.position",
-                                           point_light_objects[0].transform.position),
-            false);
+        ASSERT_RET_IF_NOT(regular_object_shader.set_vec3("u_point_light.position",
+                                                         point_light_objects[0].transform.position),
+                          false);
         ASSERT_RET_IF_NOT(regular_object_shader.set_vec3("u_point_light.ambient",
                                                          point_light_objects[0].color),
                           false);
@@ -645,27 +620,22 @@ namespace Engine
         ASSERT_RET_IF_NOT(regular_object_shader.set_vec3("u_point_light.specular",
                                                          point_light_objects[0].color),
                           false);
-        ASSERT_RET_IF_NOT(
-            regular_object_shader.set_vec3("u_directional_light.direction",
-                                           directional_light_objects[0].direction),
-            false);
-        ASSERT_RET_IF_NOT(
-            regular_object_shader.set_vec3("u_directional_light.ambient",
-                                           directional_light_objects[0].color),
-            false);
-        ASSERT_RET_IF_NOT(
-            regular_object_shader.set_vec3("u_directional_light.diffuse",
-                                           directional_light_objects[0].color),
-            false);
-        ASSERT_RET_IF_NOT(
-            regular_object_shader.set_vec3("u_directional_light.specular",
-                                           directional_light_objects[0].color),
-            false);
+        ASSERT_RET_IF_NOT(regular_object_shader.set_vec3("u_directional_light.direction",
+                                                         directional_light_objects[0].direction),
+                          false);
+        ASSERT_RET_IF_NOT(regular_object_shader.set_vec3("u_directional_light.ambient",
+                                                         directional_light_objects[0].color),
+                          false);
+        ASSERT_RET_IF_NOT(regular_object_shader.set_vec3("u_directional_light.diffuse",
+                                                         directional_light_objects[0].color),
+                          false);
+        ASSERT_RET_IF_NOT(regular_object_shader.set_vec3("u_directional_light.specular",
+                                                         directional_light_objects[0].color),
+                          false);
         shadow_map_texture.use();
         for (RegularObject &object : regular_objects)
         {
-            ASSERT_RET_IF_NOT(regular_object_shader.set_mat4("u_model",
-                                                             object.transform.model()),
+            ASSERT_RET_IF_NOT(regular_object_shader.set_mat4("u_model", object.transform.model()),
                               false);
             object.material.apply(regular_object_shader);
             object.normal_map.use();
@@ -687,15 +657,12 @@ namespace Engine
             shadow_map_texture.use();
             terrain_shader.use();
             ASSERT_RET_IF_NOT(terrain_shader.set_mat4("u_view", camera_view), false);
-            ASSERT_RET_IF_NOT(terrain_shader.set_mat4("u_light_view_projection",
-                                                      light_view_projection),
+            ASSERT_RET_IF_NOT(
+                terrain_shader.set_mat4("u_light_view_projection", light_view_projection), false);
+            ASSERT_RET_IF_NOT(terrain_shader.set_vec3("u_camera_position", camera_position), false);
+            ASSERT_RET_IF_NOT(terrain_shader.set_vec3("u_point_light.position",
+                                                      point_light_objects[0].transform.position),
                               false);
-            ASSERT_RET_IF_NOT(
-                terrain_shader.set_vec3("u_camera_position", camera_position), false);
-            ASSERT_RET_IF_NOT(
-                terrain_shader.set_vec3("u_point_light.position",
-                                        point_light_objects[0].transform.position),
-                false);
             ASSERT_RET_IF_NOT(terrain_shader.set_vec3("u_point_light.ambient",
                                                       point_light_objects[0].color),
                               false);
@@ -705,22 +672,18 @@ namespace Engine
             ASSERT_RET_IF_NOT(terrain_shader.set_vec3("u_point_light.specular",
                                                       point_light_objects[0].color),
                               false);
-            ASSERT_RET_IF_NOT(
-                terrain_shader.set_vec3("u_directional_light.direction",
-                                        directional_light_objects[0].direction),
-                false);
-            ASSERT_RET_IF_NOT(
-                terrain_shader.set_vec3("u_directional_light.ambient",
-                                        directional_light_objects[0].color),
-                false);
-            ASSERT_RET_IF_NOT(
-                terrain_shader.set_vec3("u_directional_light.diffuse",
-                                        directional_light_objects[0].color),
-                false);
-            ASSERT_RET_IF_NOT(
-                terrain_shader.set_vec3("u_directional_light.specular",
-                                        directional_light_objects[0].color),
-                false);
+            ASSERT_RET_IF_NOT(terrain_shader.set_vec3("u_directional_light.direction",
+                                                      directional_light_objects[0].direction),
+                              false);
+            ASSERT_RET_IF_NOT(terrain_shader.set_vec3("u_directional_light.ambient",
+                                                      directional_light_objects[0].color),
+                              false);
+            ASSERT_RET_IF_NOT(terrain_shader.set_vec3("u_directional_light.diffuse",
+                                                      directional_light_objects[0].color),
+                              false);
+            ASSERT_RET_IF_NOT(terrain_shader.set_vec3("u_directional_light.specular",
+                                                      directional_light_objects[0].color),
+                              false);
             terrain->normal_map.use();
             terrain->material.apply(terrain_shader);
             terrain->drawable.draw();
@@ -740,8 +703,7 @@ namespace Engine
         ASSERT_RET_IF_NOT(point_light_shader.set_mat4("u_view", camera_view), false);
         for (PointLightObject &object : point_light_objects)
         {
-            ASSERT_RET_IF_NOT(point_light_shader.set_mat4("u_model",
-                                                          object.transform.model()),
+            ASSERT_RET_IF_NOT(point_light_shader.set_mat4("u_model", object.transform.model()),
                               false);
             object.drawable.draw();
         }
@@ -755,8 +717,7 @@ namespace Engine
 
         skybox_shader.use();
         ASSERT_RET_IF_NOT(skybox_shader.set_mat4("u_view", skybox_view), false);
-        ASSERT_RET_IF_NOT(skybox_shader.set_vec3("u_sun_color",
-                                                 directional_light_objects[0].color),
+        ASSERT_RET_IF_NOT(skybox_shader.set_vec3("u_sun_color", directional_light_objects[0].color),
                           false);
         cube->draw();
 
@@ -772,8 +733,7 @@ namespace Engine
         for (uint8_t i = 0; i < passes; ++i)
         {
             glBindFramebuffer(GL_FRAMEBUFFER, ping_pong_frame_buffer[horizontal]);
-            ASSERT_RET_IF_NOT(gaussian_blur_shader.set_int("u_horizontal", horizontal),
-                              false);
+            ASSERT_RET_IF_NOT(gaussian_blur_shader.set_int("u_horizontal", horizontal), false);
 
             horizontal = 1 ^ horizontal;
 
@@ -803,8 +763,7 @@ namespace Engine
 
         screen_shader.use();
         ping_pong_texture[horizontal].use();
-        screen_shader.set_int("u_bloom_texture_sampler",
-                              ping_pong_texture[horizontal].get_slot());
+        screen_shader.set_int("u_bloom_texture_sampler", ping_pong_texture[horizontal].get_slot());
         screen_color_texture.use();
         screen->draw();
 

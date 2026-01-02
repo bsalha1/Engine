@@ -23,15 +23,11 @@ void log(const char *format, ...);
     {                       \
     } while (0)
 #else
-#define LOG_DEBUG(msg, ...) \
-    log("<debug> %s:%d: " msg, __BASE_FILENAME__, __LINE__, ##__VA_ARGS__)
+#define LOG_DEBUG(msg, ...) log("<debug> %s:%d: " msg, __BASE_FILENAME__, __LINE__, ##__VA_ARGS__)
 #endif
 
-#define LOG(msg, ...) \
-    log("<info> %s:%d: " msg, __BASE_FILENAME__, __LINE__, ##__VA_ARGS__)
+#define LOG(msg, ...) log("<info> %s:%d: " msg, __BASE_FILENAME__, __LINE__, ##__VA_ARGS__)
 
-#define LOG_ERROR(msg, ...) \
-    log("<error> %s:%d: " msg, __BASE_FILENAME__, __LINE__, ##__VA_ARGS__)
+#define LOG_ERROR(msg, ...) log("<error> %s:%d: " msg, __BASE_FILENAME__, __LINE__, ##__VA_ARGS__)
 
-#define LOG_WARN(msg, ...) \
-    log("<warn> %s:%d: " msg, __BASE_FILENAME__, __LINE__, ##__VA_ARGS__)
+#define LOG_WARN(msg, ...) log("<warn> %s:%d: " msg, __BASE_FILENAME__, __LINE__, ##__VA_ARGS__)

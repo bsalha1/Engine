@@ -29,9 +29,7 @@ namespace Engine
             glGenTextures(1, &texture_id);
             glBindTexture(GL_TEXTURE_2D, texture_id);
 
-            glTexParameteri(GL_TEXTURE_2D,
-                            GL_TEXTURE_MIN_FILTER,
-                            GL_LINEAR_MIPMAP_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -47,8 +45,7 @@ namespace Engine
 
             stbi_set_flip_vertically_on_load(1);
             int channels;
-            uint8_t *texture_buffer =
-                stbi_load(file_name.c_str(), &width, &height, &channels, 0);
+            uint8_t *texture_buffer = stbi_load(file_name.c_str(), &width, &height, &channels, 0);
             ASSERT_RET_IF_NOT(texture_buffer, false);
             const GLenum internal_format = (channels == 4) ? GL_RGBA8 : GL_RGB8;
             const GLenum format = (channels == 4) ? GL_RGBA : GL_RGB;
@@ -65,10 +62,7 @@ namespace Engine
 
             glGenerateMipmap(GL_TEXTURE_2D);
 
-            LOG("Created texture %s id: %x, slot: %u\n",
-                file_name.c_str(),
-                texture_id,
-                slot);
+            LOG("Created texture %s id: %x, slot: %u\n", file_name.c_str(), texture_id, slot);
 
             return true;
         }

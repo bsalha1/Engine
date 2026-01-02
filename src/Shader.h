@@ -73,8 +73,7 @@ namespace Engine
                                           std::string &shader_src,
                                           const bool is_include);
 
-        static bool
-        get_shader_src(const std::string &file_path, std::string &shader_src);
+        static bool get_shader_src(const std::string &file_path, std::string &shader_src);
 
         /**
          * @brief Compile a shader of given type from source code.
@@ -85,7 +84,6 @@ namespace Engine
          *
          * @return True on success, otherwise false.
          */
-        static bool
-        compile_shader(GLuint &shader_id, const GLuint type, const std::string &src);
+        static bool compile_shader(GLuint &shader_id, const GLuint type, const std::string &src);
     };
 }

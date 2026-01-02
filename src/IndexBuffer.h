@@ -37,10 +37,7 @@ namespace Engine
 
             glGenBuffers(1, &index_buffer_obj);
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer_obj);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                         _count * sizeof(IndexType),
-                         items,
-                         GL_STATIC_DRAW);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, _count * sizeof(IndexType), items, GL_STATIC_DRAW);
         }
 
         /**

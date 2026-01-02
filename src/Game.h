@@ -82,8 +82,7 @@ namespace Engine
         State state;
         State state_prev;
         static const char *state_to_string(const State state);
-        static const char *
-        player_movement_state_to_string(const PlayerMovementState state);
+        static const char *player_movement_state_to_string(const PlayerMovementState state);
 
         /**
          * Window dimensions in pixels.
@@ -236,12 +235,11 @@ namespace Engine
         VertexArray chaser_vertex_array;
 
         Texture chaser_normal_map;
-        TexturedMaterial chaser_textured_material =
-            TexturedMaterial(glm::vec3(0.2f), /* ambient */
-                             glm::vec3(0.2f), /* diffuse */
-                             glm::vec3(8.f),  /* specular */
-                             512.f            /* shininess */
-            );
+        TexturedMaterial chaser_textured_material = TexturedMaterial(glm::vec3(0.2f), /* ambient */
+                                                                     glm::vec3(0.2f), /* diffuse */
+                                                                     glm::vec3(8.f),  /* specular */
+                                                                     512.f /* shininess */
+        );
         /**
          * @}
          */

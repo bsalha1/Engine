@@ -30,10 +30,7 @@ namespace Engine
             GLuint buffer_id;
             glGenBuffers(1, &buffer_id);
             glBindBuffer(GL_ARRAY_BUFFER, buffer_id);
-            glBufferData(GL_ARRAY_BUFFER,
-                         sizeof(Vertex) * _num_vertices,
-                         vertices,
-                         GL_STATIC_DRAW);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * _num_vertices, vertices, GL_STATIC_DRAW);
         }
 
         /**
@@ -61,8 +58,7 @@ namespace Engine
             const GLuint attrib_start_offset = offset_of(member);
             const GLuint attrib_end_offset = attrib_start_offset + sizeof(Member);
             const GLuint attrib_size = sizeof(float);
-            const GLuint attrib_count =
-                (attrib_end_offset - attrib_start_offset) / attrib_size;
+            const GLuint attrib_count = (attrib_end_offset - attrib_start_offset) / attrib_size;
             glVertexAttribPointer(idx,
                                   attrib_count,
                                   GL_FLOAT,

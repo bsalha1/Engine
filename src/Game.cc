@@ -148,8 +148,7 @@ namespace Engine
              * Copy original heightmap for reference.
              */
             std::vector<uint8_t> heightmap_original(heightmap,
-                                                    heightmap + num_rows * num_cols *
-                                                                    dimensions);
+                                                    heightmap + num_rows * num_cols * dimensions);
 
             const float kernel[3][3] = {{1, 2, 1}, {2, 4, 2}, {1, 2, 1}};
 
@@ -169,13 +168,11 @@ namespace Engine
                         {
                             int height_kerneled = col + kernel_x;
                             int row_kerneled = row + kernel_z;
-                            height_kerneled =
-                                glm::clamp(height_kerneled, 0, num_cols - 1);
+                            height_kerneled = glm::clamp(height_kerneled, 0, num_cols - 1);
                             row_kerneled = glm::clamp(row_kerneled, 0, num_rows - 1);
 
                             const float kern = kernel[kernel_z + 1][kernel_x + 1];
-                            sum += heightmap_original[(row_kerneled * num_cols +
-                                                       height_kerneled) *
+                            sum += heightmap_original[(row_kerneled * num_cols + height_kerneled) *
                                                       dimensions] *
                                    kern;
                             weight_sum += kern;
@@ -315,24 +312,21 @@ namespace Engine
             /* clang-format on */
 
             chaser_vertex_array.create(vertices.data(), vertices.size());
-            TexturedVertex3dNormalTangent::setup_vertex_array_attribs(
-                chaser_vertex_array);
+            TexturedVertex3dNormalTangent::setup_vertex_array_attribs(chaser_vertex_array);
         }
 
         LOG("Loading textures\n");
         {
-            ASSERT_RET_IF_NOT(chaser_textured_material.create_from_file(
-                                  "textures/snake.jpg", 0 /* slot */),
+            ASSERT_RET_IF_NOT(chaser_textured_material.create_from_file("textures/snake.jpg",
+                                                                        0 /* slot */),
                               false);
-            ASSERT_RET_IF_NOT(chaser_normal_map.create_from_file(
-                                  "textures/snake_normals.jpg", 1 /* slot */),
+            ASSERT_RET_IF_NOT(chaser_normal_map.create_from_file("textures/snake_normals.jpg",
+                                                                 1 /* slot */),
                               false);
-            ASSERT_RET_IF_NOT(dirt_textured_material.create_from_file(
-                                  "textures/dirt.jpg", 0 /* slot */),
-                              false);
-            ASSERT_RET_IF_NOT(dirt_normal_map.create_from_file(
-                                  "textures/dirt_normals.jpg", 1 /* slot */),
-                              false);
+            ASSERT_RET_IF_NOT(
+                dirt_textured_material.create_from_file("textures/dirt.jpg", 0 /* slot */), false);
+            ASSERT_RET_IF_NOT(
+                dirt_normal_map.create_from_file("textures/dirt_normals.jpg", 1 /* slot */), false);
         }
 
         LOG("Loading terrain heightmaps\n");
@@ -398,9 +392,8 @@ namespace Engine
 
             const unsigned int num_vertices = terrain_num_rows * terrain_num_cols;
             static constexpr unsigned int num_indices_per_vertex = 6;
-            const unsigned int num_indices = (terrain_num_rows - 1) *
-                                             (terrain_num_cols - 1) *
-                                             num_indices_per_vertex;
+            const unsigned int num_indices =
+                (terrain_num_rows - 1) * (terrain_num_cols - 1) * num_indices_per_vertex;
 
             /*
              * Draw one copy of the texture per cell.
@@ -421,8 +414,7 @@ namespace Engine
             {
                 for (int col = 0; col < terrain_num_cols; col++)
                 {
-                    const uint8_t y =
-                        heightmap[(terrain_num_cols * row + col) * terrain_channels];
+                    const uint8_t y = heightmap[(terrain_num_cols * row + col) * terrain_channels];
 
                     Vertex3dNormal &vertex = vertices.emplace_back();
 
@@ -670,14 +662,11 @@ namespace Engine
         if (state == State::PAUSED)
         {
             const ImGuiViewport *viewport = ImGui::GetMainViewport();
-            ImGui::SetNextWindowPos(viewport->GetCenter(),
-                                    ImGuiCond_Always,
-                                    ImVec2(0.5f, 0.5f));
+            ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
             ImGui::Begin("Pause Menu",
                          nullptr,
-                         ImGuiWindowFlags_AlwaysAutoResize |
-                             ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoNavFocus |
-                             ImGuiWindowFlags_NoResize |
+                         ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse |
+                             ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoResize |
                              ImGuiWindowFlags_NoSavedSettings);
             ImGui::Text("Press ESC to unpause");
 
@@ -750,9 +739,8 @@ namespace Engine
         ImGui::Begin("Stats",
                      nullptr,
                      ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoFocusOnAppearing |
-                         ImGuiWindowFlags_NoBringToFrontOnFocus |
-                         ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoResize |
-                         ImGuiWindowFlags_NoSavedSettings);
+                         ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoInputs |
+                         ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings);
         ImGui::Text("%.3f ms (%.0f FPS)", 1000.f / io.Framerate, io.Framerate);
         ImGui::Text("state: %s", state_to_string(state));
         ImGui::Text("player_movement_state: %s",
@@ -938,19 +926,16 @@ namespace Engine
         /*
          * Get next player movement state.
          */
-        const bool crouch_key_pressed =
-            glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
+        const bool crouch_key_pressed = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
         const bool fly_key_pressed = glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS;
-        const bool sprint_key_pressed =
-            glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
+        const bool sprint_key_pressed = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
         const bool jump_key_pressed = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
 
         switch (player_movement_state)
         {
         case PlayerMovementState::WALKING:
         {
-            if (update_player_movement_state_grounded(fly_key_pressed,
-                                                      jump_key_pressed))
+            if (update_player_movement_state_grounded(fly_key_pressed, jump_key_pressed))
             {
                 break;
             }
@@ -962,8 +947,7 @@ namespace Engine
              * While sprint button is being pressed and the player is on the ground,
              * set them to sprinting.
              */
-            if (sprint_key_pressed && !sprint_key_pressed_prev &&
-                in_sprintable_direction)
+            if (sprint_key_pressed && !sprint_key_pressed_prev && in_sprintable_direction)
             {
                 player_movement_state = PlayerMovementState::SPRINTING;
             }
@@ -981,8 +965,7 @@ namespace Engine
 
         case PlayerMovementState::SPRINTING:
         {
-            if (update_player_movement_state_grounded(fly_key_pressed,
-                                                      jump_key_pressed))
+            if (update_player_movement_state_grounded(fly_key_pressed, jump_key_pressed))
             {
                 break;
             }
@@ -994,8 +977,7 @@ namespace Engine
              */
             const bool in_sprintable_direction =
                 move_direction.x * forwards.x + move_direction.z * forwards.z > 0.f;
-            if (sprint_key_pressed && !sprint_key_pressed_prev ||
-                !in_sprintable_direction)
+            if (sprint_key_pressed && !sprint_key_pressed_prev || !in_sprintable_direction)
             {
                 player_movement_state = PlayerMovementState::WALKING;
             }
@@ -1013,8 +995,7 @@ namespace Engine
 
         case PlayerMovementState::CROUCHING:
         {
-            if (update_player_movement_state_grounded(fly_key_pressed,
-                                                      jump_key_pressed))
+            if (update_player_movement_state_grounded(fly_key_pressed, jump_key_pressed))
             {
                 break;
             }
@@ -1024,8 +1005,7 @@ namespace Engine
              */
             const bool in_sprintable_direction =
                 move_direction.x * forwards.x + move_direction.z * forwards.z > 0.f;
-            if (sprint_key_pressed && !sprint_key_pressed_prev &&
-                in_sprintable_direction)
+            if (sprint_key_pressed && !sprint_key_pressed_prev && in_sprintable_direction)
             {
                 player_movement_state = PlayerMovementState::SPRINTING;
             }
@@ -1119,11 +1099,10 @@ namespace Engine
         /*
          * Add player move impulse.
          */
-        if (move_direction.x != 0.f || move_direction.y != 0.f ||
-            move_direction.z != 0.f)
+        if (move_direction.x != 0.f || move_direction.y != 0.f || move_direction.z != 0.f)
         {
-            player_velocity += glm::normalize(move_direction) * player_move_impulse *
-                               static_cast<float>(dt);
+            player_velocity +=
+                glm::normalize(move_direction) * player_move_impulse * static_cast<float>(dt);
         }
 
         /*
@@ -1225,8 +1204,7 @@ namespace Engine
          * Set day length and compute the rotational speed.
          */
         static constexpr float day_length_s = 10.f;
-        static constexpr float rotational_angular_speed =
-            2 * glm::pi<float>() / day_length_s;
+        static constexpr float rotational_angular_speed = 2 * glm::pi<float>() / day_length_s;
 
         /*
          * Relative to the terrain, the skybox spins around it. We draw a sun
@@ -1236,26 +1214,21 @@ namespace Engine
         static constexpr float sun_angular_radius = glm::radians<float>(5.f);
         const float sun_radius_skybox_model_space = glm::sin(sun_angular_radius);
         static constexpr float sun_orbital_elevation_angle = glm::radians<float>(10.f);
-        const glm::vec4 sun_position_skybox_model_space =
-            glm::vec4(0.f,
-                      glm::sin(sun_orbital_elevation_angle),
-                      glm::cos(sun_orbital_elevation_angle),
-                      0.f);
+        const glm::vec4 sun_position_skybox_model_space = glm::vec4(
+            0.f, glm::sin(sun_orbital_elevation_angle), glm::cos(sun_orbital_elevation_angle), 0.f);
 
         /*
          * Loop until the user closes the window or state gets set to QUIT by the
          * program.
          */
-        std::chrono::steady_clock::time_point start_time =
-            std::chrono::steady_clock::now();
+        std::chrono::steady_clock::time_point start_time = std::chrono::steady_clock::now();
         std::chrono::steady_clock::time_point frame_start_time = start_time;
         while (state != State::QUIT && !glfwWindowShouldClose(window))
         {
             /*
              * Compute how much time has passed since the last frame.
              */
-            const uint64_t dt_ns =
-                (std::chrono::steady_clock::now() - frame_start_time).count();
+            const uint64_t dt_ns = (std::chrono::steady_clock::now() - frame_start_time).count();
             dt = dt_ns / 1e9;
 
             frame_start_time = std::chrono::steady_clock::now();
@@ -1275,8 +1248,7 @@ namespace Engine
                 /*
                  * Cache variables used multiple times.
                  */
-                terrain_height =
-                    get_terrain_height(player_position.x, player_position.z);
+                terrain_height = get_terrain_height(player_position.x, player_position.z);
 
                 /*
                  * Cache whether player is on the ground.
@@ -1310,13 +1282,13 @@ namespace Engine
                 if (player_position.x != chaser_position.x ||
                     player_position.z != chaser_position.z)
                 {
-                    direction_to_player_xz = glm::normalize(
-                        glm::vec3(player_position.x - chaser_position.x,
-                                  0.f,
-                                  player_position.z - chaser_position.z));
+                    direction_to_player_xz =
+                        glm::normalize(glm::vec3(player_position.x - chaser_position.x,
+                                                 0.f,
+                                                 player_position.z - chaser_position.z));
                     static constexpr float chaser_move_impulse = 5.f;
-                    chaser_position += direction_to_player_xz * chaser_move_impulse *
-                                       static_cast<float>(dt);
+                    chaser_position +=
+                        direction_to_player_xz * chaser_move_impulse * static_cast<float>(dt);
                     chaser_position.y =
                         get_terrain_height(chaser_position.x, chaser_position.z) + 1.f;
                 }
@@ -1325,14 +1297,13 @@ namespace Engine
                     direction_to_player_xz = glm::vec3(1.f, 0.f, 0.f);
                 }
 
-                glm::mat4 chaser_model =
-                    glm::translate(glm::mat4(1.f), chaser_position);
+                glm::mat4 chaser_model = glm::translate(glm::mat4(1.f), chaser_position);
 
-                chaser_model = glm::rotate(chaser_model,
-                                           glm::radians<float>(180.f) +
-                                               std::atan2(direction_to_player_xz.x,
-                                                          direction_to_player_xz.z),
-                                           glm::vec3(0.f, 1.f, 0.f));
+                chaser_model =
+                    glm::rotate(chaser_model,
+                                glm::radians<float>(180.f) +
+                                    std::atan2(direction_to_player_xz.x, direction_to_player_xz.z),
+                                glm::vec3(0.f, 1.f, 0.f));
 
                 static float light_velocity = 20.f;
 
@@ -1340,15 +1311,12 @@ namespace Engine
                  * Update point light position.
                  */
                 if (point_light_position.y <
-                    get_terrain_height(point_light_position.x, point_light_position.z) +
-                        1.f)
+                    get_terrain_height(point_light_position.x, point_light_position.z) + 1.f)
                 {
                     light_velocity = 20.f;
                 }
                 else if (point_light_position.y >
-                         get_terrain_height(point_light_position.x,
-                                            point_light_position.z) +
-                             100.f)
+                         get_terrain_height(point_light_position.x, point_light_position.z) + 100.f)
                 {
                     light_velocity = -20.f;
                 }
@@ -1364,8 +1332,8 @@ namespace Engine
                 const glm::mat4 terrain_model_matrix_rotated =
                     glm::rotate(terrain_model, orbital_angle, rotation_axis);
 
-                const glm::vec3 sun_position_terrain_model_space = glm::vec3(
-                    terrain_model_matrix_rotated * sun_position_skybox_model_space);
+                const glm::vec3 sun_position_terrain_model_space =
+                    glm::vec3(terrain_model_matrix_rotated * sun_position_skybox_model_space);
 
                 glm::vec3 directional_light_direction =
                     -glm::normalize(sun_position_terrain_model_space);
@@ -1375,19 +1343,17 @@ namespace Engine
                  */
                 const float sun_top_y =
                     sun_position_terrain_model_space.y + sun_radius_skybox_model_space;
-                const float sun_distance =
-                    glm::sqrt(sun_top_y * sun_top_y +
-                              sun_position_terrain_model_space.x *
-                                  sun_position_terrain_model_space.x +
-                              sun_position_terrain_model_space.z *
-                                  sun_position_terrain_model_space.z);
+                const float sun_distance = glm::sqrt(
+                    sun_top_y * sun_top_y +
+                    sun_position_terrain_model_space.x * sun_position_terrain_model_space.x +
+                    sun_position_terrain_model_space.z * sun_position_terrain_model_space.z);
                 const float sine_of_elevation_angle = sun_top_y / sun_distance;
 
                 static constexpr float brightness_falloff_factor = 0.1f;
-                const float sun_brightness = sine_of_elevation_angle <= 0.f
-                                                 ? 0.f
-                                                 : glm::exp(-brightness_falloff_factor /
-                                                            sine_of_elevation_angle);
+                const float sun_brightness =
+                    sine_of_elevation_angle <= 0.f
+                        ? 0.f
+                        : glm::exp(-brightness_falloff_factor / sine_of_elevation_angle);
 
                 const glm::mat4 view =
                     glm::lookAt(player_position, player_position + direction, head);
@@ -1397,11 +1363,11 @@ namespace Engine
                  */
                 Renderer::Transform chaser_transform = {
                     .position = chaser_position,
-                    .rotation = glm::vec3(0.f,
-                                          glm::radians<float>(180.f) +
-                                              std::atan2(direction_to_player_xz.x,
-                                                         direction_to_player_xz.z),
-                                          0.f),
+                    .rotation =
+                        glm::vec3(0.f,
+                                  glm::radians<float>(180.f) + std::atan2(direction_to_player_xz.x,
+                                                                          direction_to_player_xz.z),
+                                  0.f),
                     .scale = glm::vec3(1.f, 1.f, 1.f),
                 };
                 renderer.add_regular_object({
@@ -1429,8 +1395,7 @@ namespace Engine
                 /*
                  * Submit point light to renderer.
                  */
-                glm::vec3 point_light_color =
-                    10.f * glm::vec3(0xFF, 0xDF, 0x22) / 255.f;
+                glm::vec3 point_light_color = 10.f * glm::vec3(0xFF, 0xDF, 0x22) / 255.f;
                 Renderer::Transform point_light_transform = {
                     .position = point_light_position,
                     .rotation = glm::vec3(0.f, 0.f, 0.f),
@@ -1445,8 +1410,7 @@ namespace Engine
                 /*
                  * Submit sun to renderer.
                  */
-                static constexpr glm::vec3 sun_color =
-                    10.f * glm::vec3(1.0f, 0.95f, 0.85f);
+                static constexpr glm::vec3 sun_color = 10.f * glm::vec3(1.0f, 0.95f, 0.85f);
                 glm::vec3 directional_light_color = sun_color * sun_brightness;
                 renderer.add_directional_light_object({
                     .direction = directional_light_direction,
@@ -1457,13 +1421,11 @@ namespace Engine
                  * Use the player's view but remove translation and add rotation to
                  * emulate the planet rotating.
                  */
-                const glm::mat4 view_skybox = glm::rotate(glm::mat4(glm::mat3(view)),
-                                                          orbital_angle,
-                                                          rotation_axis);
+                const glm::mat4 view_skybox =
+                    glm::rotate(glm::mat4(glm::mat3(view)), orbital_angle, rotation_axis);
 
-                ASSERT_RET_IF_NOT(
-                    renderer.render(view, view_skybox, player_position, direction),
-                    false);
+                ASSERT_RET_IF_NOT(renderer.render(view, view_skybox, player_position, direction),
+                                  false);
             }
 
             /*
