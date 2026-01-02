@@ -1,5 +1,7 @@
 #pragma once
 
+#include "VertexArray.h"
+
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 
@@ -32,4 +34,24 @@ namespace Engine
         glm::vec2 texture;
     };
     static_assert(sizeof(TexturedVertex3dNormal) == 8 * sizeof(float));
+
+    struct TexturedVertex3dNormalTangent
+    {
+        glm::vec3 position;
+        glm::vec3 norm = glm::vec3(0.f);
+        glm::vec2 texture;
+        glm::vec4 tangent; /* (tangent.xyz, handedness) */
+
+        static void setup_vertex_array_attribs(VertexArray &vertex_array)
+        {
+            vertex_array.setup_vertex_attrib(0,
+                                             &TexturedVertex3dNormalTangent::position);
+            vertex_array.setup_vertex_attrib(1, &TexturedVertex3dNormalTangent::norm);
+            vertex_array.setup_vertex_attrib(2,
+                                             &TexturedVertex3dNormalTangent::texture);
+            vertex_array.setup_vertex_attrib(3,
+                                             &TexturedVertex3dNormalTangent::tangent);
+        }
+    };
+    static_assert(sizeof(TexturedVertex3dNormalTangent) == 12 * sizeof(float));
 }

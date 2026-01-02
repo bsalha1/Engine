@@ -39,7 +39,7 @@ namespace Engine
                 std::string src;
                 const std::string file_name =
                     "shaders/" + std::string(descriptor.file_name);
-                LOG("Compiling shader: %s\n", file_name.c_str());
+                LOG("Compiling shader %s\n", file_name.c_str());
                 ASSERT_RET_IF_NOT(get_shader_src(file_name, src), false);
 
                 GLuint shader_type_id;

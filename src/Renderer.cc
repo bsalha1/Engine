@@ -56,7 +56,7 @@ namespace Engine
     /**
      * @brief Constructor.
      */
-    Renderer::Renderer(): exposure(1.0f), gamma(1.0f), sharpness(1.0f)
+    Renderer::Renderer(): exposure(1.0f), gamma(0.5f), sharpness(1.0f)
     {}
 
     /**
@@ -181,47 +181,47 @@ namespace Engine
 
             static const std::array<Vertex3d, 36> skybox_vertices = {
                 /* clang-format off */
-                glm::vec3(-1.0f, -1.0f, -1.0f),
-                glm::vec3( 1.0f, -1.0f, -1.0f),
-                glm::vec3( 1.0f,  1.0f, -1.0f),
-                glm::vec3( 1.0f,  1.0f, -1.0f),
-                glm::vec3(-1.0f,  1.0f, -1.0f),
-                glm::vec3(-1.0f, -1.0f, -1.0f),
+                glm::vec3(-1, -1, -1),
+                glm::vec3( 1, -1, -1),
+                glm::vec3( 1,  1, -1),
+                glm::vec3( 1,  1, -1),
+                glm::vec3(-1,  1, -1),
+                glm::vec3(-1, -1, -1),
 
-                glm::vec3(-1.0f, -1.0f,  1.0f),
-                glm::vec3( 1.0f, -1.0f,  1.0f),
-                glm::vec3( 1.0f,  1.0f,  1.0f),
-                glm::vec3( 1.0f,  1.0f,  1.0f),
-                glm::vec3(-1.0f,  1.0f,  1.0f),
-                glm::vec3(-1.0f, -1.0f,  1.0f),
+                glm::vec3(-1, -1,  1),
+                glm::vec3( 1, -1,  1),
+                glm::vec3( 1,  1,  1),
+                glm::vec3( 1,  1,  1),
+                glm::vec3(-1,  1,  1),
+                glm::vec3(-1, -1,  1),
 
-                glm::vec3(-1.0f,  1.0f,  1.0f),
-                glm::vec3(-1.0f,  1.0f, -1.0f),
-                glm::vec3(-1.0f, -1.0f, -1.0f),
-                glm::vec3(-1.0f, -1.0f, -1.0f),
-                glm::vec3(-1.0f, -1.0f,  1.0f),
-                glm::vec3(-1.0f,  1.0f,  1.0f),
+                glm::vec3(-1,  1,  1),
+                glm::vec3(-1,  1, -1),
+                glm::vec3(-1, -1, -1),
+                glm::vec3(-1, -1, -1),
+                glm::vec3(-1, -1,  1),
+                glm::vec3(-1,  1,  1),
 
-                glm::vec3( 1.0f,  1.0f,  1.0f),
-                glm::vec3( 1.0f,  1.0f, -1.0f),
-                glm::vec3( 1.0f, -1.0f, -1.0f),
-                glm::vec3( 1.0f, -1.0f, -1.0f),
-                glm::vec3( 1.0f, -1.0f,  1.0f),
-                glm::vec3( 1.0f,  1.0f,  1.0f),
+                glm::vec3( 1,  1,  1),
+                glm::vec3( 1,  1, -1),
+                glm::vec3( 1, -1, -1),
+                glm::vec3( 1, -1, -1),
+                glm::vec3( 1, -1,  1),
+                glm::vec3( 1,  1,  1),
 
-                glm::vec3(-1.0f, -1.0f, -1.0f),
-                glm::vec3( 1.0f, -1.0f, -1.0f),
-                glm::vec3( 1.0f, -1.0f,  1.0f),
-                glm::vec3( 1.0f, -1.0f,  1.0f),
-                glm::vec3(-1.0f, -1.0f,  1.0f),
-                glm::vec3(-1.0f, -1.0f, -1.0f),
+                glm::vec3(-1, -1, -1),
+                glm::vec3( 1, -1, -1),
+                glm::vec3( 1, -1,  1),
+                glm::vec3( 1, -1,  1),
+                glm::vec3(-1, -1,  1),
+                glm::vec3(-1, -1, -1),
 
-                glm::vec3(-1.0f,  1.0f, -1.0f),
-                glm::vec3( 1.0f,  1.0f, -1.0f),
-                glm::vec3( 1.0f,  1.0f,  1.0f),
-                glm::vec3( 1.0f,  1.0f,  1.0f),
-                glm::vec3(-1.0f,  1.0f,  1.0f),
-                glm::vec3(-1.0f,  1.0f, -1.0f),
+                glm::vec3(-1,  1, -1),
+                glm::vec3( 1,  1, -1),
+                glm::vec3( 1,  1,  1),
+                glm::vec3( 1,  1,  1),
+                glm::vec3(-1,  1,  1),
+                glm::vec3(-1,  1, -1),
                 /* clang-format on */
             };
 
@@ -322,6 +322,10 @@ namespace Engine
         ASSERT_RET_IF_NOT(regular_object_shader.set_UniformMatrix4fv("u_projection",
                                                                      projection),
                           false);
+        ASSERT_RET_IF_NOT(regular_object_shader.set_Uniform1i("u_texture_sampler", 0),
+                          false);
+        ASSERT_RET_IF_NOT(
+            regular_object_shader.set_Uniform1i("u_normal_map_sampler", 1), false);
 
         /*
          * Initialize point light shader.
@@ -625,6 +629,7 @@ namespace Engine
                                   "u_model", object.transform.model()),
                               false);
             object.material.apply(regular_object_shader);
+            object.normal_map.use();
             object.drawable.draw();
         }
 

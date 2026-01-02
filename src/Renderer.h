@@ -54,6 +54,7 @@ namespace Engine
         struct RegularObject
         {
             TexturedMaterial &material;
+            Texture &normal_map;
             Transform &transform;
             Drawable &drawable;
         };

@@ -234,6 +234,8 @@ namespace Engine
          */
         glm::vec3 chaser_position;
         VertexArray chaser_vertex_array;
+
+        Texture chaser_normal_map;
         TexturedMaterial chaser_textured_material =
             TexturedMaterial(glm::vec3(0.2f), /* ambient */
                              glm::vec3(0.2f), /* diffuse */
@@ -257,11 +259,12 @@ namespace Engine
         float terrain_height;
         float on_ground_camera_y;
 
+        Texture dirt_normal_map;
         TexturedMaterial dirt_textured_material =
             TexturedMaterial(glm::vec3(0.15f, 0.12f, 0.08f), /* ambient */
                              glm::vec3(0.45f, 0.36f, 0.25f), /* diffuse */
-                             glm::vec3(0.52f, 0.52f, 0.52f), /* specular */
-                             64.f                            /* shininess */
+                             glm::vec3(0.02f, 0.02f, 0.02f), /* specular */
+                             4.f                             /* shininess */
             );
         /**
          * @}

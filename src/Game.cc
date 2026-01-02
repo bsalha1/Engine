@@ -262,73 +262,76 @@ namespace Engine
         LOG("Creating entity buffers\n");
         {
             /* clang-format off */
-            const std::array<TexturedVertex3dNormal, 36> vertices = {{
+            const std::array<TexturedVertex3dNormalTangent, 36> vertices = {{
             /*                         position,                         normal,               texture */
                 /* -Z */
-                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec2(0.0f, 0.0f)},
-                {glm::vec3( 1.0f, -1.0f, -1.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3( 1.0f,  1.0f, -1.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3( 1.0f,  1.0f, -1.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3(-1.0f,  1.0f, -1.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec2(0.0f, 0.0f)},
+                {glm::vec3(-1, -1, -1), glm::vec3( 0,  0, -1), glm::vec2(0, 0), glm::vec4(-1, 0, 0, 1)},
+                {glm::vec3( 1, -1, -1), glm::vec3( 0,  0, -1), glm::vec2(1, 0), glm::vec4(-1, 0, 0, 1)},
+                {glm::vec3( 1,  1, -1), glm::vec3( 0,  0, -1), glm::vec2(1, 1), glm::vec4(-1, 0, 0, 1)},
+                {glm::vec3( 1,  1, -1), glm::vec3( 0,  0, -1), glm::vec2(1, 1), glm::vec4(-1, 0, 0, 1)},
+                {glm::vec3(-1,  1, -1), glm::vec3( 0,  0, -1), glm::vec2(0, 1), glm::vec4(-1, 0, 0, 1)},
+                {glm::vec3(-1, -1, -1), glm::vec3( 0,  0, -1), glm::vec2(0, 0), glm::vec4(-1, 0, 0, 1)},
 
                 /* +Z */
-                {glm::vec3(-1.0f, -1.0f,  1.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec2(0.0f, 0.0f)},
-                {glm::vec3( 1.0f, -1.0f,  1.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3(-1.0f,  1.0f,  1.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3(-1.0f, -1.0f,  1.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec2(0.0f, 0.0f)},
+                {glm::vec3(-1, -1,  1), glm::vec3( 0,  0,  1), glm::vec2(0, 0), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3( 1, -1,  1), glm::vec3( 0,  0,  1), glm::vec2(1, 0), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3( 1,  1,  1), glm::vec3( 0,  0,  1), glm::vec2(1, 1), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3( 1,  1,  1), glm::vec3( 0,  0,  1), glm::vec2(1, 1), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3(-1,  1,  1), glm::vec3( 0,  0,  1), glm::vec2(0, 1), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3(-1, -1,  1), glm::vec3( 0,  0,  1), glm::vec2(0, 0), glm::vec4(1, 0, 0, 1)},
 
                 /* -X */
-                {glm::vec3(-1.0f,  1.0f,  1.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3(-1.0f,  1.0f, -1.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3(-1.0f, -1.0f,  1.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec2(0.0f, 0.0f)},
-                {glm::vec3(-1.0f,  1.0f,  1.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3(-1,  1,  1), glm::vec3(-1,  0,  0), glm::vec2(1, 0), glm::vec4(0, 0, 1, 1)},
+                {glm::vec3(-1,  1, -1), glm::vec3(-1,  0,  0), glm::vec2(1, 1), glm::vec4(0, 0, 1, 1)},
+                {glm::vec3(-1, -1, -1), glm::vec3(-1,  0,  0), glm::vec2(0, 1), glm::vec4(0, 0, 1, 1)},
+                {glm::vec3(-1, -1, -1), glm::vec3(-1,  0,  0), glm::vec2(0, 1), glm::vec4(0, 0, 1, 1)},
+                {glm::vec3(-1, -1,  1), glm::vec3(-1,  0,  0), glm::vec2(0, 0), glm::vec4(0, 0, 1, 1)},
+                {glm::vec3(-1,  1,  1), glm::vec3(-1,  0,  0), glm::vec2(1, 0), glm::vec4(0, 0, 1, 1)},
 
                 /* +X */
-                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3( 1.0f,  1.0f, -1.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3( 1.0f, -1.0f, -1.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3( 1.0f, -1.0f, -1.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3( 1.0f, -1.0f,  1.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec2(0.0f, 0.0f)},
-                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec2(1.0f, 0.0f)},
+                {glm::vec3( 1,  1,  1), glm::vec3( 1,  0,  0), glm::vec2(1, 0), glm::vec4(0, 0, -1, 1)},
+                {glm::vec3( 1,  1, -1), glm::vec3( 1,  0,  0), glm::vec2(1, 1), glm::vec4(0, 0, -1, 1)},
+                {glm::vec3( 1, -1, -1), glm::vec3( 1,  0,  0), glm::vec2(0, 1), glm::vec4(0, 0, -1, 1)},
+                {glm::vec3( 1, -1, -1), glm::vec3( 1,  0,  0), glm::vec2(0, 1), glm::vec4(0, 0, -1, 1)},
+                {glm::vec3( 1, -1,  1), glm::vec3( 1,  0,  0), glm::vec2(0, 0), glm::vec4(0, 0, -1, 1)},
+                {glm::vec3( 1,  1,  1), glm::vec3( 1,  0,  0), glm::vec2(1, 0), glm::vec4(0, 0, -1, 1)},
 
                 /* -Y */
-                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3( 1.0f, -1.0f, -1.0f), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3( 1.0f, -1.0f,  1.0f), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3( 1.0f, -1.0f,  1.0f), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3(-1.0f, -1.0f,  1.0f), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec2(0.0f, 0.0f)},
-                {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec2(0.0f, 1.0f)},
+                {glm::vec3(-1, -1, -1), glm::vec3( 0, -1,  0), glm::vec2(0, 1), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3( 1, -1, -1), glm::vec3( 0, -1,  0), glm::vec2(1, 1), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3( 1, -1,  1), glm::vec3( 0, -1,  0), glm::vec2(1, 0), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3( 1, -1,  1), glm::vec3( 0, -1,  0), glm::vec2(1, 0), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3(-1, -1,  1), glm::vec3( 0, -1,  0), glm::vec2(0, 0), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3(-1, -1, -1), glm::vec3( 0, -1,  0), glm::vec2(0, 1), glm::vec4(1, 0, 0, 1)},
 
                 /* +Y */
-                {glm::vec3(-1.0f,  1.0f, -1.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec2(0.0f, 1.0f)},
-                {glm::vec3( 1.0f,  1.0f, -1.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec2(1.0f, 1.0f)},
-                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3( 1.0f,  1.0f,  1.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec2(1.0f, 0.0f)},
-                {glm::vec3(-1.0f,  1.0f,  1.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec2(0.0f, 0.0f)},
-                {glm::vec3(-1.0f,  1.0f, -1.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec2(0.0f, 1.0f)}
+                {glm::vec3(-1,  1, -1), glm::vec3( 0,  1,  0), glm::vec2(0, 1), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3( 1,  1, -1), glm::vec3( 0,  1,  0), glm::vec2(1, 1), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3( 1,  1,  1), glm::vec3( 0,  1,  0), glm::vec2(1, 0), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3( 1,  1,  1), glm::vec3( 0,  1,  0), glm::vec2(1, 0), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3(-1,  1,  1), glm::vec3( 0,  1,  0), glm::vec2(0, 0), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3(-1,  1, -1), glm::vec3( 0,  1,  0), glm::vec2(0, 1), glm::vec4(1, 0, 0, 1)}
             }};
             /* clang-format on */
 
             chaser_vertex_array.create(vertices.data(), vertices.size());
-            chaser_vertex_array.setup_vertex_attrib(0,
-                                                    &TexturedVertex3dNormal::position);
-            chaser_vertex_array.setup_vertex_attrib(1, &TexturedVertex3dNormal::norm);
-            chaser_vertex_array.setup_vertex_attrib(2,
-                                                    &TexturedVertex3dNormal::texture);
+            TexturedVertex3dNormalTangent::setup_vertex_array_attribs(
+                chaser_vertex_array);
         }
 
         LOG("Loading textures\n");
         {
             ASSERT_RET_IF_NOT(chaser_textured_material.create_from_file(
-                                  "textures/obama.png", 0 /* slot */),
+                                  "textures/snake.jpg", 0 /* slot */),
+                              false);
+            ASSERT_RET_IF_NOT(chaser_normal_map.create_from_file(
+                                  "textures/snake_normals.jpg", 1 /* slot */),
                               false);
             ASSERT_RET_IF_NOT(dirt_textured_material.create_from_file(
                                   "textures/dirt.jpg", 0 /* slot */),
+                              false);
+            ASSERT_RET_IF_NOT(dirt_normal_map.create_from_file(
+                                  "textures/dirt_normals.jpg", 1 /* slot */),
                               false);
         }
 
@@ -407,7 +410,7 @@ namespace Engine
             const float texture_row_scale = 1.f / static_cast<float>(terrain_num_rows) *
                                             dirt_textured_material.get_height();
 
-            std::vector<TexturedVertex3dNormal> vertices;
+            std::vector<TexturedVertex3dNormalTangent> vertices;
             vertices.reserve(num_vertices);
 
             std::vector<unsigned int> indices;
@@ -426,7 +429,7 @@ namespace Engine
                     const uint8_t y =
                         heightmap[(terrain_num_cols * row + col) * terrain_channels];
 
-                    TexturedVertex3dNormal &vertex = vertices.emplace_back();
+                    TexturedVertex3dNormalTangent &vertex = vertices.emplace_back();
 
                     vertex.position = {
                         col - terrain_x_middle,
@@ -464,8 +467,13 @@ namespace Engine
             }
 
             /*
-             * Compute normals by averaging face normals of adjacent faces.
+             * Accumulate normals, tangents, and bitangents for each vertex in each
+             * triangle.
              */
+            std::vector<glm::vec3> tangents;
+            std::vector<glm::vec3> bitangents;
+            tangents.reserve(vertices.size());
+            bitangents.reserve(vertices.size());
             for (size_t i = 0; i < indices.size(); i += 3)
             {
                 /*
@@ -491,34 +499,99 @@ namespace Engine
                  * v1------------------v2
                  */
 
-                TexturedVertex3dNormal &v0 = vertices[indices[i + 0]];
-                TexturedVertex3dNormal &v1 = vertices[indices[i + 1]];
-                TexturedVertex3dNormal &v2 = vertices[indices[i + 2]];
+                const size_t idx0 = indices[i + 0];
+                const size_t idx1 = indices[i + 1];
+                const size_t idx2 = indices[i + 2];
+
+                TexturedVertex3dNormalTangent &v0 = vertices[idx0];
+                TexturedVertex3dNormalTangent &v1 = vertices[idx1];
+                TexturedVertex3dNormalTangent &v2 = vertices[idx2];
 
                 const glm::vec3 e1 = v1.position - v0.position;
                 const glm::vec3 e2 = v2.position - v0.position;
+                const glm::vec2 delta_uv1 = v1.texture - v0.texture;
+                const glm::vec2 delta_uv2 = v2.texture - v0.texture;
 
+                /*
+                 * Compute face normal.
+                 */
                 const glm::vec3 face_normal = glm::normalize(glm::cross(e1, e2));
-
                 v0.norm += face_normal;
                 v1.norm += face_normal;
                 v2.norm += face_normal;
+
+                /*
+                 * Compute area of triangle to weigh the tangent and bitangent.
+                 */
+                const float triangle_area =
+                    glm::length(glm::cross(v1.position - v0.position,
+                                           v2.position - v0.position)) *
+                    0.5f;
+
+                /*
+                 * Compute tangent and bitangent.
+                 */
+                const float f =
+                    1.f / (delta_uv1.x * delta_uv2.y - delta_uv2.x * delta_uv1.y);
+                const float coeff = f * triangle_area;
+
+                const glm::vec3 tangent =
+                    coeff * glm::vec3 {
+                                delta_uv2.y * e1.x - delta_uv1.y * e2.x,
+                                delta_uv2.y * e1.y - delta_uv1.y * e2.y,
+                                delta_uv2.y * e1.z - delta_uv1.y * e2.z,
+                            };
+                tangents[idx0] += tangent;
+                tangents[idx1] += tangent;
+                tangents[idx2] += tangent;
+
+                const glm::vec3 bitangent =
+                    coeff * glm::vec3 {
+                                -delta_uv2.x * e1.x + delta_uv1.x * e2.x,
+                                -delta_uv2.x * e1.y + delta_uv1.x * e2.y,
+                                -delta_uv2.x * e1.z + delta_uv1.x * e2.z,
+                            };
+                bitangents[idx0] += bitangent;
+                bitangents[idx1] += bitangent;
+                bitangents[idx2] += bitangent;
             }
 
             /*
-             * Normalize the normals to average them.
+             * Finalize normals, tangents, and bitangents for each vertex.
              */
-            for (TexturedVertex3dNormal &vertex : vertices)
+            for (size_t i = 0; i < vertices.size(); i += 1)
             {
+                TexturedVertex3dNormalTangent &vertex = vertices[i];
+
+                /*
+                 * Average to produce normal.
+                 */
                 vertex.norm = glm::normalize(vertex.norm);
+
+                /*
+                 * Gram-Schmidt orthogonalize the tangent with the normal.
+                 */
+                const glm::vec3 tangent = tangents[i];
+                const glm::vec3 tangent_normalized = glm::normalize(
+                    tangent - vertex.norm * glm::dot(vertex.norm, tangent));
+
+                /*
+                 * Map bitangent to handedness.
+                 */
+                const glm::vec3 bitangent = bitangents[i];
+                const float handedness =
+                    (glm::dot(glm::cross(vertex.norm, tangent), bitangent) < 0.f) ? -1.f
+                                                                                  : 1.f;
+
+                /*
+                 * Write tangent and handedness out to vertex.
+                 */
+                vertex.tangent = glm::vec4(tangent_normalized, handedness);
             }
 
             terrain_vertex_array.create(vertices.data(), vertices.size());
-            terrain_vertex_array.setup_vertex_attrib(0,
-                                                     &TexturedVertex3dNormal::position);
-            terrain_vertex_array.setup_vertex_attrib(1, &TexturedVertex3dNormal::norm);
-            terrain_vertex_array.setup_vertex_attrib(2,
-                                                     &TexturedVertex3dNormal::texture);
+            TexturedVertex3dNormalTangent::setup_vertex_array_attribs(
+                terrain_vertex_array);
             terrain_index_buffer.create(indices.data(), indices.size());
         }
 
@@ -708,15 +781,15 @@ namespace Engine
              * Add display settings.
              */
             float exposure = renderer.get_exposure();
-            ImGui::SliderFloat("exposure", &exposure, 0.0, 10.0);
+            ImGui::SliderFloat("exposure", &exposure, 0.f, 10.f);
             ASSERT_RET_IF_NOT(renderer.set_exposure(exposure), false);
 
             float gamma = renderer.get_gamma();
-            ImGui::SliderFloat("gamma", &gamma, 0.0, 10.0);
+            ImGui::SliderFloat("gamma", &gamma, 0.f, 10.f);
             ASSERT_RET_IF_NOT(renderer.set_gamma(gamma), false);
 
             float sharpness = renderer.get_sharpness();
-            ImGui::SliderFloat("sharpness", &sharpness, 0.0, 1000.0);
+            ImGui::SliderFloat("sharpness", &sharpness, 1.f, 1000.f);
             ASSERT_RET_IF_NOT(renderer.set_sharpness(sharpness), false);
 
             if (ImGui::Button("Pause Sun"))
@@ -1394,6 +1467,7 @@ namespace Engine
                 };
                 renderer.add_regular_object({
                     .material = chaser_textured_material,
+                    .normal_map = chaser_normal_map,
                     .transform = chaser_transform,
                     .drawable = chaser_vertex_array,
                 });
@@ -1408,6 +1482,7 @@ namespace Engine
                 };
                 renderer.add_regular_object({
                     .material = chaser_textured_material,
+                    .normal_map = chaser_normal_map,
                     .transform = floating_chaser_transform,
                     .drawable = chaser_vertex_array,
                 });
@@ -1449,6 +1524,7 @@ namespace Engine
                 };
                 renderer.add_regular_object({
                     .material = dirt_textured_material,
+                    .normal_map = dirt_normal_map,
                     .transform = terrain_transform,
                     .drawable = terrain_index_buffer,
                 });

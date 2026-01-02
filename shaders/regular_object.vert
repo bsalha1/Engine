@@ -3,12 +3,13 @@
 layout(location = 0) in vec3 l_position;
 layout(location = 1) in vec3 l_norm;
 layout(location = 2) in vec2 l_texture_coord;
+layout(location = 3) in vec4 l_tangent;
 
 /**
  * Variables going to fragment shader.
  */
 out vec3 v_position_world_coords;
-out vec3 v_norm;
+out mat3 v_tangent_bitangent_norm;
 out vec2 v_texture_coord;
 out vec3 v_view_direction;
 out vec4 v_frag_pos_light_space;
@@ -33,9 +34,12 @@ void main()
     v_position_world_coords = vec3(u_model * position_four_vector);
 
     /*
-     * Transform normal vector to world space.
+     * Transform tangent-bitangent-normal vectors to world space.
      */
-    v_norm = normalize(mat3(transpose(inverse(u_model))) * l_norm);
+    const vec3 tangent =   normalize(mat3(u_model) * l_tangent.xyz);
+    const vec3 bitangent = normalize(cross(l_norm, tangent) * l_tangent.w);
+    const vec3 norm =      normalize(mat3(u_model) * l_norm);
+    v_tangent_bitangent_norm = mat3(tangent, bitangent, norm);
 
     /*
      * Compute unit vector pointing from vertex to camera to pass to fragment
