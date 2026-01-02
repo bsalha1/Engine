@@ -32,13 +32,10 @@ namespace Engine
         {
             Texture::use();
 
-            ASSERT_RET_IF_NOT(shader.set_Uniform3f("u_material.ambient", ambient),
-                              false);
-            ASSERT_RET_IF_NOT(shader.set_Uniform3f("u_material.diffuse", diffuse),
-                              false);
-            ASSERT_RET_IF_NOT(shader.set_Uniform3f("u_material.specular", specular),
-                              false);
-            ASSERT_RET_IF_NOT(shader.set_Uniform1f("u_material.shininess", shininess),
+            ASSERT_RET_IF_NOT(shader.set_vec3("u_material.ambient", ambient), false);
+            ASSERT_RET_IF_NOT(shader.set_vec3("u_material.diffuse", diffuse), false);
+            ASSERT_RET_IF_NOT(shader.set_vec3("u_material.specular", specular), false);
+            ASSERT_RET_IF_NOT(shader.set_float("u_material.shininess", shininess),
                               false);
 
             return true;

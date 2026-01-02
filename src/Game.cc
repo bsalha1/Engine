@@ -263,7 +263,7 @@ namespace Engine
         {
             /* clang-format off */
             const std::array<TexturedVertex3dNormalTangent, 36> vertices = {{
-            /*                         position,                         normal,               texture */
+            /*                position,                normal,         texture,                tangent */
                 /* -Z */
                 {glm::vec3(-1, -1, -1), glm::vec3( 0,  0, -1), glm::vec2(0, 0), glm::vec4(-1, 0, 0, 1)},
                 {glm::vec3( 1, -1, -1), glm::vec3( 0,  0, -1), glm::vec2(1, 0), glm::vec4(-1, 0, 0, 1)},
@@ -405,12 +405,7 @@ namespace Engine
             /*
              * Draw one copy of the texture per cell.
              */
-            const float texture_col_scale = 1.f / static_cast<float>(terrain_num_cols) *
-                                            dirt_textured_material.get_width();
-            const float texture_row_scale = 1.f / static_cast<float>(terrain_num_rows) *
-                                            dirt_textured_material.get_height();
-
-            std::vector<TexturedVertex3dNormalTangent> vertices;
+            std::vector<Vertex3dNormal> vertices;
             vertices.reserve(num_vertices);
 
             std::vector<unsigned int> indices;
@@ -429,17 +424,12 @@ namespace Engine
                     const uint8_t y =
                         heightmap[(terrain_num_cols * row + col) * terrain_channels];
 
-                    TexturedVertex3dNormalTangent &vertex = vertices.emplace_back();
+                    Vertex3dNormal &vertex = vertices.emplace_back();
 
                     vertex.position = {
                         col - terrain_x_middle,
                         y * y_scale + y_bottom,
                         row - terrain_z_middle,
-                    };
-
-                    vertex.texture = {
-                        col * texture_col_scale,
-                        row * texture_row_scale,
                     };
 
                     xz_to_height_map.push_back(vertex.position.y);
@@ -503,14 +493,12 @@ namespace Engine
                 const size_t idx1 = indices[i + 1];
                 const size_t idx2 = indices[i + 2];
 
-                TexturedVertex3dNormalTangent &v0 = vertices[idx0];
-                TexturedVertex3dNormalTangent &v1 = vertices[idx1];
-                TexturedVertex3dNormalTangent &v2 = vertices[idx2];
+                Vertex3dNormal &v0 = vertices[idx0];
+                Vertex3dNormal &v1 = vertices[idx1];
+                Vertex3dNormal &v2 = vertices[idx2];
 
                 const glm::vec3 e1 = v1.position - v0.position;
                 const glm::vec3 e2 = v2.position - v0.position;
-                const glm::vec2 delta_uv1 = v1.texture - v0.texture;
-                const glm::vec2 delta_uv2 = v2.texture - v0.texture;
 
                 /*
                  * Compute face normal.
@@ -519,41 +507,6 @@ namespace Engine
                 v0.norm += face_normal;
                 v1.norm += face_normal;
                 v2.norm += face_normal;
-
-                /*
-                 * Compute area of triangle to weigh the tangent and bitangent.
-                 */
-                const float triangle_area =
-                    glm::length(glm::cross(v1.position - v0.position,
-                                           v2.position - v0.position)) *
-                    0.5f;
-
-                /*
-                 * Compute tangent and bitangent.
-                 */
-                const float f =
-                    1.f / (delta_uv1.x * delta_uv2.y - delta_uv2.x * delta_uv1.y);
-                const float coeff = f * triangle_area;
-
-                const glm::vec3 tangent =
-                    coeff * glm::vec3 {
-                                delta_uv2.y * e1.x - delta_uv1.y * e2.x,
-                                delta_uv2.y * e1.y - delta_uv1.y * e2.y,
-                                delta_uv2.y * e1.z - delta_uv1.y * e2.z,
-                            };
-                tangents[idx0] += tangent;
-                tangents[idx1] += tangent;
-                tangents[idx2] += tangent;
-
-                const glm::vec3 bitangent =
-                    coeff * glm::vec3 {
-                                -delta_uv2.x * e1.x + delta_uv1.x * e2.x,
-                                -delta_uv2.x * e1.y + delta_uv1.x * e2.y,
-                                -delta_uv2.x * e1.z + delta_uv1.x * e2.z,
-                            };
-                bitangents[idx0] += bitangent;
-                bitangents[idx1] += bitangent;
-                bitangents[idx2] += bitangent;
             }
 
             /*
@@ -561,37 +514,16 @@ namespace Engine
              */
             for (size_t i = 0; i < vertices.size(); i += 1)
             {
-                TexturedVertex3dNormalTangent &vertex = vertices[i];
+                Vertex3dNormal &vertex = vertices[i];
 
                 /*
                  * Average to produce normal.
                  */
                 vertex.norm = glm::normalize(vertex.norm);
-
-                /*
-                 * Gram-Schmidt orthogonalize the tangent with the normal.
-                 */
-                const glm::vec3 tangent = tangents[i];
-                const glm::vec3 tangent_normalized = glm::normalize(
-                    tangent - vertex.norm * glm::dot(vertex.norm, tangent));
-
-                /*
-                 * Map bitangent to handedness.
-                 */
-                const glm::vec3 bitangent = bitangents[i];
-                const float handedness =
-                    (glm::dot(glm::cross(vertex.norm, tangent), bitangent) < 0.f) ? -1.f
-                                                                                  : 1.f;
-
-                /*
-                 * Write tangent and handedness out to vertex.
-                 */
-                vertex.tangent = glm::vec4(tangent_normalized, handedness);
             }
 
             terrain_vertex_array.create(vertices.data(), vertices.size());
-            TexturedVertex3dNormalTangent::setup_vertex_array_attribs(
-                terrain_vertex_array);
+            Vertex3dNormal::setup_vertex_array_attribs(terrain_vertex_array);
             terrain_index_buffer.create(indices.data(), indices.size());
         }
 
@@ -1282,6 +1214,13 @@ namespace Engine
     {
         LOG("Entering main loop\n");
 
+        ASSERT_RET_IF_NOT(renderer.set_terrain({
+                              .material = dirt_textured_material,
+                              .normal_map = dirt_normal_map,
+                              .drawable = terrain_index_buffer,
+                          }),
+                          false);
+
         /*
          * Set day length and compute the rotational speed.
          */
@@ -1512,21 +1451,6 @@ namespace Engine
                 renderer.add_directional_light_object({
                     .direction = directional_light_direction,
                     .color = directional_light_color,
-                });
-
-                /*
-                 * Submit terrain to renderer.
-                 */
-                Renderer::Transform terrain_transform = {
-                    .position = glm::vec3(0.f, 0.f, 0.f),
-                    .rotation = glm::vec3(0.f, 0.f, 0.f),
-                    .scale = glm::vec3(1.f, 1.f, 1.f),
-                };
-                renderer.add_regular_object({
-                    .material = dirt_textured_material,
-                    .normal_map = dirt_normal_map,
-                    .transform = terrain_transform,
-                    .drawable = terrain_index_buffer,
                 });
 
                 /*

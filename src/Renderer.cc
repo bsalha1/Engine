@@ -266,15 +266,15 @@ namespace Engine
                           }),
                           false);
         screen_shader.use();
-        ASSERT_RET_IF_NOT(screen_shader.set_Uniform1i("u_color_texture_sampler",
-                                                      screen_color_texture.get_slot()),
+        ASSERT_RET_IF_NOT(screen_shader.set_int("u_color_texture_sampler",
+                                                screen_color_texture.get_slot()),
                           false);
-        ASSERT_RET_IF_NOT(screen_shader.set_Uniform1i("u_bloom_texture_sampler",
-                                                      screen_bloom_texture.get_slot()),
+        ASSERT_RET_IF_NOT(screen_shader.set_int("u_bloom_texture_sampler",
+                                                screen_bloom_texture.get_slot()),
                           false);
-        ASSERT_RET_IF_NOT(screen_shader.set_Uniform1f("u_exposure", exposure), false);
-        ASSERT_RET_IF_NOT(screen_shader.set_Uniform1f("u_gamma", gamma), false);
-        ASSERT_RET_IF_NOT(screen_shader.set_Uniform1f("u_sharpness", sharpness), false);
+        ASSERT_RET_IF_NOT(screen_shader.set_float("u_exposure", exposure), false);
+        ASSERT_RET_IF_NOT(screen_shader.set_float("u_gamma", gamma), false);
+        ASSERT_RET_IF_NOT(screen_shader.set_float("u_sharpness", sharpness), false);
 
         /*
          * Initialize gaussian blur shader.
@@ -285,8 +285,8 @@ namespace Engine
                           }),
                           false);
         gaussian_blur_shader.use();
-        ASSERT_RET_IF_NOT(gaussian_blur_shader.set_Uniform1i(
-                              "u_texture_sampler", screen_bloom_texture.get_slot()),
+        ASSERT_RET_IF_NOT(gaussian_blur_shader.set_int("u_texture_sampler",
+                                                       screen_bloom_texture.get_slot()),
                           false);
 
         /*
@@ -298,16 +298,14 @@ namespace Engine
                           }),
                           false);
         skybox_shader.use();
+        ASSERT_RET_IF_NOT(skybox_shader.set_mat4("u_projection", projection), false);
         ASSERT_RET_IF_NOT(
-            skybox_shader.set_UniformMatrix4fv("u_projection", projection), false);
-        ASSERT_RET_IF_NOT(skybox_shader.set_Uniform1f("u_sun_angular_radius",
-                                                      sun_angular_radius),
+            skybox_shader.set_float("u_sun_angular_radius", sun_angular_radius), false);
+        ASSERT_RET_IF_NOT(skybox_shader.set_vec3("u_sun_position",
+                                                 sun_position_skybox_model_space),
                           false);
-        ASSERT_RET_IF_NOT(skybox_shader.set_Uniform3f("u_sun_position",
-                                                      sun_position_skybox_model_space),
-                          false);
-        ASSERT_RET_IF_NOT(skybox_shader.set_Uniform1i("u_texture_sampler",
-                                                      skybox_texture.get_slot()),
+        ASSERT_RET_IF_NOT(skybox_shader.set_int("u_texture_sampler",
+                                                skybox_texture.get_slot()),
                           false);
 
         /*
@@ -319,13 +317,14 @@ namespace Engine
                           }),
                           false);
         regular_object_shader.use();
-        ASSERT_RET_IF_NOT(regular_object_shader.set_UniformMatrix4fv("u_projection",
-                                                                     projection),
+        ASSERT_RET_IF_NOT(regular_object_shader.set_mat4("u_projection", projection),
                           false);
-        ASSERT_RET_IF_NOT(regular_object_shader.set_Uniform1i("u_texture_sampler", 0),
+        ASSERT_RET_IF_NOT(regular_object_shader.set_int("u_texture_sampler", 0), false);
+        ASSERT_RET_IF_NOT(regular_object_shader.set_int("u_normal_map_sampler", 1),
                           false);
-        ASSERT_RET_IF_NOT(
-            regular_object_shader.set_Uniform1i("u_normal_map_sampler", 1), false);
+        ASSERT_RET_IF_NOT(regular_object_shader.set_int("u_shadow_map_sampler",
+                                                        shadow_map_texture.get_slot()),
+                          false);
 
         /*
          * Initialize point light shader.
@@ -336,8 +335,8 @@ namespace Engine
                           }),
                           false);
         point_light_shader.use();
-        ASSERT_RET_IF_NOT(
-            point_light_shader.set_UniformMatrix4fv("u_projection", projection), false);
+        ASSERT_RET_IF_NOT(point_light_shader.set_mat4("u_projection", projection),
+                          false);
 
         /*
          * Initialize depth shader.
@@ -357,8 +356,42 @@ namespace Engine
                           }),
                           false);
         debug_shader.use();
-        ASSERT_RET_IF_NOT(debug_shader.set_UniformMatrix4fv("u_projection", projection),
+        ASSERT_RET_IF_NOT(debug_shader.set_mat4("u_projection", projection), false);
+
+        /*
+         * Initialize terrain shader.
+         */
+        ASSERT_RET_IF_NOT(terrain_shader.compile({
+                              {"terrain.vert", GL_VERTEX_SHADER},
+                              {"terrain.frag", GL_FRAGMENT_SHADER},
+                          }),
                           false);
+        terrain_shader.use();
+        ASSERT_RET_IF_NOT(terrain_shader.set_mat4("u_projection", projection), false);
+        ASSERT_RET_IF_NOT(terrain_shader.set_mat4("u_model", glm::mat4(1)), false);
+
+        return true;
+    }
+
+    /**
+     * @brief Set the terrain to be rendered.
+     *
+     * @param _terrain Terrain to set.
+     *
+     * @return True on success, otherwise false.
+     */
+    bool Renderer::set_terrain(const Terrain &_terrain)
+    {
+        terrain_shader.use();
+        ASSERT_RET_IF_NOT(_terrain.material.apply(terrain_shader), false);
+        ASSERT_RET_IF_NOT(terrain_shader.set_int("u_normal_map_sampler",
+                                                 _terrain.normal_map.get_slot()),
+                          false);
+        ASSERT_RET_IF_NOT(terrain_shader.set_int("u_shadow_map_sampler",
+                                                 shadow_map_texture.get_slot()),
+                          false);
+
+        terrain = std::make_unique<Terrain>(_terrain);
 
         return true;
     }
@@ -422,45 +455,6 @@ namespace Engine
          */
         ASSERT_RET_IF_NOT(directional_light_objects.size() == 1, false);
         ASSERT_RET_IF_NOT(point_light_objects.size() == 1, false);
-
-        /*
-         * Set the lit textured shader uniforms.
-         */
-        regular_object_shader.use();
-        ASSERT_RET_IF_NOT(
-            regular_object_shader.set_UniformMatrix4fv("u_view", camera_view), false);
-        ASSERT_RET_IF_NOT(regular_object_shader.set_Uniform3f(
-                              "u_point_light.position",
-                              point_light_objects[0].transform.position),
-                          false);
-        ASSERT_RET_IF_NOT(regular_object_shader.set_Uniform3f(
-                              "u_point_light.ambient", point_light_objects[0].color),
-                          false);
-        ASSERT_RET_IF_NOT(regular_object_shader.set_Uniform3f(
-                              "u_point_light.diffuse", point_light_objects[0].color),
-                          false);
-        ASSERT_RET_IF_NOT(regular_object_shader.set_Uniform3f(
-                              "u_point_light.specular", point_light_objects[0].color),
-                          false);
-        ASSERT_RET_IF_NOT(
-            regular_object_shader.set_Uniform3f("u_directional_light.direction",
-                                                directional_light_objects[0].direction),
-            false);
-        ASSERT_RET_IF_NOT(
-            regular_object_shader.set_Uniform3f("u_directional_light.ambient",
-                                                directional_light_objects[0].color),
-            false);
-        ASSERT_RET_IF_NOT(
-            regular_object_shader.set_Uniform3f("u_directional_light.diffuse",
-                                                directional_light_objects[0].color),
-            false);
-        ASSERT_RET_IF_NOT(
-            regular_object_shader.set_Uniform3f("u_directional_light.specular",
-                                                directional_light_objects[0].color),
-            false);
-        ASSERT_RET_IF_NOT(regular_object_shader.set_Uniform3f("u_camera_position",
-                                                              camera_position),
-                          false);
 
         glm::mat4 light_view_projection;
 
@@ -544,25 +538,39 @@ namespace Engine
              * to transform from world space to light space. This rotates the
              * orthographic projection box to emit from the light's point of view.
              */
-            const glm::mat4 light_view_projection = light_projection * light_view;
+            light_view_projection = light_projection * light_view;
 
             glViewport(0, 0, shadow_map_resolution, shadow_map_resolution);
             glBindFramebuffer(GL_FRAMEBUFFER, shadow_map_frame_buffer);
             glClear(GL_DEPTH_BUFFER_BIT);
 
             depth_shader.use();
-            ASSERT_RET_IF_NOT(depth_shader.set_UniformMatrix4fv(
-                                  "u_light_view_projection", light_view_projection),
+            ASSERT_RET_IF_NOT(depth_shader.set_mat4("u_light_view_projection",
+                                                    light_view_projection),
                               false);
 
             glCullFace(GL_FRONT);
+
+            /*
+             * Draw regular objects into shadow map.
+             */
             for (RegularObject &object : regular_objects)
             {
-                ASSERT_RET_IF_NOT(depth_shader.set_UniformMatrix4fv(
-                                      "u_model", object.transform.model()),
-                                  false);
+                ASSERT_RET_IF_NOT(
+                    depth_shader.set_mat4("u_model", object.transform.model()), false);
                 object.drawable.draw();
             }
+
+            /*
+             * Draw terrain into shadow map.
+             */
+            if (terrain)
+            {
+                ASSERT_RET_IF_NOT(depth_shader.set_mat4("u_model", glm::mat4(1)),
+                                  false);
+                terrain->drawable.draw();
+            }
+
             glCullFace(GL_BACK);
         }
         else
@@ -587,23 +595,24 @@ namespace Engine
         /*
          * Render debug objects.
          */
+        if (!debug_objects.empty())
         {
-            const std::array<GLenum, 1> buffers = {
-                screen_color_texture.get_attachment(),
-            };
-            glDrawBuffers(buffers.size(), buffers.data());
-        }
-        debug_shader.use();
-        ASSERT_RET_IF_NOT(debug_shader.set_UniformMatrix4fv("u_view", camera_view),
-                          false);
-        for (const DebugObject &object : debug_objects)
-        {
-            ASSERT_RET_IF_NOT(
-                debug_shader.set_UniformMatrix4fv("u_model", object.transform.model()),
-                false);
-            ASSERT_RET_IF_NOT(debug_shader.set_Uniform3f("u_color", object.color),
-                              false);
-            object.drawable.draw();
+            {
+                const std::array<GLenum, 1> buffers = {
+                    screen_color_texture.get_attachment(),
+                };
+                glDrawBuffers(buffers.size(), buffers.data());
+            }
+            debug_shader.use();
+            ASSERT_RET_IF_NOT(debug_shader.set_mat4("u_view", camera_view), false);
+            for (const DebugObject &object : debug_objects)
+            {
+                ASSERT_RET_IF_NOT(
+                    debug_shader.set_mat4("u_model", object.transform.model()), false);
+                ASSERT_RET_IF_NOT(debug_shader.set_vec3("u_color", object.color),
+                                  false);
+                object.drawable.draw();
+            }
         }
 
         /*
@@ -616,21 +625,105 @@ namespace Engine
             glDrawBuffers(buffers.size(), buffers.data());
         }
         regular_object_shader.use();
-        ASSERT_RET_IF_NOT(regular_object_shader.set_UniformMatrix4fv(
-                              "u_light_view_projection", light_view_projection),
+        ASSERT_RET_IF_NOT(regular_object_shader.set_mat4("u_view", camera_view), false);
+        ASSERT_RET_IF_NOT(regular_object_shader.set_vec3("u_camera_position",
+                                                         camera_position),
                           false);
-        ASSERT_RET_IF_NOT(regular_object_shader.set_Uniform1i(
-                              "u_shadow_map_sampler", shadow_map_texture.get_slot()),
+        ASSERT_RET_IF_NOT(regular_object_shader.set_mat4("u_light_view_projection",
+                                                         light_view_projection),
                           false);
+        ASSERT_RET_IF_NOT(
+            regular_object_shader.set_vec3("u_point_light.position",
+                                           point_light_objects[0].transform.position),
+            false);
+        ASSERT_RET_IF_NOT(regular_object_shader.set_vec3("u_point_light.ambient",
+                                                         point_light_objects[0].color),
+                          false);
+        ASSERT_RET_IF_NOT(regular_object_shader.set_vec3("u_point_light.diffuse",
+                                                         point_light_objects[0].color),
+                          false);
+        ASSERT_RET_IF_NOT(regular_object_shader.set_vec3("u_point_light.specular",
+                                                         point_light_objects[0].color),
+                          false);
+        ASSERT_RET_IF_NOT(
+            regular_object_shader.set_vec3("u_directional_light.direction",
+                                           directional_light_objects[0].direction),
+            false);
+        ASSERT_RET_IF_NOT(
+            regular_object_shader.set_vec3("u_directional_light.ambient",
+                                           directional_light_objects[0].color),
+            false);
+        ASSERT_RET_IF_NOT(
+            regular_object_shader.set_vec3("u_directional_light.diffuse",
+                                           directional_light_objects[0].color),
+            false);
+        ASSERT_RET_IF_NOT(
+            regular_object_shader.set_vec3("u_directional_light.specular",
+                                           directional_light_objects[0].color),
+            false);
         shadow_map_texture.use();
         for (RegularObject &object : regular_objects)
         {
-            ASSERT_RET_IF_NOT(regular_object_shader.set_UniformMatrix4fv(
-                                  "u_model", object.transform.model()),
+            ASSERT_RET_IF_NOT(regular_object_shader.set_mat4("u_model",
+                                                             object.transform.model()),
                               false);
             object.material.apply(regular_object_shader);
             object.normal_map.use();
             object.drawable.draw();
+        }
+
+        /*
+         * Render terrain.
+         */
+        if (terrain)
+        {
+            {
+                const std::array<GLenum, 1> buffers = {
+                    screen_color_texture.get_attachment(),
+                };
+                glDrawBuffers(buffers.size(), buffers.data());
+            }
+
+            shadow_map_texture.use();
+            terrain_shader.use();
+            ASSERT_RET_IF_NOT(terrain_shader.set_mat4("u_view", camera_view), false);
+            ASSERT_RET_IF_NOT(terrain_shader.set_mat4("u_light_view_projection",
+                                                      light_view_projection),
+                              false);
+            ASSERT_RET_IF_NOT(
+                terrain_shader.set_vec3("u_camera_position", camera_position), false);
+            ASSERT_RET_IF_NOT(
+                terrain_shader.set_vec3("u_point_light.position",
+                                        point_light_objects[0].transform.position),
+                false);
+            ASSERT_RET_IF_NOT(terrain_shader.set_vec3("u_point_light.ambient",
+                                                      point_light_objects[0].color),
+                              false);
+            ASSERT_RET_IF_NOT(terrain_shader.set_vec3("u_point_light.diffuse",
+                                                      point_light_objects[0].color),
+                              false);
+            ASSERT_RET_IF_NOT(terrain_shader.set_vec3("u_point_light.specular",
+                                                      point_light_objects[0].color),
+                              false);
+            ASSERT_RET_IF_NOT(
+                terrain_shader.set_vec3("u_directional_light.direction",
+                                        directional_light_objects[0].direction),
+                false);
+            ASSERT_RET_IF_NOT(
+                terrain_shader.set_vec3("u_directional_light.ambient",
+                                        directional_light_objects[0].color),
+                false);
+            ASSERT_RET_IF_NOT(
+                terrain_shader.set_vec3("u_directional_light.diffuse",
+                                        directional_light_objects[0].color),
+                false);
+            ASSERT_RET_IF_NOT(
+                terrain_shader.set_vec3("u_directional_light.specular",
+                                        directional_light_objects[0].color),
+                false);
+            terrain->normal_map.use();
+            terrain->material.apply(terrain_shader);
+            terrain->drawable.draw();
         }
 
         /*
@@ -644,12 +737,11 @@ namespace Engine
             glDrawBuffers(buffers.size(), buffers.data());
         }
         point_light_shader.use();
-        ASSERT_RET_IF_NOT(
-            point_light_shader.set_UniformMatrix4fv("u_view", camera_view), false);
+        ASSERT_RET_IF_NOT(point_light_shader.set_mat4("u_view", camera_view), false);
         for (PointLightObject &object : point_light_objects)
         {
-            ASSERT_RET_IF_NOT(point_light_shader.set_UniformMatrix4fv(
-                                  "u_model", object.transform.model()),
+            ASSERT_RET_IF_NOT(point_light_shader.set_mat4("u_model",
+                                                          object.transform.model()),
                               false);
             object.drawable.draw();
         }
@@ -662,10 +754,9 @@ namespace Engine
         skybox_texture.use();
 
         skybox_shader.use();
-        ASSERT_RET_IF_NOT(skybox_shader.set_UniformMatrix4fv("u_view", skybox_view),
-                          false);
-        ASSERT_RET_IF_NOT(skybox_shader.set_Uniform3f(
-                              "u_sun_color", directional_light_objects[0].color),
+        ASSERT_RET_IF_NOT(skybox_shader.set_mat4("u_view", skybox_view), false);
+        ASSERT_RET_IF_NOT(skybox_shader.set_vec3("u_sun_color",
+                                                 directional_light_objects[0].color),
                           false);
         cube->draw();
 
@@ -681,8 +772,8 @@ namespace Engine
         for (uint8_t i = 0; i < passes; ++i)
         {
             glBindFramebuffer(GL_FRAMEBUFFER, ping_pong_frame_buffer[horizontal]);
-            ASSERT_RET_IF_NOT(
-                gaussian_blur_shader.set_Uniform1i("u_horizontal", horizontal), false);
+            ASSERT_RET_IF_NOT(gaussian_blur_shader.set_int("u_horizontal", horizontal),
+                              false);
 
             horizontal = 1 ^ horizontal;
 
@@ -712,8 +803,8 @@ namespace Engine
 
         screen_shader.use();
         ping_pong_texture[horizontal].use();
-        screen_shader.set_Uniform1i("u_bloom_texture_sampler",
-                                    ping_pong_texture[horizontal].get_slot());
+        screen_shader.set_int("u_bloom_texture_sampler",
+                              ping_pong_texture[horizontal].get_slot());
         screen_color_texture.use();
         screen->draw();
 
@@ -737,7 +828,7 @@ namespace Engine
     {
         exposure = _exposure;
         screen_shader.use();
-        ASSERT_RET_IF_NOT(screen_shader.set_Uniform1f("u_exposure", _exposure), false);
+        ASSERT_RET_IF_NOT(screen_shader.set_float("u_exposure", _exposure), false);
         return true;
     }
 
@@ -750,7 +841,7 @@ namespace Engine
     {
         gamma = _gamma;
         screen_shader.use();
-        ASSERT_RET_IF_NOT(screen_shader.set_Uniform1f("u_gamma", _gamma), false);
+        ASSERT_RET_IF_NOT(screen_shader.set_float("u_gamma", _gamma), false);
         return true;
     }
 
@@ -765,8 +856,7 @@ namespace Engine
     {
         sharpness = _sharpness;
         screen_shader.use();
-        ASSERT_RET_IF_NOT(screen_shader.set_Uniform1f("u_sharpness", _sharpness),
-                          false);
+        ASSERT_RET_IF_NOT(screen_shader.set_float("u_sharpness", _sharpness), false);
         return true;
     }
 

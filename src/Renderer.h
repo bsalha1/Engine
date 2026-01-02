@@ -49,14 +49,24 @@ namespace Engine
         };
 
         /**
+         * @brief Terrain object has a material, normal map, and drawable component.
+         */
+        struct Terrain
+        {
+            const TexturedMaterial &material;
+            const Texture &normal_map;
+            const Drawable &drawable;
+        };
+
+        /**
          * @brief A regular object has a material, transform, and drawable component.
          */
         struct RegularObject
         {
-            TexturedMaterial &material;
-            Texture &normal_map;
-            Transform &transform;
-            Drawable &drawable;
+            const TexturedMaterial &material;
+            const Texture &normal_map;
+            const Transform &transform;
+            const Drawable &drawable;
         };
 
         /**
@@ -65,9 +75,9 @@ namespace Engine
          */
         struct PointLightObject
         {
-            glm::vec3 &color;
-            Transform &transform;
-            Drawable &drawable;
+            const glm::vec3 &color;
+            const Transform &transform;
+            const Drawable &drawable;
         };
 
         /**
@@ -75,8 +85,8 @@ namespace Engine
          */
         struct DirectionalLightObject
         {
-            glm::vec3 &direction;
-            glm::vec3 &color;
+            const glm::vec3 &direction;
+            const glm::vec3 &color;
         };
 
         /**
@@ -90,6 +100,8 @@ namespace Engine
         };
 
         bool init(const int _window_width, const int _window_height);
+
+        bool set_terrain(const Terrain &_terrain);
 
         void add_regular_object(const RegularObject &object);
 
@@ -133,6 +145,16 @@ namespace Engine
         GLuint screen_frame_buffer;
         FramebufferTexture screen_color_texture;
         FramebufferTexture screen_bloom_texture;
+        /**
+         * @}
+         */
+
+        /**
+         * Terrain.
+         * @{
+         */
+        Shader terrain_shader;
+        std::unique_ptr<Terrain> terrain;
         /**
          * @}
          */
