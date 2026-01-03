@@ -3,6 +3,8 @@
 #include "CubemapTexture.h"
 #include "FramebufferTexture.h"
 #include "IndexBuffer.h"
+#include "MenuManager.h"
+#include "PauseMenu.h"
 #include "Renderer.h"
 #include "Shader.h"
 #include "Texture.h"
@@ -45,6 +47,29 @@ namespace Engine
             FLYING,
         };
 
+        /**
+         * @brief Keyboard inputs.
+         */
+        struct KeyboardInputs
+        {
+            bool forwards;
+            bool backwards;
+            bool left;
+            bool right;
+
+            bool jump;
+            bool jump_rising_edge;
+
+            bool crouch;
+            bool crouch_rising_edge;
+
+            bool sprint;
+            bool sprint_rising_edge;
+
+            bool fly;
+            bool fly_rising_edge;
+        };
+
         Game();
 
         bool _init();
@@ -61,10 +86,11 @@ namespace Engine
 
         void update_view();
 
-        bool update_player_movement_state_grounded(const bool fly_key_pressed,
-                                                   const bool jump_key_pressed);
+        bool update_player_movement_state_grounded();
 
         void apply_player_movement_state_grounded();
+
+        void get_movement_keyboard_inputs();
 
         void update_player_position();
 
@@ -128,12 +154,9 @@ namespace Engine
         float player_height;
 
         /**
-         * Rising edge detectors.
+         * Keyboard inputs.
          */
-        bool fly_key_pressed_prev;
-        bool crouch_key_pressed_prev;
-        bool sprint_key_pressed_prev;
-        bool jump_key_pressed_prev;
+        KeyboardInputs keyboard_inputs;
 
         /**
          * Player position.
@@ -300,6 +323,19 @@ namespace Engine
         size_t stats_frames;
         double stats_dt_sum;
         double stats_dt_sq_sum;
+        GLint stats_free_vram_MB;
+        GLint stats_total_vram_MB;
+        unsigned long stats_ram_usage_MB;
+        /**
+         * @}
+         */
+
+        /**
+         * Menus.
+         * @{
+         */
+        MenuManager menu_manager;
+        PauseMenu pause_menu;
         /**
          * @}
          */

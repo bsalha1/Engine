@@ -24,14 +24,6 @@ using namespace std::chrono_literals;
 
 namespace Engine
 {
-    namespace
-    {
-        /**
-         * Debug flag to pause the sun movement.
-         */
-        bool sun_paused = false;
-    }
-
     static void gl_debug_message_callback(GLenum source,
                                           GLenum type,
                                           GLuint id,
@@ -94,10 +86,7 @@ namespace Engine
         player_movement_state(PlayerMovementState::WALKING),
         player_move_impulse(move_impulse_walking),
         player_height(height_standing),
-        fly_key_pressed_prev(false),
-        crouch_key_pressed_prev(false),
-        sprint_key_pressed_prev(false),
-        jump_key_pressed_prev(false),
+        keyboard_inputs {},
         player_position(0.f, player_height, 0.f),
         player_velocity(0.f, 0.f, 0.f),
         last_crouch_time(std::chrono::steady_clock::now()),
@@ -119,7 +108,8 @@ namespace Engine
         stats_dt_buffer_idx(0),
         stats_frames(0),
         stats_dt_sum(0),
-        stats_dt_sq_sum(0)
+        stats_dt_sq_sum(0),
+        pause_menu(*this, renderer)
     {}
 
     /**
@@ -214,6 +204,20 @@ namespace Engine
         glfwMakeContextCurrent(window);
 
         /*
+         * Get GPU info.
+         */
+        const char *vendor = reinterpret_cast<const char *>(glGetString(GL_VENDOR));
+        LOG("Vendor: %s\n", vendor);
+
+        const char *_renderer = reinterpret_cast<const char *>(glGetString(GL_RENDERER));
+        LOG("Renderer: %s\n", _renderer);
+
+        /*
+         * Disable V-Sync.
+         */
+        glfwSwapInterval(0);
+
+        /*
          * Get the actual window's size. Window managers can disobey our request.
          */
         glfwGetFramebufferSize(window, &window_width, &window_height);
@@ -253,6 +257,12 @@ namespace Engine
          */
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LESS);
+
+        /*
+         * Get total VRAM.
+         */
+        glGetIntegerv(GL_GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX, &stats_total_vram_MB);
+        stats_total_vram_MB /= 1024;
 
         /*
          * Create screen frame buffer.
@@ -639,17 +649,30 @@ namespace Engine
         {
             if (state == State::PAUSED)
             {
-                state = State::RUNNING;
-
                 /*
-                 * Put the mouse back to where it was before pausing and hide it again.
+                 * If pressing escape on the final menu, start running again.
                  */
-                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-                glfwSetCursorPos(window, mouse_x_prev, mouse_y_prev);
+                bool menus_left = false;
+                ASSERT_RET_IF_NOT(menu_manager.pop_menu(menus_left), false);
+                if (!menus_left)
+                {
+                    state = State::RUNNING;
+
+                    /*
+                     * Put the mouse back to where it was before pausing and hide it again.
+                     */
+                    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                    glfwSetCursorPos(window, mouse_x_prev, mouse_y_prev);
+                }
             }
             else
             {
                 state = State::PAUSED;
+
+                /*
+                 * Put up the pause menu.
+                 */
+                menu_manager.push_menu(&pause_menu);
 
                 /*
                  * Show the mouse cursor and put it in the middle of window.
@@ -664,83 +687,15 @@ namespace Engine
         ImGui::NewFrame();
 
         /*
-         * Configure the pause menu if paused.
+         * Render current menu if paused.
          */
         if (state == State::PAUSED)
         {
-            const ImGuiViewport *viewport = ImGui::GetMainViewport();
-            ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-            ImGui::Begin("Pause Menu",
-                         nullptr,
-                         ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse |
-                             ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoResize |
-                             ImGuiWindowFlags_NoSavedSettings);
-            ImGui::Text("Press ESC to unpause");
-
-            /*
-             * Add settings button.
-             */
-            ImGui::Separator();
-            if (ImGui::Button("Settings"))
-            {
-                LOG("Pause Menu -> Settings\n");
-            }
-
-            /*
-             * Add button to toggle triangle outlining for debugging.
-             */
-            ImGui::Separator();
-            if (ImGui::Button("Outline Triangles"))
-            {
-                LOG("Pause Menu -> Outline Triangles\n");
-                GLint gl_polygon_mode[2];
-                glGetIntegerv(GL_POLYGON_MODE, gl_polygon_mode);
-                if (gl_polygon_mode[0] == GL_LINE)
-                {
-                    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-                }
-                else
-                {
-                    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-                }
-            }
-
-            /*
-             * Add display settings.
-             */
-            float exposure = renderer.get_exposure();
-            ImGui::SliderFloat("exposure", &exposure, 0.f, 10.f);
-            ASSERT_RET_IF_NOT(renderer.set_exposure(exposure), false);
-
-            float gamma = renderer.get_gamma();
-            ImGui::SliderFloat("gamma", &gamma, 0.f, 10.f);
-            ASSERT_RET_IF_NOT(renderer.set_gamma(gamma), false);
-
-            float sharpness = renderer.get_sharpness();
-            ImGui::SliderFloat("sharpness", &sharpness, 1.f, 1000.f);
-            ASSERT_RET_IF_NOT(renderer.set_sharpness(sharpness), false);
-
-            if (ImGui::Button("Pause Sun"))
-            {
-                sun_paused = !sun_paused;
-            }
-
-            /*
-             * Add quit button.
-             */
-            ImGui::Separator();
-            if (ImGui::Button("Quit"))
-            {
-                LOG("Pause Menu -> Quit\n");
-                quit();
-            }
-            ImGui::End();
+            ASSERT_RET_IF_NOT(menu_manager.render(), false);
         }
 
-        ImGuiIO &io = ImGui::GetIO();
-
         /*
-         * Show FPS window in top left.
+         * Show statistics in top left corner of screen.
          */
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
         ImGui::Begin("Stats",
@@ -748,6 +703,7 @@ namespace Engine
                      ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoFocusOnAppearing |
                          ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoInputs |
                          ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings);
+
         ImGui::Text("%.3f ms (%.0f FPS)", dt * 1000.0, 1.0 / dt);
 
         const double dt_mean = stats_dt_sum / stats_frames;
@@ -759,8 +715,9 @@ namespace Engine
         const double fps_stdev = dt_stdev / (dt_mean * dt_mean);
         ImGui::Text("stdev: %.3f ms (%.0f FPS)", dt_stdev * 1000.0, fps_stdev);
 
-        // double minFPS = 1.0 / MAX(buffer);
-        // double maxFPS = 1.0 / MIN(buffer);
+        ImGui::Text("free vram: %d MB / %d MB", stats_free_vram_MB, stats_total_vram_MB);
+
+        ImGui::Text("ram usage: %d MB", stats_ram_usage_MB);
 
         ImGui::Text("state: %s", state_to_string(state));
         ImGui::Text("player_movement_state: %s",
@@ -811,6 +768,22 @@ namespace Engine
         }
 
         stats_dt_buffer_idx = (stats_dt_buffer_idx + 1) % num_stats_frames;
+
+        /*
+         * Update expensive stats every 60 frames.
+         */
+        if (stats_dt_buffer_idx % 60 == 0)
+        {
+            glGetIntegerv(GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, &stats_free_vram_MB);
+            stats_free_vram_MB /= 1024;
+
+            unsigned long rss_pages = 0;
+            std::ifstream statm("/proc/self/statm");
+            statm >> rss_pages >> rss_pages;
+            statm.close();
+
+            stats_ram_usage_MB = rss_pages * sysconf(_SC_PAGESIZE) / 1024 / 1024;
+        }
     }
 
     /**
@@ -890,21 +863,18 @@ namespace Engine
     /**
      * @brief Update a grounded player's state.
      *
-     * @param fly_key_pressed Whether the fly key is currently pressed.
-     *
      * @return True if the player state was changed, otherwise false.
      */
-    bool Game::update_player_movement_state_grounded(const bool fly_key_pressed,
-                                                     const bool jump_key_pressed)
+    bool Game::update_player_movement_state_grounded()
     {
-        if (fly_key_pressed && !fly_key_pressed_prev)
+        if (keyboard_inputs.fly_rising_edge)
         {
             player_movement_state = PlayerMovementState::FLYING;
             return true;
         }
 
         const bool can_jump = player_position.y - on_ground_camera_y <= 0.2f;
-        if (can_jump && jump_key_pressed && !jump_key_pressed_prev)
+        if (can_jump && keyboard_inputs.jump_rising_edge)
         {
             player_velocity.y += move_impulse_jump * dt;
 
@@ -947,6 +917,33 @@ namespace Engine
     }
 
     /**
+     * Get keyboard inputs which pertain to movement.
+     */
+    void Game::get_movement_keyboard_inputs()
+    {
+        keyboard_inputs.forwards = glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS;
+        keyboard_inputs.backwards = glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS;
+        keyboard_inputs.left = glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS;
+        keyboard_inputs.right = glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS;
+
+        const bool jump = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
+        keyboard_inputs.jump_rising_edge = jump && !keyboard_inputs.jump;
+        keyboard_inputs.jump = jump;
+
+        const bool crouch = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
+        keyboard_inputs.crouch_rising_edge = crouch && !keyboard_inputs.crouch;
+        keyboard_inputs.crouch = crouch;
+
+        const bool sprint = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
+        keyboard_inputs.sprint_rising_edge = sprint && !keyboard_inputs.sprint;
+        keyboard_inputs.sprint = sprint;
+
+        const bool fly = glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS;
+        keyboard_inputs.fly_rising_edge = fly && !keyboard_inputs.fly;
+        keyboard_inputs.fly = fly;
+    }
+
+    /**
      * Update player position based on keyboard input.
      */
     void Game::update_player_position()
@@ -955,20 +952,20 @@ namespace Engine
          * Determine which direction to move into.
          */
         glm::vec3 move_direction(0.f, 0.f, 0.f);
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        if (keyboard_inputs.forwards)
         {
             move_direction = forwards;
         }
-        else if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        else if (keyboard_inputs.backwards)
         {
             move_direction = -forwards;
         }
 
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        if (keyboard_inputs.right)
         {
             move_direction += right;
         }
-        else if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        else if (keyboard_inputs.left)
         {
             move_direction -= right;
         }
@@ -976,16 +973,12 @@ namespace Engine
         /*
          * Get next player movement state.
          */
-        const bool crouch_key_pressed = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
-        const bool fly_key_pressed = glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS;
-        const bool sprint_key_pressed = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
-        const bool jump_key_pressed = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
 
         switch (player_movement_state)
         {
         case PlayerMovementState::WALKING:
         {
-            if (update_player_movement_state_grounded(fly_key_pressed, jump_key_pressed))
+            if (update_player_movement_state_grounded())
             {
                 break;
             }
@@ -997,7 +990,7 @@ namespace Engine
              * While sprint button is being pressed and the player is on the ground,
              * set them to sprinting.
              */
-            if (sprint_key_pressed && !sprint_key_pressed_prev && in_sprintable_direction)
+            if (keyboard_inputs.sprint_rising_edge && in_sprintable_direction)
             {
                 player_movement_state = PlayerMovementState::SPRINTING;
             }
@@ -1005,7 +998,7 @@ namespace Engine
             /*
              * Crouch if crouch button is pressed.
              */
-            else if (crouch_key_pressed && !crouch_key_pressed_prev)
+            else if (keyboard_inputs.crouch_rising_edge)
             {
                 player_movement_state = PlayerMovementState::CROUCHING;
             }
@@ -1015,7 +1008,7 @@ namespace Engine
 
         case PlayerMovementState::SPRINTING:
         {
-            if (update_player_movement_state_grounded(fly_key_pressed, jump_key_pressed))
+            if (update_player_movement_state_grounded())
             {
                 break;
             }
@@ -1027,7 +1020,7 @@ namespace Engine
              */
             const bool in_sprintable_direction =
                 move_direction.x * forwards.x + move_direction.z * forwards.z > 0.f;
-            if (sprint_key_pressed && !sprint_key_pressed_prev || !in_sprintable_direction)
+            if (keyboard_inputs.sprint_rising_edge || !in_sprintable_direction)
             {
                 player_movement_state = PlayerMovementState::WALKING;
             }
@@ -1035,7 +1028,7 @@ namespace Engine
             /*
              * Crouch if crouch button is pressed.
              */
-            else if (crouch_key_pressed && !crouch_key_pressed_prev)
+            else if (keyboard_inputs.crouch_rising_edge)
             {
                 player_movement_state = PlayerMovementState::CROUCHING;
             }
@@ -1045,7 +1038,7 @@ namespace Engine
 
         case PlayerMovementState::CROUCHING:
         {
-            if (update_player_movement_state_grounded(fly_key_pressed, jump_key_pressed))
+            if (update_player_movement_state_grounded())
             {
                 break;
             }
@@ -1055,7 +1048,7 @@ namespace Engine
              */
             const bool in_sprintable_direction =
                 move_direction.x * forwards.x + move_direction.z * forwards.z > 0.f;
-            if (sprint_key_pressed && !sprint_key_pressed_prev && in_sprintable_direction)
+            if (keyboard_inputs.sprint_rising_edge && in_sprintable_direction)
             {
                 player_movement_state = PlayerMovementState::SPRINTING;
             }
@@ -1063,7 +1056,7 @@ namespace Engine
             /*
              * Uncrouch if crouch button is pressed again.
              */
-            else if (crouch_key_pressed && !crouch_key_pressed_prev)
+            else if (keyboard_inputs.crouch_rising_edge)
             {
                 player_movement_state = PlayerMovementState::WALKING;
             }
@@ -1072,7 +1065,7 @@ namespace Engine
         }
 
         case PlayerMovementState::FLYING:
-            if (fly_key_pressed && !fly_key_pressed_prev)
+            if (keyboard_inputs.fly_rising_edge)
             {
                 player_movement_state = PlayerMovementState::WALKING;
             }
@@ -1082,11 +1075,6 @@ namespace Engine
         default:
             LOG_ERROR("Unknown player state: %u\n", player_movement_state);
         }
-
-        crouch_key_pressed_prev = crouch_key_pressed;
-        fly_key_pressed_prev = fly_key_pressed;
-        sprint_key_pressed_prev = sprint_key_pressed;
-        jump_key_pressed_prev = jump_key_pressed;
 
         /*
          * Set player parameters based on current state.
@@ -1125,17 +1113,17 @@ namespace Engine
             friction_coeff = friction_coeff_flying;
 
             /*
-             * If player presses space, go up.
+             * Replace jump with flying up.
              */
-            if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+            if (keyboard_inputs.jump)
             {
                 player_velocity.y += player_move_impulse * dt;
             }
 
             /*
-             * If player presses left shift, go down.
+             * Replace crouch with flying down.
              */
-            if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
+            if (keyboard_inputs.crouch)
             {
                 player_velocity.y -= player_move_impulse * dt;
             }
@@ -1294,194 +1282,190 @@ namespace Engine
             ASSERT_RET_IF_NOT(process_menu(), false);
 
             /*
-             * If not paused, run gameplay.
+             * Run gameplay.
+             */
+
+            time_since_start += dt;
+
+            /*
+             * Cache variables used multiple times.
+             */
+            terrain_height = get_terrain_height(player_position.x, player_position.z);
+
+            /*
+             * Cache whether player is on the ground.
+             */
+            is_on_ground = player_position.y <= on_ground_camera_y;
+
+            /*
+             * If not paused, get keyboard input and update view.
              */
             if (likely(state != State::PAUSED))
             {
-                time_since_start += dt;
-
-                /*
-                 * Cache variables used multiple times.
-                 */
-                terrain_height = get_terrain_height(player_position.x, player_position.z);
-
-                /*
-                 * Cache whether player is on the ground.
-                 */
-                is_on_ground = player_position.y <= on_ground_camera_y;
-
-                /*
-                 * Update view based on mouse movement.
-                 */
+                get_movement_keyboard_inputs();
                 update_view();
-
-                /*
-                 * Update player_position based on keyboard input.
-                 */
-                update_player_position();
-
-                /*
-                 * Update orbital angle. Offset by -pi so that at time 0, the sun is
-                 * rising from the horizon.
-                 */
-                if (likely(!sun_paused))
-                {
-                    orbital_angle += rotational_angular_speed * dt;
-                }
-
-                /*
-                 * Update chaser position to move towards player position on X-Z
-                 * plane and face them.
-                 */
-                glm::vec3 direction_to_player_xz;
-                if (likely(player_position.x != chaser_position.x ||
-                           player_position.z != chaser_position.z))
-                {
-                    direction_to_player_xz =
-                        glm::normalize(glm::vec3(player_position.x - chaser_position.x,
-                                                 0.f,
-                                                 player_position.z - chaser_position.z));
-                    static constexpr float chaser_move_impulse = 5.f;
-                    chaser_position +=
-                        direction_to_player_xz * chaser_move_impulse * static_cast<float>(dt);
-                    chaser_position.y =
-                        get_terrain_height(chaser_position.x, chaser_position.z) + 1.f;
-                }
-                else
-                {
-                    direction_to_player_xz = glm::vec3(1.f, 0.f, 0.f);
-                }
-
-                glm::mat4 chaser_model = glm::translate(glm::mat4(1.f), chaser_position);
-
-                chaser_model =
-                    glm::rotate(chaser_model,
-                                glm::radians<float>(180.f) +
-                                    std::atan2(direction_to_player_xz.x, direction_to_player_xz.z),
-                                glm::vec3(0.f, 1.f, 0.f));
-
-                static float light_velocity = 20.f;
-
-                /*
-                 * Update point light position.
-                 */
-                if (point_light_position.y <
-                    get_terrain_height(point_light_position.x, point_light_position.z) + 1.f)
-                {
-                    light_velocity = 20.f;
-                }
-                else if (point_light_position.y >
-                         get_terrain_height(point_light_position.x, point_light_position.z) + 100.f)
-                {
-                    light_velocity = -20.f;
-                }
-                point_light_position.y += light_velocity * dt;
-
-                /*
-                 * Compute the directional light direction relative to the terrain
-                 * by converting the sun's position from skybox model space to the
-                 * terrain model space.
-                 */
-                const glm::mat4 terrain_model = glm::mat4(1.0f);
-
-                const glm::mat4 terrain_model_matrix_rotated =
-                    glm::rotate(terrain_model, orbital_angle, rotation_axis);
-
-                const glm::vec3 sun_position_terrain_model_space =
-                    glm::vec3(terrain_model_matrix_rotated * sun_position_skybox_model_space);
-
-                glm::vec3 directional_light_direction =
-                    -glm::normalize(sun_position_terrain_model_space);
-
-                /*
-                 * Compute sun brightness based on its elevation angle.
-                 */
-                const float sun_top_y =
-                    sun_position_terrain_model_space.y + sun_radius_skybox_model_space;
-                const float sun_distance = glm::sqrt(
-                    sun_top_y * sun_top_y +
-                    sun_position_terrain_model_space.x * sun_position_terrain_model_space.x +
-                    sun_position_terrain_model_space.z * sun_position_terrain_model_space.z);
-                const float sine_of_elevation_angle = sun_top_y / sun_distance;
-
-                static constexpr float brightness_falloff_factor = 0.1f;
-                const float sun_brightness =
-                    sine_of_elevation_angle <= 0.f
-                        ? 0.f
-                        : glm::exp(-brightness_falloff_factor / sine_of_elevation_angle);
-
-                const glm::mat4 view =
-                    glm::lookAt(player_position, player_position + direction, head);
-
-                /*
-                 * Submit chaser to renderer.
-                 */
-                Renderer::Transform chaser_transform = {
-                    .position = chaser_position,
-                    .rotation =
-                        glm::vec3(0.f,
-                                  glm::radians<float>(180.f) + std::atan2(direction_to_player_xz.x,
-                                                                          direction_to_player_xz.z),
-                                  0.f),
-                    .scale = glm::vec3(1.f, 1.f, 1.f),
-                };
-                renderer.add_regular_object({
-                    .material = chaser_textured_material,
-                    .normal_map = chaser_normal_map,
-                    .transform = chaser_transform,
-                    .drawable = chaser_vertex_array,
-                });
-
-                /*
-                 * Submit floating chaser to renderer.
-                 */
-                Renderer::Transform floating_chaser_transform = {
-                    .position = glm::vec3(0.f, 10.f, 0.f),
-                    .rotation = glm::vec3(0.f, 0.f, 0.f),
-                    .scale = glm::vec3(1.f, 1.f, 1.f),
-                };
-                renderer.add_regular_object({
-                    .material = chaser_textured_material,
-                    .normal_map = chaser_normal_map,
-                    .transform = floating_chaser_transform,
-                    .drawable = chaser_vertex_array,
-                });
-
-                /*
-                 * Submit point light to renderer.
-                 */
-                glm::vec3 point_light_color = 10.f * glm::vec3(0xFF, 0xDF, 0x22) / 255.f;
-                Renderer::Transform point_light_transform = {
-                    .position = point_light_position,
-                    .rotation = glm::vec3(0.f, 0.f, 0.f),
-                    .scale = glm::vec3(1.f, 1.f, 1.f),
-                };
-                renderer.add_point_light_object({
-                    .color = point_light_color,
-                    .transform = point_light_transform,
-                    .drawable = chaser_vertex_array,
-                });
-
-                /*
-                 * Submit sun to renderer.
-                 */
-                static constexpr glm::vec3 sun_color = 10.f * glm::vec3(1.0f, 0.95f, 0.85f);
-                glm::vec3 directional_light_color = sun_color * sun_brightness;
-                renderer.add_directional_light_object({
-                    .direction = directional_light_direction,
-                    .color = directional_light_color,
-                });
-
-                /*
-                 * Use the player's view but remove translation and add rotation to
-                 * emulate the planet rotating.
-                 */
-                const glm::mat4 view_skybox =
-                    glm::rotate(glm::mat4(glm::mat3(view)), orbital_angle, rotation_axis);
-
-                ASSERT_RET_IF_NOT(renderer.render(view, view_skybox, player_position, direction),
-                                  false);
             }
+
+            /*
+             * Update player_position based on keyboard input.
+             */
+            update_player_position();
+
+            /*
+             * Update orbital angle.
+             */
+            orbital_angle += rotational_angular_speed * dt;
+
+            /*
+             * Update chaser position to move towards player position on X-Z
+             * plane and face them.
+             */
+            glm::vec3 direction_to_player_xz;
+            if (likely(player_position.x != chaser_position.x ||
+                       player_position.z != chaser_position.z))
+            {
+                direction_to_player_xz =
+                    glm::normalize(glm::vec3(player_position.x - chaser_position.x,
+                                             0.f,
+                                             player_position.z - chaser_position.z));
+                static constexpr float chaser_move_impulse = 5.f;
+                chaser_position +=
+                    direction_to_player_xz * chaser_move_impulse * static_cast<float>(dt);
+                chaser_position.y = get_terrain_height(chaser_position.x, chaser_position.z) + 1.f;
+            }
+            else
+            {
+                direction_to_player_xz = glm::vec3(1.f, 0.f, 0.f);
+            }
+
+            glm::mat4 chaser_model = glm::translate(glm::mat4(1.f), chaser_position);
+
+            chaser_model =
+                glm::rotate(chaser_model,
+                            glm::radians<float>(180.f) +
+                                std::atan2(direction_to_player_xz.x, direction_to_player_xz.z),
+                            glm::vec3(0.f, 1.f, 0.f));
+
+            static float light_velocity = 20.f;
+
+            /*
+             * Update point light position.
+             */
+            if (point_light_position.y <
+                get_terrain_height(point_light_position.x, point_light_position.z) + 1.f)
+            {
+                light_velocity = 20.f;
+            }
+            else if (point_light_position.y >
+                     get_terrain_height(point_light_position.x, point_light_position.z) + 100.f)
+            {
+                light_velocity = -20.f;
+            }
+            point_light_position.y += light_velocity * dt;
+
+            /*
+             * Compute the directional light direction relative to the terrain
+             * by converting the sun's position from skybox model space to the
+             * terrain model space.
+             */
+            const glm::mat4 terrain_model = glm::mat4(1.0f);
+
+            const glm::mat4 terrain_model_matrix_rotated =
+                glm::rotate(terrain_model, orbital_angle, rotation_axis);
+
+            const glm::vec3 sun_position_terrain_model_space =
+                glm::vec3(terrain_model_matrix_rotated * sun_position_skybox_model_space);
+
+            glm::vec3 directional_light_direction =
+                -glm::normalize(sun_position_terrain_model_space);
+
+            /*
+             * Compute sun brightness based on its elevation angle.
+             */
+            const float sun_top_y =
+                sun_position_terrain_model_space.y + sun_radius_skybox_model_space;
+            const float sun_distance =
+                glm::sqrt(sun_top_y * sun_top_y +
+                          sun_position_terrain_model_space.x * sun_position_terrain_model_space.x +
+                          sun_position_terrain_model_space.z * sun_position_terrain_model_space.z);
+            const float sine_of_elevation_angle = sun_top_y / sun_distance;
+
+            static constexpr float brightness_falloff_factor = 0.1f;
+            const float sun_brightness =
+                sine_of_elevation_angle <= 0.f
+                    ? 0.f
+                    : glm::exp(-brightness_falloff_factor / sine_of_elevation_angle);
+
+            const glm::mat4 view = glm::lookAt(player_position, player_position + direction, head);
+
+            /*
+             * Submit chaser to renderer.
+             */
+            Renderer::Transform chaser_transform = {
+                .position = chaser_position,
+                .rotation =
+                    glm::vec3(0.f,
+                              glm::radians<float>(180.f) +
+                                  std::atan2(direction_to_player_xz.x, direction_to_player_xz.z),
+                              0.f),
+                .scale = glm::vec3(1.f, 1.f, 1.f),
+            };
+            renderer.add_regular_object({
+                .material = chaser_textured_material,
+                .normal_map = chaser_normal_map,
+                .transform = chaser_transform,
+                .drawable = chaser_vertex_array,
+            });
+
+            /*
+             * Submit floating chaser to renderer.
+             */
+            Renderer::Transform floating_chaser_transform = {
+                .position = glm::vec3(0.f, 10.f, 0.f),
+                .rotation = glm::vec3(0.f, 0.f, 0.f),
+                .scale = glm::vec3(1.f, 1.f, 1.f),
+            };
+            renderer.add_regular_object({
+                .material = chaser_textured_material,
+                .normal_map = chaser_normal_map,
+                .transform = floating_chaser_transform,
+                .drawable = chaser_vertex_array,
+            });
+
+            /*
+             * Submit point light to renderer.
+             */
+            glm::vec3 point_light_color = 10.f * glm::vec3(0xFF, 0xDF, 0x22) / 255.f;
+            Renderer::Transform point_light_transform = {
+                .position = point_light_position,
+                .rotation = glm::vec3(0.f, 0.f, 0.f),
+                .scale = glm::vec3(1.f, 1.f, 1.f),
+            };
+            renderer.add_point_light_object({
+                .color = point_light_color,
+                .transform = point_light_transform,
+                .drawable = chaser_vertex_array,
+            });
+
+            /*
+             * Submit sun to renderer.
+             */
+            static constexpr glm::vec3 sun_color = 10.f * glm::vec3(1.0f, 0.95f, 0.85f);
+            glm::vec3 directional_light_color = sun_color * sun_brightness;
+            renderer.add_directional_light_object({
+                .direction = directional_light_direction,
+                .color = directional_light_color,
+            });
+
+            /*
+             * Use the player's view but remove translation and add rotation to
+             * emulate the planet rotating.
+             */
+            const glm::mat4 view_skybox =
+                glm::rotate(glm::mat4(glm::mat3(view)), orbital_angle, rotation_axis);
+
+            ASSERT_RET_IF_NOT(renderer.render(view, view_skybox, player_position, direction),
+                              false);
 
             /*
              * Render GUI.

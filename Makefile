@@ -9,7 +9,7 @@ INCLUDE_DIRS = glfw/include/ glew/include/ glu/include/ glm/ stb/include/ imgui/
 CXXFLAGS += $(addprefix -I,$(INCLUDE_DIRS))
 
 # Object files.
-OBJS = assert_util.o Shader.o Renderer.o Game.o log.o main.o
+OBJS = PauseMenu.o SettingsMenu.o ConfirmMenu.o MenuManager.o assert_util.o Shader.o Renderer.o Game.o log.o main.o
 
 PROGRAM_NAME = engine
 
@@ -58,7 +58,7 @@ all: $(BUILD_DIR)/$(PROGRAM_NAME) $(BUILD_DIR)/$(PROGRAM_NAME).s
 
 # Play game.
 play: $(BUILD_DIR)/$(PROGRAM_NAME)
-	__GLX_VENDOR_LIBRARY_NAME=nvidia __NV_PRIME_RENDER_OFFLOAD=1 $(BUILD_DIR)/$(PROGRAM_NAME)
+	$(BUILD_DIR)/$(PROGRAM_NAME)
 
 # Format all .cpp and .h files in the src directory.
 format:
@@ -73,7 +73,7 @@ clean:
 help:
 	@echo "Available targets:"
 	@echo "  all      - Build the program and assembly."
-	@echo "  play     - Run the built program."
+	@echo "  play     - Build and run the program."
 	@echo "  format   - Format all source files."
 	@echo "  clean    - Remove built artifacts."
 
