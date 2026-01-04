@@ -11,6 +11,7 @@
 #include <backends/imgui_impl_opengl3.h>
 #include <execinfo.h>
 #include <fstream>
+#include <glm/ext/quaternion_trigonometric.hpp>
 #include <glm/ext/scalar_constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <imgui.h>
@@ -86,7 +87,7 @@ namespace Engine
         player_movement_state(PlayerMovementState::WALKING),
         player_move_impulse(move_impulse_walking),
         player_height(height_standing),
-        keyboard_inputs {},
+        user_inputs {},
         player_position(0.f, player_height, 0.f),
         player_velocity(0.f, 0.f, 0.f),
         last_crouch_time(std::chrono::steady_clock::now()),
@@ -204,15 +205,6 @@ namespace Engine
         glfwMakeContextCurrent(window);
 
         /*
-         * Get GPU info.
-         */
-        const char *vendor = reinterpret_cast<const char *>(glGetString(GL_VENDOR));
-        LOG("Vendor: %s\n", vendor);
-
-        const char *_renderer = reinterpret_cast<const char *>(glGetString(GL_RENDERER));
-        LOG("Renderer: %s\n", _renderer);
-
-        /*
          * Disable V-Sync.
          */
         glfwSwapInterval(0);
@@ -230,33 +222,14 @@ namespace Engine
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         glfwSetCursorPos(window, window_center_x, window_center_y);
 
-        /*
-         * Enable blending for transparent/translucent textures.
-         */
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glEnable(GL_BLEND);
-
-        /*
-         * Enable anti-aliasing.
-         */
-        glEnable(GL_MULTISAMPLE);
-
         LOG("Initializing GLEW\n");
         ASSERT_RET_IF_GLEW_NOT_OK(glewInit(), false);
-
-        LOG("OpenGL version: %s\n", glGetString(GL_VERSION));
 
         /*
          * Enable debug message callback.
          */
         glEnable(GL_DEBUG_OUTPUT);
         glDebugMessageCallback(gl_debug_message_callback, this);
-
-        /*
-         * Draw fragments closer to camera over the fragments behind.
-         */
-        glEnable(GL_DEPTH_TEST);
-        glDepthFunc(GL_LESS);
 
         /*
          * Get total VRAM.
@@ -268,7 +241,7 @@ namespace Engine
          * Create screen frame buffer.
          */
         LOG("Initializing renderer\n");
-        renderer.init(window_width, window_height);
+        ASSERT_RET_IF_NOT(renderer.init(window_width, window_height), false);
 
         /*
          * Create chaser buffers.
@@ -466,13 +439,8 @@ namespace Engine
             }
 
             /*
-             * Accumulate normals, tangents, and bitangents for each vertex in each
-             * triangle.
+             * Accumulate normals for each triangle.
              */
-            std::vector<glm::vec3> tangents;
-            std::vector<glm::vec3> bitangents;
-            tangents.reserve(vertices.size());
-            bitangents.reserve(vertices.size());
             for (size_t i = 0; i < indices.size(); i += 3)
             {
                 /*
@@ -497,37 +465,25 @@ namespace Engine
                  *  /                  |
                  * v1------------------v2
                  */
-
-                const size_t idx0 = indices[i + 0];
-                const size_t idx1 = indices[i + 1];
-                const size_t idx2 = indices[i + 2];
-
-                Vertex3dNormal &v0 = vertices[idx0];
-                Vertex3dNormal &v1 = vertices[idx1];
-                Vertex3dNormal &v2 = vertices[idx2];
+                Vertex3dNormal &v0 = vertices[indices[i + 0]];
+                Vertex3dNormal &v1 = vertices[indices[i + 1]];
+                Vertex3dNormal &v2 = vertices[indices[i + 2]];
 
                 const glm::vec3 e1 = v1.position - v0.position;
                 const glm::vec3 e2 = v2.position - v0.position;
 
-                /*
-                 * Compute face normal.
-                 */
-                const glm::vec3 face_normal = glm::normalize(glm::cross(e1, e2));
-                v0.norm += face_normal;
-                v1.norm += face_normal;
-                v2.norm += face_normal;
+                const glm::vec3 normal = glm::normalize(glm::cross(e1, e2));
+                v0.norm += normal;
+                v1.norm += normal;
+                v2.norm += normal;
             }
 
             /*
-             * Finalize normals, tangents, and bitangents for each vertex.
+             * Normalize normals.
              */
             for (size_t i = 0; i < vertices.size(); i += 1)
             {
                 Vertex3dNormal &vertex = vertices[i];
-
-                /*
-                 * Average to produce normal.
-                 */
                 vertex.norm = glm::normalize(vertex.norm);
             }
 
@@ -610,6 +566,7 @@ namespace Engine
         const float dx = x_terrain - cell_x_left;
         const float dz = z_terrain - cell_z_down;
 
+        const float y0 = cell_to_height(cell_x_left, cell_z_down);
         const float y2 = cell_to_height(cell_x_right, cell_z_up);
 
         /*
@@ -617,10 +574,9 @@ namespace Engine
          */
         if (dx > dz)
         {
-            const float y0 = cell_to_height(cell_x_left, cell_z_down);
             const float y3 = cell_to_height(cell_x_right, cell_z_down);
-            const float x_slope = (y3 - y0);
-            const float z_slope = (y2 - y3);
+            const float x_slope = y3 - y0;
+            const float z_slope = y2 - y3;
             return y0 + x_slope * dx + z_slope * dz;
         }
 
@@ -629,10 +585,9 @@ namespace Engine
          */
         else
         {
-            const float y0 = cell_to_height(cell_x_left, cell_z_down);
             const float y1 = cell_to_height(cell_x_left, cell_z_up);
-            const float x_slope = (y2 - y1);
-            const float z_slope = (y1 - y0);
+            const float x_slope = y2 - y1;
+            const float z_slope = y1 - y0;
             return y0 + x_slope * dx + z_slope * dz;
         }
     }
@@ -733,6 +688,8 @@ namespace Engine
                     player_velocity.y,
                     player_velocity.z,
                     player_speed);
+        ImGui::Text("direction: (%.2f, %.2f, %.2f)", direction.x, direction.y, direction.z);
+        ImGui::Text("head: (%.2f, %.2f, %.2f)", head.x, head.y, head.z);
         ImGui::Text("move_impulse: %.2f", player_move_impulse);
         ImGui::Text("friction_coeff: %.2f", friction_coeff);
         ImGui::End();
@@ -867,14 +824,14 @@ namespace Engine
      */
     bool Game::update_player_movement_state_grounded()
     {
-        if (keyboard_inputs.fly_rising_edge)
+        if (user_inputs.fly_rising_edge)
         {
             player_movement_state = PlayerMovementState::FLYING;
             return true;
         }
 
         const bool can_jump = player_position.y - on_ground_camera_y <= 0.2f;
-        if (can_jump && keyboard_inputs.jump_rising_edge)
+        if (can_jump && user_inputs.jump_rising_edge)
         {
             player_velocity.y += move_impulse_jump * dt;
 
@@ -917,30 +874,34 @@ namespace Engine
     }
 
     /**
-     * Get keyboard inputs which pertain to movement.
+     * Get user inputs.
      */
-    void Game::get_movement_keyboard_inputs()
+    void Game::get_user_inputs()
     {
-        keyboard_inputs.forwards = glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS;
-        keyboard_inputs.backwards = glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS;
-        keyboard_inputs.left = glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS;
-        keyboard_inputs.right = glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS;
+        user_inputs.forwards = glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS;
+        user_inputs.backwards = glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS;
+        user_inputs.left = glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS;
+        user_inputs.right = glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS;
 
         const bool jump = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
-        keyboard_inputs.jump_rising_edge = jump && !keyboard_inputs.jump;
-        keyboard_inputs.jump = jump;
+        user_inputs.jump_rising_edge = jump && !user_inputs.jump;
+        user_inputs.jump = jump;
 
         const bool crouch = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
-        keyboard_inputs.crouch_rising_edge = crouch && !keyboard_inputs.crouch;
-        keyboard_inputs.crouch = crouch;
+        user_inputs.crouch_rising_edge = crouch && !user_inputs.crouch;
+        user_inputs.crouch = crouch;
 
         const bool sprint = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
-        keyboard_inputs.sprint_rising_edge = sprint && !keyboard_inputs.sprint;
-        keyboard_inputs.sprint = sprint;
+        user_inputs.sprint_rising_edge = sprint && !user_inputs.sprint;
+        user_inputs.sprint = sprint;
 
         const bool fly = glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS;
-        keyboard_inputs.fly_rising_edge = fly && !keyboard_inputs.fly;
-        keyboard_inputs.fly = fly;
+        user_inputs.fly_rising_edge = fly && !user_inputs.fly;
+        user_inputs.fly = fly;
+
+        const bool left_click = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
+        user_inputs.left_click_rising_edge = left_click && !user_inputs.left_click;
+        user_inputs.left_click = left_click;
     }
 
     /**
@@ -952,20 +913,20 @@ namespace Engine
          * Determine which direction to move into.
          */
         glm::vec3 move_direction(0.f, 0.f, 0.f);
-        if (keyboard_inputs.forwards)
+        if (user_inputs.forwards)
         {
             move_direction = forwards;
         }
-        else if (keyboard_inputs.backwards)
+        else if (user_inputs.backwards)
         {
             move_direction = -forwards;
         }
 
-        if (keyboard_inputs.right)
+        if (user_inputs.right)
         {
             move_direction += right;
         }
-        else if (keyboard_inputs.left)
+        else if (user_inputs.left)
         {
             move_direction -= right;
         }
@@ -990,7 +951,7 @@ namespace Engine
              * While sprint button is being pressed and the player is on the ground,
              * set them to sprinting.
              */
-            if (keyboard_inputs.sprint_rising_edge && in_sprintable_direction)
+            if (user_inputs.sprint_rising_edge && in_sprintable_direction)
             {
                 player_movement_state = PlayerMovementState::SPRINTING;
             }
@@ -998,7 +959,7 @@ namespace Engine
             /*
              * Crouch if crouch button is pressed.
              */
-            else if (keyboard_inputs.crouch_rising_edge)
+            else if (user_inputs.crouch_rising_edge)
             {
                 player_movement_state = PlayerMovementState::CROUCHING;
             }
@@ -1020,7 +981,7 @@ namespace Engine
              */
             const bool in_sprintable_direction =
                 move_direction.x * forwards.x + move_direction.z * forwards.z > 0.f;
-            if (keyboard_inputs.sprint_rising_edge || !in_sprintable_direction)
+            if (user_inputs.sprint_rising_edge || !in_sprintable_direction)
             {
                 player_movement_state = PlayerMovementState::WALKING;
             }
@@ -1028,7 +989,7 @@ namespace Engine
             /*
              * Crouch if crouch button is pressed.
              */
-            else if (keyboard_inputs.crouch_rising_edge)
+            else if (user_inputs.crouch_rising_edge)
             {
                 player_movement_state = PlayerMovementState::CROUCHING;
             }
@@ -1048,7 +1009,7 @@ namespace Engine
              */
             const bool in_sprintable_direction =
                 move_direction.x * forwards.x + move_direction.z * forwards.z > 0.f;
-            if (keyboard_inputs.sprint_rising_edge && in_sprintable_direction)
+            if (user_inputs.sprint_rising_edge && in_sprintable_direction)
             {
                 player_movement_state = PlayerMovementState::SPRINTING;
             }
@@ -1056,7 +1017,7 @@ namespace Engine
             /*
              * Uncrouch if crouch button is pressed again.
              */
-            else if (keyboard_inputs.crouch_rising_edge)
+            else if (user_inputs.crouch_rising_edge)
             {
                 player_movement_state = PlayerMovementState::WALKING;
             }
@@ -1065,7 +1026,7 @@ namespace Engine
         }
 
         case PlayerMovementState::FLYING:
-            if (keyboard_inputs.fly_rising_edge)
+            if (user_inputs.fly_rising_edge)
             {
                 player_movement_state = PlayerMovementState::WALKING;
             }
@@ -1115,7 +1076,7 @@ namespace Engine
             /*
              * Replace jump with flying up.
              */
-            if (keyboard_inputs.jump)
+            if (user_inputs.jump)
             {
                 player_velocity.y += player_move_impulse * dt;
             }
@@ -1123,7 +1084,7 @@ namespace Engine
             /*
              * Replace crouch with flying down.
              */
-            if (keyboard_inputs.crouch)
+            if (user_inputs.crouch)
             {
                 player_velocity.y -= player_move_impulse * dt;
             }
@@ -1155,12 +1116,18 @@ namespace Engine
         player_position += player_velocity * static_cast<float>(dt);
 
         /*
-         * Don't let the player go outside the world.
+         * Snap player to ground if the position update would place them under ground or if they're
+         * falling and close enough to the ground.
          */
-
-        if (player_position.y < on_ground_camera_y)
+        static constexpr float ground_snap_dy_threshold = 0.1f;
+        const bool would_player_be_below_ground = player_position.y < on_ground_camera_y;
+        const bool is_player_falling = player_velocity.y < 0.f;
+        const bool is_player_close_to_ground =
+            (player_position.y - on_ground_camera_y) < ground_snap_dy_threshold;
+        if (would_player_be_below_ground || (is_player_falling && is_player_close_to_ground))
         {
             player_position.y = on_ground_camera_y;
+            player_velocity.y = 0.f;
         }
 
         if (player_position.x < -terrain_x_middle + 1.f)
@@ -1179,6 +1146,57 @@ namespace Engine
         else if (player_position.z > terrain_z_middle - 1.f)
         {
             player_position.z = terrain_z_middle - 1.f;
+        }
+    }
+
+    /**
+     * @brief Update player actions from user inputs.
+     */
+    void Game::update_player_actions()
+    {
+        if (user_inputs.left_click_rising_edge)
+        {
+            static constexpr glm::vec3 weapon_projectile_color =
+                2.f * glm::vec3(0xFF, 0x00, 0xFF) / 255.f;
+
+            const glm::vec3 player_right_hand_position =
+                player_position + glm::vec3(0.f, -0.5f, 0.f) + right * 0.5f + direction * 0.5f;
+
+            /*
+             * Consider shooting into the +Z direction to be 0 degrees rotation.
+             *
+             *         t=0
+             *           d.x
+             *       +Z |---/ d
+             *      d.z |  /
+             *          |t/
+             * t=90 ----o---- t=-90
+             *      +X
+             *
+             * t = atan(d.x/d.z)
+             */
+
+            const glm::quat yaw = glm::angleAxis(std::atan2(direction.x, direction.z), head);
+
+            const glm::quat pitch = glm::angleAxis(glm::asin(direction.y), right);
+
+            const Renderer::Transform weapon_projectile_transform = {
+                .position = player_right_hand_position,
+                .rotation = yaw * pitch,
+                .scale = glm::vec3(0.2f, 0.2f, 0.2f),
+            };
+
+            const glm::vec3 weapon_projectile_velocity = direction * 100.f;
+
+            projectiles.push_back({
+                .color = weapon_projectile_color,
+                .transform = weapon_projectile_transform,
+                .drawable = &chaser_vertex_array,
+                .velocity = weapon_projectile_velocity + player_velocity,
+                .rotation_axis = head,
+                .angular_velocity = glm::radians<float>(720.f),
+                .time_to_live = 2.f,
+            });
         }
     }
 
@@ -1241,7 +1259,7 @@ namespace Engine
         /*
          * Set day length and compute the rotational speed.
          */
-        static constexpr float day_length_s = 10.f;
+        static constexpr float day_length_s = 120.f;
         static constexpr float rotational_angular_speed = 2 * glm::pi<float>() / day_length_s;
 
         /*
@@ -1298,11 +1316,19 @@ namespace Engine
             is_on_ground = player_position.y <= on_ground_camera_y;
 
             /*
-             * If not paused, get keyboard input and update view.
+             * If paused, clear user inputs.
              */
-            if (likely(state != State::PAUSED))
+            if (unlikely(state == State::PAUSED))
             {
-                get_movement_keyboard_inputs();
+                user_inputs = {};
+            }
+
+            /*
+             * If not paused, get user input and update view.
+             */
+            else
+            {
+                get_user_inputs();
                 update_view();
             }
 
@@ -1310,6 +1336,11 @@ namespace Engine
              * Update player_position based on keyboard input.
              */
             update_player_position();
+
+            /*
+             * Update player actions.
+             */
+            update_player_actions();
 
             /*
              * Update orbital angle.
@@ -1399,15 +1430,70 @@ namespace Engine
             const glm::mat4 view = glm::lookAt(player_position, player_position + direction, head);
 
             /*
+             * Submit projectiles to renderer and update their state.
+             */
+            for (size_t projectile_idx = 0; projectile_idx < projectiles.size();)
+            {
+                Projectile &projectile = projectiles[projectile_idx];
+
+                /*
+                 * Decrement time to live.
+                 */
+                projectile.time_to_live -= static_cast<float>(dt);
+                if (projectile.time_to_live <= 0.f)
+                {
+                    projectiles[projectile_idx] = projectiles.back();
+                    projectiles.pop_back();
+                    continue;
+                }
+
+                /*
+                 * Update projectile position.
+                 */
+                projectile.transform.position += projectile.velocity * static_cast<float>(dt);
+
+                /*
+                 * If projectile hits terrain, remove it.
+                 */
+                const float projectile_ground_height =
+                    get_terrain_height(projectile.transform.position.x,
+                                       projectile.transform.position.z) +
+                    projectile.transform.scale.y * 0.5f;
+                if (projectile.transform.position.y <= projectile_ground_height)
+                {
+                    projectiles[projectile_idx] = projectiles.back();
+                    projectiles.pop_back();
+                    continue;
+                }
+
+                /*
+                 * Update projectile rotation.
+                 */
+                const glm::quat dq =
+                    glm::angleAxis(projectile.angular_velocity * static_cast<float>(dt),
+                                   projectile.rotation_axis);
+                projectile.transform.rotation = dq * projectile.transform.rotation;
+
+                /*
+                 * Render object.
+                 */
+                renderer.add_point_light_object({
+                    .color = projectile.color,
+                    .transform = projectile.transform,
+                    .drawable = *projectile.drawable,
+                });
+                projectile_idx++;
+            }
+
+            /*
              * Submit chaser to renderer.
              */
-            Renderer::Transform chaser_transform = {
+            const Renderer::Transform chaser_transform = {
                 .position = chaser_position,
-                .rotation =
-                    glm::vec3(0.f,
-                              glm::radians<float>(180.f) +
-                                  std::atan2(direction_to_player_xz.x, direction_to_player_xz.z),
-                              0.f),
+                .rotation = glm::angleAxis(glm::radians<float>(180.f) +
+                                               std::atan2(direction_to_player_xz.x,
+                                                          direction_to_player_xz.z),
+                                           glm::vec3(0.f, 1.f, 0.f)),
                 .scale = glm::vec3(1.f, 1.f, 1.f),
             };
             renderer.add_regular_object({
@@ -1420,9 +1506,8 @@ namespace Engine
             /*
              * Submit floating chaser to renderer.
              */
-            Renderer::Transform floating_chaser_transform = {
+            const Renderer::Transform floating_chaser_transform = {
                 .position = glm::vec3(0.f, 10.f, 0.f),
-                .rotation = glm::vec3(0.f, 0.f, 0.f),
                 .scale = glm::vec3(1.f, 1.f, 1.f),
             };
             renderer.add_regular_object({
@@ -1435,10 +1520,10 @@ namespace Engine
             /*
              * Submit point light to renderer.
              */
-            glm::vec3 point_light_color = 10.f * glm::vec3(0xFF, 0xDF, 0x22) / 255.f;
-            Renderer::Transform point_light_transform = {
+            static constexpr glm::vec3 point_light_color =
+                10.f * glm::vec3(0xFF, 0xDF, 0x22) / 255.f;
+            const Renderer::Transform point_light_transform = {
                 .position = point_light_position,
-                .rotation = glm::vec3(0.f, 0.f, 0.f),
                 .scale = glm::vec3(1.f, 1.f, 1.f),
             };
             renderer.add_point_light_object({
@@ -1451,7 +1536,7 @@ namespace Engine
              * Submit sun to renderer.
              */
             static constexpr glm::vec3 sun_color = 10.f * glm::vec3(1.0f, 0.95f, 0.85f);
-            glm::vec3 directional_light_color = sun_color * sun_brightness;
+            const glm::vec3 directional_light_color = sun_color * sun_brightness;
             renderer.add_directional_light_object({
                 .direction = directional_light_direction,
                 .color = directional_light_color,

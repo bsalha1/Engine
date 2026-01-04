@@ -26,34 +26,12 @@ namespace Engine
 
         bool set_mat4(const std::string &uniform_name, const glm::mat4 &value);
 
-        /**
-         * @brief Set a integer variable in the shader.
-         *
-         * @param uniform_name Name of the uniform variable.
-         * @param value Integer value.
-         *
-         * @return True on success, otherwise false.
-         */
         bool set_int(const std::string &uniform_name, const GLint value);
 
-        /**
-         * @brief Set a vec3 variable in the shader.
-         *
-         * @param uniform_name Name of the uniform variable.
-         * @param value Vector.
-         *
-         * @return True on success, otherwise false.
-         */
+        bool set_vec2(const std::string &uniform_name, const glm::vec2 &value);
+
         bool set_vec3(const std::string &uniform_name, const glm::vec3 &value);
 
-        /**
-         * @brief Set a float variable in the shader.
-         *
-         * @param uniform_name Name of the uniform variable.
-         * @param value Float value.
-         *
-         * @return True on success, otherwise false.
-         */
         bool set_float(const std::string &uniform_name, const float value);
 
     private:

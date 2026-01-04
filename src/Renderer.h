@@ -5,6 +5,7 @@
 #include "TexturedMaterial.h"
 
 #include <GL/glew.h>
+#include <glm/ext/quaternion_float.hpp>
 #include <glm/mat4x4.hpp>
 #include <memory>
 
@@ -32,7 +33,7 @@ namespace Engine
         struct Transform
         {
             glm::vec3 position;
-            glm::vec3 rotation;
+            glm::quat rotation;
             glm::vec3 scale;
 
             glm::mat4 model() const;
@@ -227,6 +228,15 @@ namespace Engine
          */
         Shader debug_shader;
         std::vector<DebugObject> debug_objects;
+        /**
+         * @}
+         */
+
+        /**
+         * UI.
+         * @{
+         */
+        Shader crosshair_shader;
         /**
          * @}
          */

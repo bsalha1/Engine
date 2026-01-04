@@ -61,7 +61,6 @@ vec3 sharpen_filter()
 void main()
 {
     const vec3 color = sharpen_filter();
-    // const vec3 color = texture(u_color_texture_sampler, v_texture_coord).rgb;
     const vec3 bloom = texture(u_bloom_texture_sampler, v_texture_coord).rgb;
 
     vec3 mapped = vec3(1.0) - exp(-(color + bloom) * u_exposure);

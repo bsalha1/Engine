@@ -13,7 +13,10 @@ uniform sampler2D u_texture_sampler;
 uniform sampler2D u_normal_map_sampler;
 uniform sampler2D u_shadow_map_sampler;
 
-uniform PointLight u_point_light;
+#define MAX_POINT_LIGHTS 64
+
+uniform int u_num_point_lights;
+uniform PointLight u_point_lights[MAX_POINT_LIGHTS];
 uniform DirectionalLight u_directional_light;
 uniform Material u_material;
 
@@ -134,12 +137,15 @@ void main()
         v_frag_pos_light_space,
         v_view_direction);
 
-    result += compute_point_component(
-        u_point_light,
-        u_material,
-        normal_world_space,
-        v_position_world_coords,
-        v_view_direction);
+    for (int i = 0; i < u_num_point_lights; i++)
+    {
+        result += compute_point_component(
+            u_point_lights[i],
+            u_material,
+            normal_world_space,
+            v_position_world_coords,
+            v_view_direction);
+    }
 
     color = vec4(result * texture_color, 1.0);
 }

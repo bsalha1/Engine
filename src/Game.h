@@ -50,7 +50,7 @@ namespace Engine
         /**
          * @brief Keyboard inputs.
          */
-        struct KeyboardInputs
+        struct UserInputs
         {
             bool forwards;
             bool backwards;
@@ -68,6 +68,23 @@ namespace Engine
 
             bool fly;
             bool fly_rising_edge;
+
+            bool left_click;
+            bool left_click_rising_edge;
+        };
+
+        /**
+         * @brief Projectile structure.
+         */
+        struct Projectile
+        {
+            glm::vec3 color;
+            Renderer::Transform transform;
+            Renderer::Drawable *drawable;
+            glm::vec3 velocity;
+            glm::vec3 rotation_axis;
+            float angular_velocity;
+            float time_to_live;
         };
 
         Game();
@@ -90,9 +107,11 @@ namespace Engine
 
         void apply_player_movement_state_grounded();
 
-        void get_movement_keyboard_inputs();
+        void get_user_inputs();
 
         void update_player_position();
+
+        void update_player_actions();
 
         /**
          * Window handle.
@@ -149,14 +168,14 @@ namespace Engine
         /**
          * Player height.
          */
-        static constexpr float height_standing = 1.78f;
+        static constexpr float height_standing = 2.f;
         static constexpr float height_crouching = 1.f;
         float player_height;
 
         /**
-         * Keyboard inputs.
+         * User inputs from peripherals i.e. mouse and keyboard.
          */
-        KeyboardInputs keyboard_inputs;
+        UserInputs user_inputs;
 
         /**
          * Player position.
@@ -336,6 +355,15 @@ namespace Engine
          */
         MenuManager menu_manager;
         PauseMenu pause_menu;
+        /**
+         * @}
+         */
+
+        /**
+         * Projectiles.
+         * @{
+         */
+        std::vector<Projectile> projectiles;
         /**
          * @}
          */

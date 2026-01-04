@@ -131,6 +131,23 @@ namespace Engine
     }
 
     /**
+     * @brief Set a vec2 variable in the shader.
+     *
+     * @param uniform_name Name of the uniform variable.
+     * @param value Vector.
+     *
+     * @return True on success, otherwise false.
+     */
+    bool Shader::set_vec2(const std::string &uniform_name, const glm::vec2 &value)
+    {
+        GLint location;
+        ASSERT_RET_IF_NOT(get_uniform_location(uniform_name, location), false);
+        glUniform2f(location, value.x, value.y);
+
+        return true;
+    }
+
+    /**
      * @brief Set a vec3 variable in the shader.
      *
      * @param uniform_name Name of the uniform variable.

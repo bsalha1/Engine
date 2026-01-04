@@ -8,7 +8,7 @@
 #include <GL/glew.h>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
-#include <glm/mat4x4.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 namespace Engine
 {
@@ -33,13 +33,9 @@ namespace Engine
      */
     glm::mat4 Renderer::Transform::model() const
     {
-        glm::mat4 model_matrix = glm::mat4(1.0f);
-        model_matrix = glm::translate(model_matrix, position);
-        model_matrix = glm::rotate(model_matrix, rotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
-        model_matrix = glm::rotate(model_matrix, rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
-        model_matrix = glm::rotate(model_matrix, rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
-        model_matrix = glm::scale(model_matrix, scale);
-        return model_matrix;
+        const glm::mat4 model_matrix =
+            glm::translate(glm::mat4(1.0f), position) * glm::mat4_cast(rotation);
+        return glm::scale(model_matrix, scale);
     }
 
     /**
@@ -53,7 +49,7 @@ namespace Engine
     /**
      * @brief Constructor.
      */
-    Renderer::Renderer(): exposure(1.0f), gamma(0.5f), sharpness(1.0f)
+    Renderer::Renderer(): exposure(3.0f), gamma(0.5f), sharpness(1.0f)
     {}
 
     /**
@@ -68,6 +64,27 @@ namespace Engine
     {
         window_width = _window_width;
         window_height = _window_height;
+
+        LOG("OpenGL version: %s\n", glGetString(GL_VERSION));
+        LOG("Vendor: %s\n", glGetString(GL_VENDOR));
+        LOG("Renderer: %s\n", glGetString(GL_RENDERER));
+
+        /*
+         * Enable blending for transparent/translucent textures.
+         */
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glEnable(GL_BLEND);
+
+        /*
+         * Enable anti-aliasing.
+         */
+        glEnable(GL_MULTISAMPLE);
+
+        /*
+         * Draw fragments closer to camera over the fragments behind.
+         */
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LESS);
 
         static constexpr float fov_deg = 75.f;
         static constexpr const float far_clip = 5000.f;
@@ -170,7 +187,7 @@ namespace Engine
             ASSERT_RET_IF_NOT(
                 skybox_texture.create_from_file("textures/skybox/", ".jpg", 0 /* slot */), false);
 
-            static const std::array<Vertex3d, 36> skybox_vertices = {
+            static const std::array<Vertex3d, 36> cube_vertices = {
                 /* clang-format off */
                 glm::vec3(-1, -1, -1),
                 glm::vec3( 1, -1, -1),
@@ -217,7 +234,7 @@ namespace Engine
             };
 
             std::unique_ptr<VertexArray> cube_vertex_array = std::make_unique<VertexArray>();
-            cube_vertex_array->create(skybox_vertices.data(), skybox_vertices.size());
+            cube_vertex_array->create(cube_vertices.data(), cube_vertices.size());
             cube_vertex_array->setup_vertex_attrib(0, &Vertex3d::position);
             cube = std::move(cube_vertex_array);
         }
@@ -354,6 +371,22 @@ namespace Engine
         ASSERT_RET_IF_NOT(terrain_shader.set_mat4("u_projection", projection), false);
         ASSERT_RET_IF_NOT(terrain_shader.set_mat4("u_model", glm::mat4(1)), false);
 
+        /*
+         * Initialize crosshair shader.
+         */
+        ASSERT_RET_IF_NOT(crosshair_shader.compile({
+                              {"crosshair.vert", GL_VERTEX_SHADER},
+                              {"crosshair.frag", GL_FRAGMENT_SHADER},
+                          }),
+                          false);
+        crosshair_shader.use();
+        ASSERT_RET_IF_NOT(crosshair_shader.set_vec2("u_window_size",
+                                                    glm::vec2(window_width, window_height)),
+                          false);
+        ASSERT_RET_IF_NOT(crosshair_shader.set_float("u_size", 10.f), false);
+        ASSERT_RET_IF_NOT(crosshair_shader.set_float("u_thickness", 1.f), false);
+        ASSERT_RET_IF_NOT(crosshair_shader.set_vec3("u_color", glm::vec3(1.0f)), false);
+
         return true;
     }
 
@@ -433,10 +466,9 @@ namespace Engine
                           const glm::vec3 &camera_direction)
     {
         /*
-         * For now, only one directional and point light is supported.
+         * For now, only one directional light is supported.
          */
         ASSERT_RET_IF_NOT(directional_light_objects.size() == 1, false);
-        ASSERT_RET_IF_NOT(point_light_objects.size() == 1, false);
 
         glm::mat4 light_view_projection;
 
@@ -611,18 +643,32 @@ namespace Engine
         ASSERT_RET_IF_NOT(regular_object_shader.set_mat4("u_light_view_projection",
                                                          light_view_projection),
                           false);
-        ASSERT_RET_IF_NOT(regular_object_shader.set_vec3("u_point_light.position",
-                                                         point_light_objects[0].transform.position),
-                          false);
-        ASSERT_RET_IF_NOT(regular_object_shader.set_vec3("u_point_light.ambient",
-                                                         point_light_objects[0].color),
-                          false);
-        ASSERT_RET_IF_NOT(regular_object_shader.set_vec3("u_point_light.diffuse",
-                                                         point_light_objects[0].color),
-                          false);
-        ASSERT_RET_IF_NOT(regular_object_shader.set_vec3("u_point_light.specular",
-                                                         point_light_objects[0].color),
-                          false);
+
+        ASSERT_RET_IF_NOT(
+            regular_object_shader.set_int("u_num_point_lights", point_light_objects.size()), false);
+        for (size_t point_light_idx = 0; point_light_idx < point_light_objects.size();
+             point_light_idx++)
+        {
+            const std::string uniform_name =
+                "u_point_lights[" + std::to_string(point_light_idx) + "]";
+            ASSERT_RET_IF_NOT(regular_object_shader.set_vec3(
+                                  uniform_name + ".position",
+                                  point_light_objects[point_light_idx].transform.position),
+                              false);
+            ASSERT_RET_IF_NOT(
+                regular_object_shader.set_vec3(uniform_name + ".ambient",
+                                               point_light_objects[point_light_idx].color),
+                false);
+            ASSERT_RET_IF_NOT(
+                regular_object_shader.set_vec3(uniform_name + ".diffuse",
+                                               point_light_objects[point_light_idx].color),
+                false);
+            ASSERT_RET_IF_NOT(
+                regular_object_shader.set_vec3(uniform_name + ".specular",
+                                               point_light_objects[point_light_idx].color),
+                false);
+        }
+
         ASSERT_RET_IF_NOT(regular_object_shader.set_vec3("u_directional_light.direction",
                                                          directional_light_objects[0].direction),
                           false);
@@ -663,18 +709,32 @@ namespace Engine
             ASSERT_RET_IF_NOT(
                 terrain_shader.set_mat4("u_light_view_projection", light_view_projection), false);
             ASSERT_RET_IF_NOT(terrain_shader.set_vec3("u_camera_position", camera_position), false);
-            ASSERT_RET_IF_NOT(terrain_shader.set_vec3("u_point_light.position",
-                                                      point_light_objects[0].transform.position),
-                              false);
-            ASSERT_RET_IF_NOT(terrain_shader.set_vec3("u_point_light.ambient",
-                                                      point_light_objects[0].color),
-                              false);
-            ASSERT_RET_IF_NOT(terrain_shader.set_vec3("u_point_light.diffuse",
-                                                      point_light_objects[0].color),
-                              false);
-            ASSERT_RET_IF_NOT(terrain_shader.set_vec3("u_point_light.specular",
-                                                      point_light_objects[0].color),
-                              false);
+
+            ASSERT_RET_IF_NOT(
+                terrain_shader.set_int("u_num_point_lights", point_light_objects.size()), false);
+            for (size_t point_light_idx = 0; point_light_idx < point_light_objects.size();
+                 point_light_idx++)
+            {
+                const std::string uniform_name =
+                    "u_point_lights[" + std::to_string(point_light_idx) + "]";
+                ASSERT_RET_IF_NOT(terrain_shader.set_vec3(
+                                      uniform_name + ".position",
+                                      point_light_objects[point_light_idx].transform.position),
+                                  false);
+                ASSERT_RET_IF_NOT(
+                    terrain_shader.set_vec3(uniform_name + ".ambient",
+                                            point_light_objects[point_light_idx].color),
+                    false);
+                ASSERT_RET_IF_NOT(
+                    terrain_shader.set_vec3(uniform_name + ".diffuse",
+                                            point_light_objects[point_light_idx].color),
+                    false);
+                ASSERT_RET_IF_NOT(
+                    terrain_shader.set_vec3(uniform_name + ".specular",
+                                            point_light_objects[point_light_idx].color),
+                    false);
+            }
+
             ASSERT_RET_IF_NOT(terrain_shader.set_vec3("u_directional_light.direction",
                                                       directional_light_objects[0].direction),
                               false);
@@ -762,9 +822,16 @@ namespace Engine
 
         screen_shader.use();
         ping_pong_texture[horizontal].use();
-        screen_shader.set_int("u_bloom_texture_sampler", ping_pong_texture[horizontal].get_slot());
         screen_color_texture.use();
         screen->draw();
+
+        /*
+         * Draw crosshair.
+         */
+        glDisable(GL_DEPTH_TEST);
+        crosshair_shader.use();
+        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+        glEnable(GL_DEPTH_TEST);
 
         /*
          * Clear object buffers.
