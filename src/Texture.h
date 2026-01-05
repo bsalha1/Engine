@@ -1,5 +1,6 @@
 #pragma once
 
+#include "TextureSlot.h"
 #include "assert_util.h"
 
 #include <GL/glew.h>
@@ -22,7 +23,7 @@ namespace Engine
          *
          * @return True on success, otherwise false.
          */
-        bool create_from_file(const std::string &file_name, const uint8_t _slot)
+        bool create_from_file(const std::string &file_name, const TextureSlot _slot)
         {
             slot = _slot;
 
@@ -62,7 +63,7 @@ namespace Engine
 
             glGenerateMipmap(GL_TEXTURE_2D);
 
-            LOG("Created texture %s id: %x, slot: %u\n", file_name.c_str(), texture_id, slot);
+            LOG("Created texture %s id: %u, slot: %u\n", file_name.c_str(), texture_id, slot);
 
             return true;
         }
@@ -76,33 +77,9 @@ namespace Engine
             glBindTexture(GL_TEXTURE_2D, texture_id);
         }
 
-        /**
-         * @return The texture slot.
-         */
-        uint8_t get_slot() const
-        {
-            return slot;
-        }
-
-        /**
-         * @return Texture width in pixels.
-         */
-        int get_width() const
-        {
-            return width;
-        }
-
-        /**
-         * @return Texture height in pixels.
-         */
-        int get_height() const
-        {
-            return height;
-        }
-
     private:
         GLuint texture_id;
-        uint8_t slot;
+        TextureSlot slot;
         int width;
         int height;
     };

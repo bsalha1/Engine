@@ -1,5 +1,6 @@
 #pragma once
 
+#include "TextureSlot.h"
 #include "assert_util.h"
 
 #include <GL/glew.h>
@@ -24,7 +25,7 @@ namespace Engine
         void create(const GLsizei _width,
                     const GLsizei _height,
                     const GLenum _attachment,
-                    const GLenum _slot,
+                    const TextureSlot _slot,
                     const GLint internal_format,
                     const GLint format,
                     const GLenum min_filter,
@@ -53,7 +54,7 @@ namespace Engine
 
             glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, texture_id, 0);
 
-            LOG("Created framebuffer texture id: 0x%x, slot: %u, attachment: %u\n",
+            LOG("Created framebuffer texture id: %u, slot: %u, attachment: %u\n",
                 texture_id,
                 slot,
                 attachment - GL_COLOR_ATTACHMENT0);
@@ -69,14 +70,6 @@ namespace Engine
         }
 
         /**
-         * @return The texture slot.
-         */
-        uint8_t get_slot() const
-        {
-            return slot;
-        }
-
-        /**
          * @return The texture attachment.
          */
         GLuint get_attachment() const
@@ -84,26 +77,10 @@ namespace Engine
             return attachment;
         }
 
-        /**
-         * @return Texture width in pixels.
-         */
-        int get_width() const
-        {
-            return width;
-        }
-
-        /**
-         * @return Texture height in pixels.
-         */
-        int get_height() const
-        {
-            return height;
-        }
-
     private:
         GLuint texture_id;
         GLenum attachment;
-        uint8_t slot;
+        TextureSlot slot;
         int width;
         int height;
     };

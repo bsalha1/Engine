@@ -1,15 +1,15 @@
 # Libraries.
-STATIC_LIBS = glfw/build/src/libglfw3.a glew/lib/libGLEW.a glm/build/glm/libglm.a stb/build/stb_image.a imgui/libimgui.a
+STATIC_LIBS = glfw/build/src/libglfw3.a glew/lib/libGLEW.a glm/build/glm/libglm.a stb/build/stb_image.a imgui/libimgui.a assimp/lib/libassimp.a
 LDFLAGS += $(STATIC_LIBS)
-LDFLAGS += -lGL -lGLX
+LDFLAGS += -lGL -lGLX -lz
 CXXFLAGS += -DGLEW_STATIC
 
 # Include directories.
-INCLUDE_DIRS = glfw/include/ glew/include/ glu/include/ glm/ stb/include/ imgui/
+INCLUDE_DIRS = glfw/include/ glew/include/ glu/include/ glm/ stb/include/ imgui/ assimp/include/
 CXXFLAGS += $(addprefix -I,$(INCLUDE_DIRS))
 
 # Object files.
-OBJS = PauseMenu.o SettingsMenu.o ConfirmMenu.o MenuManager.o assert_util.o Shader.o Renderer.o Game.o log.o main.o
+OBJS = Model.o VertexArray.o PauseMenu.o SettingsMenu.o ConfirmMenu.o MenuManager.o assert_util.o Shader.o Renderer.o Game.o log.o main.o
 
 PROGRAM_NAME = engine
 
@@ -24,7 +24,8 @@ CXXFLAGS += -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
 # Debug flag disables optimizations and enables debug info.
 ifdef DEBUG
-CXXFLAGS += -O0 -g
+CXXFLAGS += -O0 -g -rdynamic
+LDFLAGS += -g -rdynamic
 else
 CXXFLAGS += -O3 -DNDEBUG
 LDFLAGS += -s

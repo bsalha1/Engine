@@ -1,6 +1,7 @@
 #include "Renderer.h"
 
 #include "FramebufferTexture.h"
+#include "TextureSlot.h"
 #include "TexturedMaterial.h"
 #include "Vertex.h"
 #include "VertexArray.h"
@@ -49,7 +50,7 @@ namespace Engine
     /**
      * @brief Constructor.
      */
-    Renderer::Renderer(): exposure(3.0f), gamma(0.5f), sharpness(1.0f)
+    Renderer::Renderer(): exposure(1.4f), gamma(0.5f), sharpness(1.0f)
     {}
 
     /**
@@ -109,8 +110,7 @@ namespace Engine
             std::unique_ptr<VertexArray> screen_vertex_array = std::make_unique<VertexArray>();
 
             screen_vertex_array->create(vertices.data(), vertices.size());
-            screen_vertex_array->setup_vertex_attrib(0, &TexturedVertex2d::position);
-            screen_vertex_array->setup_vertex_attrib(1, &TexturedVertex2d::texture);
+            TexturedVertex2d::setup_vertex_array_attribs(*screen_vertex_array);
             screen = std::move(screen_vertex_array);
 
             glGenFramebuffers(1, &screen_frame_buffer);
@@ -122,7 +122,7 @@ namespace Engine
             screen_color_texture.create(window_width,
                                         window_height,
                                         GL_COLOR_ATTACHMENT0,
-                                        0 /* slot */,
+                                        TextureSlot::DIFFUSE /* slot */,
                                         GL_RGBA16F /* internal_format */,
                                         GL_RGBA /* format */,
                                         GL_LINEAR /* min_filter */,
@@ -131,7 +131,7 @@ namespace Engine
             screen_bloom_texture.create(window_width,
                                         window_height,
                                         GL_COLOR_ATTACHMENT1,
-                                        1 /* slot */,
+                                        TextureSlot::BLOOM /* slot */,
                                         GL_RGBA16F /* internal_format */,
                                         GL_RGBA /* format */,
                                         GL_LINEAR /* min_filter */,
@@ -164,10 +164,10 @@ namespace Engine
                 glGenFramebuffers(1, &ping_pong_frame_buffer[i]);
                 glBindFramebuffer(GL_FRAMEBUFFER, ping_pong_frame_buffer[i]);
 
-                ping_pong_texture[i].create(screen_bloom_texture.get_width(),
-                                            screen_bloom_texture.get_height(),
+                ping_pong_texture[i].create(window_width,
+                                            window_height,
                                             GL_COLOR_ATTACHMENT0,
-                                            screen_bloom_texture.get_slot(),
+                                            TextureSlot::BLOOM /* slot */,
                                             GL_RGBA16F /* internal_format */,
                                             GL_RGBA /* format */,
                                             GL_LINEAR /* min_filter */,
@@ -185,7 +185,8 @@ namespace Engine
         LOG("Loading skybox\n");
         {
             ASSERT_RET_IF_NOT(
-                skybox_texture.create_from_file("textures/skybox/", ".jpg", 0 /* slot */), false);
+                skybox_texture.create_from_file("textures/skybox/", ".jpg", TextureSlot::DIFFUSE),
+                false);
 
             static const std::array<Vertex3d, 36> cube_vertices = {
                 /* clang-format off */
@@ -235,7 +236,7 @@ namespace Engine
 
             std::unique_ptr<VertexArray> cube_vertex_array = std::make_unique<VertexArray>();
             cube_vertex_array->create(cube_vertices.data(), cube_vertices.size());
-            cube_vertex_array->setup_vertex_attrib(0, &Vertex3d::position);
+            Vertex3d::setup_vertex_array_attribs(*cube_vertex_array);
             cube = std::move(cube_vertex_array);
         }
 
@@ -249,7 +250,7 @@ namespace Engine
             shadow_map_texture.create(shadow_map_resolution,
                                       shadow_map_resolution,
                                       GL_DEPTH_ATTACHMENT,
-                                      2 /* slot */,
+                                      TextureSlot::SHADOW /* slot */,
                                       GL_DEPTH_COMPONENT /* internal_format */,
                                       GL_DEPTH_COMPONENT /* format */,
                                       GL_NEAREST /* min_filter */,
@@ -272,11 +273,9 @@ namespace Engine
                           }),
                           false);
         screen_shader.use();
-        ASSERT_RET_IF_NOT(screen_shader.set_int("u_color_texture_sampler",
-                                                screen_color_texture.get_slot()),
+        ASSERT_RET_IF_NOT(screen_shader.set_int("u_color_texture_sampler", TextureSlot::DIFFUSE),
                           false);
-        ASSERT_RET_IF_NOT(screen_shader.set_int("u_bloom_texture_sampler",
-                                                screen_bloom_texture.get_slot()),
+        ASSERT_RET_IF_NOT(screen_shader.set_int("u_bloom_texture_sampler", TextureSlot::BLOOM),
                           false);
         ASSERT_RET_IF_NOT(screen_shader.set_float("u_exposure", exposure), false);
         ASSERT_RET_IF_NOT(screen_shader.set_float("u_gamma", gamma), false);
@@ -291,8 +290,7 @@ namespace Engine
                           }),
                           false);
         gaussian_blur_shader.use();
-        ASSERT_RET_IF_NOT(gaussian_blur_shader.set_int("u_texture_sampler",
-                                                       screen_bloom_texture.get_slot()),
+        ASSERT_RET_IF_NOT(gaussian_blur_shader.set_int("u_texture_sampler", TextureSlot::BLOOM),
                           false);
 
         /*
@@ -309,8 +307,7 @@ namespace Engine
                           false);
         ASSERT_RET_IF_NOT(skybox_shader.set_vec3("u_sun_position", sun_position_skybox_model_space),
                           false);
-        ASSERT_RET_IF_NOT(skybox_shader.set_int("u_texture_sampler", skybox_texture.get_slot()),
-                          false);
+        ASSERT_RET_IF_NOT(skybox_shader.set_int("u_texture_sampler", TextureSlot::DIFFUSE), false);
 
         /*
          * Initialize regular object shader.
@@ -322,11 +319,12 @@ namespace Engine
                           false);
         regular_object_shader.use();
         ASSERT_RET_IF_NOT(regular_object_shader.set_mat4("u_projection", projection), false);
-        ASSERT_RET_IF_NOT(regular_object_shader.set_int("u_texture_sampler", 0), false);
-        ASSERT_RET_IF_NOT(regular_object_shader.set_int("u_normal_map_sampler", 1), false);
-        ASSERT_RET_IF_NOT(regular_object_shader.set_int("u_shadow_map_sampler",
-                                                        shadow_map_texture.get_slot()),
+        ASSERT_RET_IF_NOT(regular_object_shader.set_int("u_texture_sampler", TextureSlot::DIFFUSE),
                           false);
+        ASSERT_RET_IF_NOT(
+            regular_object_shader.set_int("u_normal_map_sampler", TextureSlot::NORMAL), false);
+        ASSERT_RET_IF_NOT(
+            regular_object_shader.set_int("u_shadow_map_sampler", TextureSlot::SHADOW), false);
 
         /*
          * Initialize point light shader.
@@ -387,6 +385,25 @@ namespace Engine
         ASSERT_RET_IF_NOT(crosshair_shader.set_float("u_thickness", 1.f), false);
         ASSERT_RET_IF_NOT(crosshair_shader.set_vec3("u_color", glm::vec3(1.0f)), false);
 
+        /*
+         * Initialize model shader.
+         */
+        ASSERT_RET_IF_NOT(model_shader.compile({
+                              {"model.vert", GL_VERTEX_SHADER},
+                              {"model.frag", GL_FRAGMENT_SHADER},
+                          }),
+                          false);
+        model_shader.use();
+        ASSERT_RET_IF_NOT(model_shader.set_mat4("u_projection", projection), false);
+        ASSERT_RET_IF_NOT(model_shader.set_int("u_shadow_map_sampler", TextureSlot::SHADOW), false);
+        ASSERT_RET_IF_NOT(model_shader.set_int("u_material.diffuse_texture_sampler",
+                                               TextureSlot::DIFFUSE),
+                          false);
+        ASSERT_RET_IF_NOT(model_shader.set_int("u_material.specular_texture_sampler",
+                                               TextureSlot::SPECULAR),
+                          false);
+        ASSERT_RET_IF_NOT(model_shader.set_float("u_material.shininess", 4.f), false);
+
         return true;
     }
 
@@ -401,10 +418,10 @@ namespace Engine
     {
         terrain_shader.use();
         ASSERT_RET_IF_NOT(_terrain.material.apply(terrain_shader), false);
-        ASSERT_RET_IF_NOT(
-            terrain_shader.set_int("u_normal_map_sampler", _terrain.normal_map.get_slot()), false);
-        ASSERT_RET_IF_NOT(
-            terrain_shader.set_int("u_shadow_map_sampler", shadow_map_texture.get_slot()), false);
+        ASSERT_RET_IF_NOT(terrain_shader.set_int("u_normal_map_sampler", TextureSlot::NORMAL),
+                          false);
+        ASSERT_RET_IF_NOT(terrain_shader.set_int("u_shadow_map_sampler", TextureSlot::SHADOW),
+                          false);
 
         terrain = std::make_unique<Terrain>(_terrain);
 
@@ -449,6 +466,16 @@ namespace Engine
     void Renderer::add_debug_object(const DebugObject &object)
     {
         debug_objects.push_back(object);
+    }
+
+    /**
+     * @brief Add a model object to be rendered.
+     *
+     * @param object Model object to add.
+     */
+    void Renderer::add_model_object(const ModelObject &object)
+    {
+        model_objects.push_back(object);
     }
 
     /**
@@ -568,11 +595,21 @@ namespace Engine
             /*
              * Draw regular objects into shadow map.
              */
-            for (RegularObject &object : regular_objects)
+            for (const RegularObject &object : regular_objects)
             {
                 ASSERT_RET_IF_NOT(depth_shader.set_mat4("u_model", object.transform.model()),
                                   false);
                 object.drawable.draw();
+            }
+
+            /*
+             * Draw models into shadow map.
+             */
+            for (const ModelObject &object : model_objects)
+            {
+                ASSERT_RET_IF_NOT(depth_shader.set_mat4("u_model", object.transform.model()),
+                                  false);
+                object.model.draw_no_textures();
             }
 
             /*
@@ -682,13 +719,68 @@ namespace Engine
                                                          directional_light_objects[0].color),
                           false);
         shadow_map_texture.use();
-        for (RegularObject &object : regular_objects)
+        for (const RegularObject &object : regular_objects)
         {
             ASSERT_RET_IF_NOT(regular_object_shader.set_mat4("u_model", object.transform.model()),
                               false);
             object.material.apply(regular_object_shader);
             object.normal_map.use();
             object.drawable.draw();
+        }
+
+        /*
+         * Render model objects.
+         */
+
+        shadow_map_texture.use();
+        model_shader.use();
+        ASSERT_RET_IF_NOT(model_shader.set_mat4("u_view", camera_view), false);
+        ASSERT_RET_IF_NOT(model_shader.set_mat4("u_light_view_projection", light_view_projection),
+                          false);
+        ASSERT_RET_IF_NOT(model_shader.set_vec3("u_camera_position", camera_position), false);
+
+        ASSERT_RET_IF_NOT(model_shader.set_int("u_num_point_lights", point_light_objects.size()),
+                          false);
+        for (size_t point_light_idx = 0; point_light_idx < point_light_objects.size();
+             point_light_idx++)
+        {
+            const std::string uniform_name =
+                "u_point_lights[" + std::to_string(point_light_idx) + "]";
+            ASSERT_RET_IF_NOT(
+                model_shader.set_vec3(uniform_name + ".position",
+                                      point_light_objects[point_light_idx].transform.position),
+                false);
+            ASSERT_RET_IF_NOT(model_shader.set_vec3(uniform_name + ".ambient",
+                                                    point_light_objects[point_light_idx].color),
+                              false);
+            ASSERT_RET_IF_NOT(model_shader.set_vec3(uniform_name + ".diffuse",
+                                                    point_light_objects[point_light_idx].color),
+                              false);
+            ASSERT_RET_IF_NOT(model_shader.set_vec3(uniform_name + ".specular",
+                                                    point_light_objects[point_light_idx].color),
+                              false);
+        }
+
+        ASSERT_RET_IF_NOT(model_shader.set_vec3("u_directional_light.direction",
+                                                directional_light_objects[0].direction),
+                          false);
+        ASSERT_RET_IF_NOT(model_shader.set_vec3("u_directional_light.ambient",
+                                                directional_light_objects[0].color),
+                          false);
+        ASSERT_RET_IF_NOT(model_shader.set_vec3("u_directional_light.diffuse",
+                                                directional_light_objects[0].color),
+                          false);
+        ASSERT_RET_IF_NOT(model_shader.set_vec3("u_directional_light.specular",
+                                                directional_light_objects[0].color),
+                          false);
+
+        ASSERT_RET_IF_NOT(model_shader.set_vec3("u_directional_light.specular",
+                                                directional_light_objects[0].color),
+                          false);
+        for (const ModelObject &object : model_objects)
+        {
+            ASSERT_RET_IF_NOT(model_shader.set_mat4("u_model", object.transform.model()), false);
+            object.model.draw();
         }
 
         /*
@@ -764,7 +856,7 @@ namespace Engine
         }
         point_light_shader.use();
         ASSERT_RET_IF_NOT(point_light_shader.set_mat4("u_view", camera_view), false);
-        for (PointLightObject &object : point_light_objects)
+        for (const PointLightObject &object : point_light_objects)
         {
             ASSERT_RET_IF_NOT(point_light_shader.set_mat4("u_model", object.transform.model()),
                               false);
@@ -840,6 +932,7 @@ namespace Engine
         point_light_objects.clear();
         directional_light_objects.clear();
         debug_objects.clear();
+        model_objects.clear();
 
         return true;
     }

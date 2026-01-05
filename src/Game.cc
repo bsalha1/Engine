@@ -1,5 +1,6 @@
 #include "Game.h"
 
+#include "TextureSlot.h"
 #include "Vertex.h"
 #include "assert_util.h"
 #include "log.h"
@@ -58,11 +59,7 @@ namespace Engine
                 free(bt_syms);
             }
 
-            /*
-             * Stop the run loop.
-             */
-            Game *game = reinterpret_cast<Game *>(const_cast<void *>(user_param));
-            game->quit();
+            _exit(EXIT_FAILURE);
         }
 
 #ifdef DEBUG
@@ -308,15 +305,17 @@ namespace Engine
         LOG("Loading textures\n");
         {
             ASSERT_RET_IF_NOT(chaser_textured_material.create_from_file("textures/snake.jpg",
-                                                                        0 /* slot */),
+                                                                        TextureSlot::DIFFUSE),
                               false);
             ASSERT_RET_IF_NOT(chaser_normal_map.create_from_file("textures/snake_normals.jpg",
-                                                                 1 /* slot */),
+                                                                 TextureSlot::NORMAL),
                               false);
-            ASSERT_RET_IF_NOT(
-                dirt_textured_material.create_from_file("textures/dirt.jpg", 0 /* slot */), false);
-            ASSERT_RET_IF_NOT(
-                dirt_normal_map.create_from_file("textures/dirt_normals.jpg", 1 /* slot */), false);
+            ASSERT_RET_IF_NOT(dirt_textured_material.create_from_file("textures/dirt.jpg",
+                                                                      TextureSlot::DIFFUSE),
+                              false);
+            ASSERT_RET_IF_NOT(dirt_normal_map.create_from_file("textures/dirt_normals.jpg",
+                                                               TextureSlot::NORMAL),
+                              false);
         }
 
         LOG("Loading terrain heightmaps\n");
@@ -497,6 +496,10 @@ namespace Engine
         ImGui::StyleColorsDark();
         ImGui_ImplGlfw_InitForOpenGL(window, true);
         ImGui_ImplOpenGL3_Init("#version 460");
+
+        LOG("Loading models\n");
+
+        ASSERT_RET_IF_NOT(backpack_model.load("models/backpack/backpack.obj"), false);
 
         return true;
     }
@@ -1259,7 +1262,7 @@ namespace Engine
         /*
          * Set day length and compute the rotational speed.
          */
-        static constexpr float day_length_s = 120.f;
+        static constexpr float day_length_s = 10.f;
         static constexpr float rotational_angular_speed = 2 * glm::pi<float>() / day_length_s;
 
         /*
@@ -1515,6 +1518,18 @@ namespace Engine
                 .normal_map = chaser_normal_map,
                 .transform = floating_chaser_transform,
                 .drawable = chaser_vertex_array,
+            });
+
+            /*
+             * Submit floating backpack to renderer.
+             */
+            const Renderer::Transform floating_backpack_transform = {
+                .position = glm::vec3(10.f, 10.f, 0.f),
+                .scale = glm::vec3(1.f, 1.f, 1.f),
+            };
+            renderer.add_model_object({
+                .model = backpack_model,
+                .transform = floating_backpack_transform,
             });
 
             /*

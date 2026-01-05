@@ -4,6 +4,11 @@ set -ex
 
 base_dir="$(dirname $(realpath $0))"
 
+# Clean source tree. Sudo used for submodules for libglvnd.
+git clean -fxd
+git submodule foreach --recursive sudo git clean -fxd
+
+# Initialize submodules.
 git submodule update --init
 
 source /etc/os-release
@@ -23,49 +28,43 @@ elif [ "$ID" = arch ]; then
     sudo pacman -Sy clang
 fi
 
+# Set build environment.
+export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
+export MAKEFLAGS="-j$(nproc)"
+
 # Build GLFW library.
-cd glfw
-git clean -fxd
+cd "$base_dir/glfw"
 cmake -S . -B build -D GLFW_BUILD_WAYLAND=OFF
 cd build
-make -j$(nproc)
-cd "$base_dir"
+make
 
 # Build GLEW library.
-cd glew/auto
-git clean -fxd
-make -j$(nproc)
+cd "$base_dir/glew/auto"
+make
 cd ..
-make -j$(nproc)
-cd "$base_dir"
+make
 
 # Build libglvnd library.
-cd libglvnd
-sudo git clean -fxd
+cd "$base_dir/libglvnd"
 ./autogen.sh
 ./configure
 sudo make install
-cd "$base_dir"
 
 # Build glm library.
-cd glm
-git clean -fxd
+cd "$base_dir/glm"
 cmake \
     -DGLM_BUILD_TESTS=OFF \
     -DBUILD_SHARED_LIBS=OFF \
     -B build .
 cmake --build build -- all
-cd "$base_dir"
 
 # Build stb_image library.
-cd stb
+cd "$base_dir/stb"
 make clean
-make -j$(nproc)
-cd "$base_dir"
+make
 
 # Build imgui library.
-cd imgui
-git clean -fxd
+cd "$base_dir/imgui"
 g++ \
     -c \
     -I. \
@@ -77,5 +76,9 @@ g++ \
     imgui_widgets.cpp \
     imgui.cpp \
     imgui_demo.cpp
-
 ar rcs libimgui.a *.o
+
+# Build assimp library.
+cd "$base_dir/assimp"
+cmake CMakeLists.txt -DBUILD_SHARED_LIBS=OFF
+cmake --build .

@@ -19,3 +19,6 @@
 	path = imgui
 	url = git@github.com:ocornut/imgui.git
 	ignore = dirty
+[submodule "assimp"]
+	path = assimp
+	url = git@github.com:assimp/assimp.git

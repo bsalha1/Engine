@@ -5,6 +5,7 @@
         "-I${workspaceFolder}/glu/include/",
         "-I${workspaceFolder}/glm/",
         "-I${workspaceFolder}/stb_image/include/",
-        "-I${workspaceFolder}/imgui/"
+        "-I${workspaceFolder}/imgui/",
+        "-I${workspaceFolder}/assimp/include/"
     ]
 }

@@ -1,14 +1,15 @@
 #pragma once
 
-#include "Renderer.h"
+#include "Drawable.h"
 #include "VertexArray.h"
+#include "log.h"
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
 namespace Engine
 {
-    class IndexBuffer: public Renderer::Drawable
+    class IndexBuffer: public Drawable
     {
     public:
         /**
@@ -20,6 +21,8 @@ namespace Engine
          * Type of index in terms of OpenGL.
          */
         static constexpr GLenum IndexGLtype = GL_UNSIGNED_INT;
+
+        IndexBuffer() = delete;
 
         IndexBuffer(const VertexArray &_vertex_array):
             vertex_array(_vertex_array), index_buffer_obj(0), count(0)
@@ -38,6 +41,8 @@ namespace Engine
             glGenBuffers(1, &index_buffer_obj);
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer_obj);
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, _count * sizeof(IndexType), items, GL_STATIC_DRAW);
+
+            LOG_DEBUG("Created EBO %u: %zu indices\n", index_buffer_obj, count);
         }
 
         /**
@@ -45,6 +50,8 @@ namespace Engine
          */
         void draw() const override
         {
+            LOG_DEBUG("Drawing EBO %u\n", index_buffer_obj);
+
             vertex_array.bind();
             glDrawElements(GL_TRIANGLES, count, IndexGLtype, nullptr);
         }

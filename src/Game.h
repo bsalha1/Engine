@@ -4,6 +4,7 @@
 #include "FramebufferTexture.h"
 #include "IndexBuffer.h"
 #include "MenuManager.h"
+#include "Model.h"
 #include "PauseMenu.h"
 #include "Renderer.h"
 #include "Shader.h"
@@ -80,7 +81,7 @@ namespace Engine
         {
             glm::vec3 color;
             Renderer::Transform transform;
-            Renderer::Drawable *drawable;
+            Drawable *drawable;
             glm::vec3 velocity;
             glm::vec3 rotation_axis;
             float angular_velocity;
@@ -364,6 +365,15 @@ namespace Engine
          * @{
          */
         std::vector<Projectile> projectiles;
+        /**
+         * @}
+         */
+
+        /**
+         * Models.
+         * @{
+         */
+        Model backpack_model;
         /**
          * @}
          */

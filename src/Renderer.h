@@ -2,6 +2,7 @@
 
 #include "CubemapTexture.h"
 #include "FramebufferTexture.h"
+#include "Model.h"
 #include "TexturedMaterial.h"
 
 #include <GL/glew.h>
@@ -15,17 +16,6 @@ namespace Engine
     {
     public:
         Renderer();
-
-        /**
-         * @brief Interface for drawable objects.
-         */
-        class Drawable
-        {
-        public:
-            virtual ~Drawable() = default;
-
-            virtual void draw() const = 0;
-        };
 
         /**
          * @brief Transform of an object.
@@ -100,6 +90,15 @@ namespace Engine
             const Drawable &drawable;
         };
 
+        /**
+         * @brief A model object has a model and transform.
+         */
+        struct ModelObject
+        {
+            const Model &model;
+            const Transform &transform;
+        };
+
         bool init(const int _window_width, const int _window_height);
 
         bool set_terrain(const Terrain &_terrain);
@@ -111,6 +110,8 @@ namespace Engine
         void add_directional_light_object(const DirectionalLightObject &object);
 
         void add_debug_object(const DebugObject &object);
+
+        void add_model_object(const ModelObject &object);
 
         bool render(const glm::mat4 &camera_view,
                     const glm::mat4 &skybox_view,
@@ -237,6 +238,16 @@ namespace Engine
          * @{
          */
         Shader crosshair_shader;
+        /**
+         * @}
+         */
+
+        /**
+         * Model objects.
+         * @{
+         */
+        Shader model_shader;
+        std::vector<ModelObject> model_objects;
         /**
          * @}
          */

@@ -1,17 +1,17 @@
 #pragma once
 
-#include "Renderer.h"
+#include "Drawable.h"
+#include "log.h"
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
 namespace Engine
 {
-    class VertexArray: public Renderer::Drawable
+    class VertexArray: public Drawable
     {
     public:
-        VertexArray(): vertex_array_id(0)
-        {}
+        VertexArray();
 
         /**
          * @brief Create a vertex array object.
@@ -30,14 +30,16 @@ namespace Engine
             GLuint buffer_id;
             glGenBuffers(1, &buffer_id);
             glBindBuffer(GL_ARRAY_BUFFER, buffer_id);
-            glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * _num_vertices, vertices, GL_STATIC_DRAW);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * num_vertices, vertices, GL_STATIC_DRAW);
+
+            LOG_DEBUG("Created VAO %u: %zu vertices\n", vertex_array_id, num_vertices);
         }
 
         /**
          * @return Offset of member in vertex structure.
          */
         template <typename Vertex, typename Member>
-        constexpr size_t offset_of(const Member Vertex::*member)
+        constexpr size_t offset_of(const Member Vertex::*member) const
         {
             return reinterpret_cast<size_t>(
                 &(reinterpret_cast<Vertex const volatile *>(0)->*member));
@@ -53,7 +55,7 @@ namespace Engine
          * @param member Pointer to member in vertex structure.
          */
         template <typename Vertex, typename Member>
-        void setup_vertex_attrib(const GLuint idx, const Member Vertex::*member)
+        void setup_vertex_attrib(const GLuint idx, const Member Vertex::*member) const
         {
             const GLuint attrib_start_offset = offset_of(member);
             const GLuint attrib_end_offset = attrib_start_offset + sizeof(Member);
@@ -68,24 +70,12 @@ namespace Engine
             glEnableVertexAttribArray(idx);
         }
 
-        /**
-         * @brief Bind the vertex array object.
-         */
-        void bind() const
-        {
-            glBindVertexArray(vertex_array_id);
-        }
+        void bind() const;
 
-        /**
-         * @brief Draw the vertex array.
-         */
-        void draw() const override
-        {
-            bind();
-            glDrawArrays(GL_TRIANGLES, 0, num_vertices);
-        }
+        void draw() const override;
 
     private:
+    public:
         /**
          * OpenGL vertex array object ID.
          */
