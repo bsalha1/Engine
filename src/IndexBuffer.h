@@ -57,8 +57,19 @@ namespace Engine
         }
 
     private:
+        /**
+         * Reference to vertex array to index into.
+         */
         const VertexArray &vertex_array;
+
+        /**
+         * OpenGL index buffer object ID.
+         */
         GLuint index_buffer_obj;
+
+        /**
+         * Number of indices.
+         */
         size_t count;
     };
 }

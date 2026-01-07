@@ -5,7 +5,8 @@
 out vec4 color;
 
 in vec3 v_position_world_coords;
-in mat3 v_tangent_bitangent_norm;
+in vec3 v_normal;
+in vec4 v_tangent_handedness;
 in vec2 v_texture_coord;
 in vec3 v_view_direction;
 in vec4 v_frag_pos_light_space;
@@ -23,10 +24,15 @@ uniform Material u_material;
 
 void main()
 {
-    const vec3 texture_color = texture(u_texture_sampler, v_texture_coord).rgb;
-    vec3 normal = texture(u_normal_map_sampler, v_texture_coord).rgb;
-    normal = normal * 2.0 - 1.0;
-    normal = normalize(v_tangent_bitangent_norm * normal);
+    vec3 texture_color = texture(u_texture_sampler, v_texture_coord).rgb;
+    vec3 normal_from_texture = texture(u_normal_map_sampler, v_texture_coord).rgb * 2.0 - 1.0;
+
+    vec3 normal = normalize(v_normal);
+    vec3 tangent = normalize(v_tangent_handedness.xyz);
+    vec3 bitangent = v_tangent_handedness.w * normalize(cross(normal, tangent));
+
+    mat3 tangent_bitangent_norm = mat3(tangent, bitangent, normal);
+    normal = normalize(tangent_bitangent_norm * normal_from_texture);
 
     vec3 result = compute_directional_component(
         u_directional_light,

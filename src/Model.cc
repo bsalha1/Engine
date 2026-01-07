@@ -4,6 +4,7 @@
 
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
+#include <glm/geometric.hpp>
 
 namespace Engine
 {
@@ -13,11 +14,11 @@ namespace Engine
      * @param vertices Vertices.
      * @param indices Indices.
      */
-    void Mesh::create_buffers(const std::vector<TexturedVertex3dNormal> &vertices,
+    void Mesh::create_buffers(const std::vector<TexturedVertex3dNormalTangent> &vertices,
                               const std::vector<unsigned int> &indices)
     {
         vertex_array.create(vertices.data(), vertices.size());
-        TexturedVertex3dNormal::setup_vertex_array_attribs(vertex_array);
+        TexturedVertex3dNormalTangent::setup_vertex_array_attribs(vertex_array);
         index_buffer.create(indices.data(), indices.size());
     }
 
@@ -33,6 +34,10 @@ namespace Engine
         if (textures[TextureSlot::SPECULAR])
         {
             textures[TextureSlot::SPECULAR]->use();
+        }
+        if (textures[TextureSlot::NORMAL])
+        {
+            textures[TextureSlot::NORMAL]->use();
         }
 
         index_buffer.draw();
@@ -69,7 +74,9 @@ namespace Engine
         LOG("Loading model %s\n", path.c_str());
 
         Assimp::Importer importer;
-        const aiScene *scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs);
+        const aiScene *scene = importer.ReadFile(path,
+                                                 aiProcess_Triangulate | aiProcess_FlipUVs |
+                                                     aiProcess_CalcTangentSpace);
         ASSERT_RET_IF_NOT(scene, false);
         ASSERT_RET_IF_NOT(scene->mRootNode, false);
         ASSERT_RET_IF(scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE, false);
@@ -79,7 +86,7 @@ namespace Engine
          * object contains IndexBuffers which contain references to the VertexArray objects,
          * and so dynamic resizing of the meshes vector would invalidate those references.
          */
-        size_t num_meshes = get_num_meshes(scene->mRootNode);
+        const size_t num_meshes = get_num_meshes(scene->mRootNode);
         LOG("Contains %zu meshes\n", num_meshes);
 
         meshes.reserve(num_meshes);
@@ -139,6 +146,9 @@ namespace Engine
         case aiTextureType_SPECULAR:
             slot = TextureSlot::SPECULAR;
             break;
+        case aiTextureType_HEIGHT:
+            slot = TextureSlot::NORMAL;
+            break;
         default:
             ASSERT_RET_IF_NOT(false, false);
         }
@@ -177,6 +187,7 @@ namespace Engine
              * Load texture from file.
              */
             LOG("Loading texture %s\n", (directory + std::string(file_path.C_Str())).c_str());
+
             ASSERT_RET_IF_NOT(
                 texture->create_from_file(directory + std::string(file_path.C_Str()), slot), false);
         }
@@ -201,17 +212,38 @@ namespace Engine
         /*
          * Load vertices.
          */
-        std::vector<TexturedVertex3dNormal> vertices;
+        std::vector<TexturedVertex3dNormalTangent> vertices;
         vertices.reserve(mesh->mNumVertices);
         for (unsigned int i = 0; i < mesh->mNumVertices; i++)
         {
-            TexturedVertex3dNormal &vertex = vertices.emplace_back();
+            TexturedVertex3dNormalTangent &vertex = vertices.emplace_back();
 
+            /*
+             * Set position.
+             */
             const aiVector3D &position = mesh->mVertices[i];
             vertex.position = glm::vec3(position.x, position.y, position.z);
 
+            /*
+             * Set normal.
+             */
             const aiVector3D &normal = mesh->mNormals[i];
             vertex.norm = glm::vec3(normal.x, normal.y, normal.z);
+
+            const aiVector3D &bitangent = mesh->mBitangents[i];
+            const glm::vec3 _bitangent = glm::vec3(bitangent.x, bitangent.y, bitangent.z);
+
+            /*
+             * Compute tangent and use Gram-Schmidt orthonormalization to remove any normal
+             * component from the tangent.
+             */
+            const aiVector3D &tangent = mesh->mTangents[i];
+            glm::vec3 _tangent = glm::vec3(tangent.x, tangent.y, tangent.z);
+            _tangent = normalize(_tangent - vertex.norm * dot(vertex.norm, _tangent));
+
+            const float handedness =
+                (glm::dot(glm::cross(vertex.norm, _tangent), _bitangent) < 0.0f) ? -1.0f : 1.0f;
+            vertex.tangent = glm::vec4(_tangent, handedness);
 
             if (mesh->mTextureCoords[0])
             {
@@ -251,6 +283,9 @@ namespace Engine
                 false);
             ASSERT_RET_IF_NOT(
                 load_material_textures(internal_mesh, material, aiTextureType_SPECULAR, directory),
+                false);
+            ASSERT_RET_IF_NOT(
+                load_material_textures(internal_mesh, material, aiTextureType_HEIGHT, directory),
                 false);
         }
 

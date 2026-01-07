@@ -75,7 +75,6 @@ namespace Engine
         void draw() const override;
 
     private:
-    public:
         /**
          * OpenGL vertex array object ID.
          */

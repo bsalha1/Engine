@@ -389,7 +389,7 @@ namespace Engine
          * Initialize model shader.
          */
         ASSERT_RET_IF_NOT(model_shader.compile({
-                              {"model.vert", GL_VERTEX_SHADER},
+                              {"regular_object.vert", GL_VERTEX_SHADER},
                               {"model.frag", GL_FRAGMENT_SHADER},
                           }),
                           false);
@@ -402,6 +402,8 @@ namespace Engine
         ASSERT_RET_IF_NOT(model_shader.set_int("u_material.specular_texture_sampler",
                                                TextureSlot::SPECULAR),
                           false);
+        ASSERT_RET_IF_NOT(
+            model_shader.set_int("u_material.normal_texture_sampler", TextureSlot::NORMAL), false);
         ASSERT_RET_IF_NOT(model_shader.set_float("u_material.shininess", 4.f), false);
 
         return true;

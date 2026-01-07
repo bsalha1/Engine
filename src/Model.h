@@ -16,7 +16,7 @@ namespace Engine
     class Mesh
     {
     public:
-        void create_buffers(const std::vector<TexturedVertex3dNormal> &vertices,
+        void create_buffers(const std::vector<TexturedVertex3dNormalTangent> &vertices,
                             const std::vector<unsigned int> &indices);
 
         void draw() const;

@@ -249,12 +249,12 @@ namespace Engine
             const std::array<TexturedVertex3dNormalTangent, 36> vertices = {{
             /*                position,                normal,         texture,                tangent */
                 /* -Z */
-                {glm::vec3(-1, -1, -1), glm::vec3( 0,  0, -1), glm::vec2(0, 0), glm::vec4(-1, 0, 0, 1)},
-                {glm::vec3( 1, -1, -1), glm::vec3( 0,  0, -1), glm::vec2(1, 0), glm::vec4(-1, 0, 0, 1)},
-                {glm::vec3( 1,  1, -1), glm::vec3( 0,  0, -1), glm::vec2(1, 1), glm::vec4(-1, 0, 0, 1)},
-                {glm::vec3( 1,  1, -1), glm::vec3( 0,  0, -1), glm::vec2(1, 1), glm::vec4(-1, 0, 0, 1)},
-                {glm::vec3(-1,  1, -1), glm::vec3( 0,  0, -1), glm::vec2(0, 1), glm::vec4(-1, 0, 0, 1)},
-                {glm::vec3(-1, -1, -1), glm::vec3( 0,  0, -1), glm::vec2(0, 0), glm::vec4(-1, 0, 0, 1)},
+                {glm::vec3( 1, -1, -1), glm::vec3( 0,  0, -1), glm::vec2(0, 0), glm::vec4(-1, 0, 0, 1)},
+                {glm::vec3(-1, -1, -1), glm::vec3( 0,  0, -1), glm::vec2(1, 0), glm::vec4(-1, 0, 0, 1)},
+                {glm::vec3(-1,  1, -1), glm::vec3( 0,  0, -1), glm::vec2(1, 1), glm::vec4(-1, 0, 0, 1)},
+                {glm::vec3(-1,  1, -1), glm::vec3( 0,  0, -1), glm::vec2(1, 1), glm::vec4(-1, 0, 0, 1)},
+                {glm::vec3( 1,  1, -1), glm::vec3( 0,  0, -1), glm::vec2(0, 1), glm::vec4(-1, 0, 0, 1)},
+                {glm::vec3( 1, -1, -1), glm::vec3( 0,  0, -1), glm::vec2(0, 0), glm::vec4(-1, 0, 0, 1)},
 
                 /* +Z */
                 {glm::vec3(-1, -1,  1), glm::vec3( 0,  0,  1), glm::vec2(0, 0), glm::vec4(1, 0, 0, 1)},
@@ -265,36 +265,36 @@ namespace Engine
                 {glm::vec3(-1, -1,  1), glm::vec3( 0,  0,  1), glm::vec2(0, 0), glm::vec4(1, 0, 0, 1)},
 
                 /* -X */
-                {glm::vec3(-1,  1,  1), glm::vec3(-1,  0,  0), glm::vec2(1, 0), glm::vec4(0, 0, 1, 1)},
-                {glm::vec3(-1,  1, -1), glm::vec3(-1,  0,  0), glm::vec2(1, 1), glm::vec4(0, 0, 1, 1)},
-                {glm::vec3(-1, -1, -1), glm::vec3(-1,  0,  0), glm::vec2(0, 1), glm::vec4(0, 0, 1, 1)},
-                {glm::vec3(-1, -1, -1), glm::vec3(-1,  0,  0), glm::vec2(0, 1), glm::vec4(0, 0, 1, 1)},
-                {glm::vec3(-1, -1,  1), glm::vec3(-1,  0,  0), glm::vec2(0, 0), glm::vec4(0, 0, 1, 1)},
-                {glm::vec3(-1,  1,  1), glm::vec3(-1,  0,  0), glm::vec2(1, 0), glm::vec4(0, 0, 1, 1)},
+                {glm::vec3(-1, -1, -1), glm::vec3(-1,  0,  0), glm::vec2(0, 0), glm::vec4(0, 0, 1, 1)},
+                {glm::vec3(-1, -1,  1), glm::vec3(-1,  0,  0), glm::vec2(1, 0), glm::vec4(0, 0, 1, 1)},
+                {glm::vec3(-1,  1,  1), glm::vec3(-1,  0,  0), glm::vec2(1, 1), glm::vec4(0, 0, 1, 1)},
+                {glm::vec3(-1,  1,  1), glm::vec3(-1,  0,  0), glm::vec2(1, 1), glm::vec4(0, 0, 1, 1)},
+                {glm::vec3(-1,  1, -1), glm::vec3(-1,  0,  0), glm::vec2(0, 1), glm::vec4(0, 0, 1, 1)},
+                {glm::vec3(-1, -1, -1), glm::vec3(-1,  0,  0), glm::vec2(0, 0), glm::vec4(0, 0, 1, 1)},
 
                 /* +X */
-                {glm::vec3( 1,  1,  1), glm::vec3( 1,  0,  0), glm::vec2(1, 0), glm::vec4(0, 0, -1, 1)},
-                {glm::vec3( 1,  1, -1), glm::vec3( 1,  0,  0), glm::vec2(1, 1), glm::vec4(0, 0, -1, 1)},
-                {glm::vec3( 1, -1, -1), glm::vec3( 1,  0,  0), glm::vec2(0, 1), glm::vec4(0, 0, -1, 1)},
-                {glm::vec3( 1, -1, -1), glm::vec3( 1,  0,  0), glm::vec2(0, 1), glm::vec4(0, 0, -1, 1)},
                 {glm::vec3( 1, -1,  1), glm::vec3( 1,  0,  0), glm::vec2(0, 0), glm::vec4(0, 0, -1, 1)},
-                {glm::vec3( 1,  1,  1), glm::vec3( 1,  0,  0), glm::vec2(1, 0), glm::vec4(0, 0, -1, 1)},
+                {glm::vec3( 1, -1, -1), glm::vec3( 1,  0,  0), glm::vec2(1, 0), glm::vec4(0, 0, -1, 1)},
+                {glm::vec3( 1,  1, -1), glm::vec3( 1,  0,  0), glm::vec2(1, 1), glm::vec4(0, 0, -1, 1)},
+                {glm::vec3( 1,  1, -1), glm::vec3( 1,  0,  0), glm::vec2(1, 1), glm::vec4(0, 0, -1, 1)},
+                {glm::vec3( 1,  1,  1), glm::vec3( 1,  0,  0), glm::vec2(0, 1), glm::vec4(0, 0, -1, 1)},
+                {glm::vec3( 1, -1,  1), glm::vec3( 1,  0,  0), glm::vec2(0, 0), glm::vec4(0, 0, -1, 1)},
 
                 /* -Y */
-                {glm::vec3(-1, -1, -1), glm::vec3( 0, -1,  0), glm::vec2(0, 1), glm::vec4(1, 0, 0, 1)},
-                {glm::vec3( 1, -1, -1), glm::vec3( 0, -1,  0), glm::vec2(1, 1), glm::vec4(1, 0, 0, 1)},
-                {glm::vec3( 1, -1,  1), glm::vec3( 0, -1,  0), glm::vec2(1, 0), glm::vec4(1, 0, 0, 1)},
-                {glm::vec3( 1, -1,  1), glm::vec3( 0, -1,  0), glm::vec2(1, 0), glm::vec4(1, 0, 0, 1)},
-                {glm::vec3(-1, -1,  1), glm::vec3( 0, -1,  0), glm::vec2(0, 0), glm::vec4(1, 0, 0, 1)},
-                {glm::vec3(-1, -1, -1), glm::vec3( 0, -1,  0), glm::vec2(0, 1), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3(-1, -1, -1), glm::vec3( 0, -1,  0), glm::vec2(0, 0), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3( 1, -1, -1), glm::vec3( 0, -1,  0), glm::vec2(1, 0), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3( 1, -1,  1), glm::vec3( 0, -1,  0), glm::vec2(1, 1), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3( 1, -1,  1), glm::vec3( 0, -1,  0), glm::vec2(1, 1), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3(-1, -1,  1), glm::vec3( 0, -1,  0), glm::vec2(0, 1), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3(-1, -1, -1), glm::vec3( 0, -1,  0), glm::vec2(0, 0), glm::vec4(1, 0, 0, 1)},
 
                 /* +Y */
-                {glm::vec3(-1,  1, -1), glm::vec3( 0,  1,  0), glm::vec2(0, 1), glm::vec4(1, 0, 0, 1)},
-                {glm::vec3( 1,  1, -1), glm::vec3( 0,  1,  0), glm::vec2(1, 1), glm::vec4(1, 0, 0, 1)},
-                {glm::vec3( 1,  1,  1), glm::vec3( 0,  1,  0), glm::vec2(1, 0), glm::vec4(1, 0, 0, 1)},
-                {glm::vec3( 1,  1,  1), glm::vec3( 0,  1,  0), glm::vec2(1, 0), glm::vec4(1, 0, 0, 1)},
                 {glm::vec3(-1,  1,  1), glm::vec3( 0,  1,  0), glm::vec2(0, 0), glm::vec4(1, 0, 0, 1)},
-                {glm::vec3(-1,  1, -1), glm::vec3( 0,  1,  0), glm::vec2(0, 1), glm::vec4(1, 0, 0, 1)}
+                {glm::vec3( 1,  1,  1), glm::vec3( 0,  1,  0), glm::vec2(1, 0), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3( 1,  1, -1), glm::vec3( 0,  1,  0), glm::vec2(1, 1), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3( 1,  1, -1), glm::vec3( 0,  1,  0), glm::vec2(1, 1), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3(-1,  1, -1), glm::vec3( 0,  1,  0), glm::vec2(0, 1), glm::vec4(1, 0, 0, 1)},
+                {glm::vec3(-1,  1,  1), glm::vec3( 0,  1,  0), glm::vec2(0, 0), glm::vec4(1, 0, 0, 1)},
             }};
             /* clang-format on */
 
@@ -308,7 +308,8 @@ namespace Engine
                                                                         TextureSlot::DIFFUSE),
                               false);
             ASSERT_RET_IF_NOT(chaser_normal_map.create_from_file("textures/snake_normals.jpg",
-                                                                 TextureSlot::NORMAL),
+                                                                 TextureSlot::NORMAL,
+                                                                 true),
                               false);
             ASSERT_RET_IF_NOT(dirt_textured_material.create_from_file("textures/dirt.jpg",
                                                                       TextureSlot::DIFFUSE),

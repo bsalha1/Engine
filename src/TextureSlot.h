@@ -19,13 +19,13 @@ namespace Engine
          */
         DIFFUSE = 0,
         SPECULAR,
+        NORMAL,
         NUM_MODEL_TEXTURE_TYPES,
         /**
          * @}
          */
 
-        NORMAL = NUM_MODEL_TEXTURE_TYPES,
-        SHADOW,
+        SHADOW = NUM_MODEL_TEXTURE_TYPES,
         BLOOM,
         NUM_TEXTURE_SLOTS,
     };

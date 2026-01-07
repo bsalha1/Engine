@@ -23,7 +23,9 @@ namespace Engine
          *
          * @return True on success, otherwise false.
          */
-        bool create_from_file(const std::string &file_name, const TextureSlot _slot)
+        bool create_from_file(const std::string &file_name,
+                              const TextureSlot _slot,
+                              const bool invert_green = false)
         {
             slot = _slot;
 
@@ -50,6 +52,13 @@ namespace Engine
             ASSERT_RET_IF_NOT(texture_buffer, false);
             const GLenum internal_format = (channels == 4) ? GL_RGBA8 : GL_RGB8;
             const GLenum format = (channels == 4) ? GL_RGBA : GL_RGB;
+            if (invert_green)
+            {
+                for (int i = 0; i < width * height; i++)
+                {
+                    texture_buffer[i * channels + 1] = 255 - texture_buffer[i * channels + 1];
+                }
+            }
             glTexImage2D(GL_TEXTURE_2D,
                          0,
                          internal_format,
