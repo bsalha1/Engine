@@ -304,19 +304,13 @@ namespace Engine
 
         LOG("Loading textures\n");
         {
-            ASSERT_RET_IF_NOT(chaser_textured_material.create_from_file("textures/snake.jpg",
-                                                                        TextureSlot::DIFFUSE),
+            ASSERT_RET_IF_NOT(chaser_textured_material.create_from_file("textures/snake.jpg"),
                               false);
             ASSERT_RET_IF_NOT(chaser_normal_map.create_from_file("textures/snake_normals.jpg",
-                                                                 TextureSlot::NORMAL,
-                                                                 true),
+                                                                 true /* invert_green */),
                               false);
-            ASSERT_RET_IF_NOT(dirt_textured_material.create_from_file("textures/dirt.jpg",
-                                                                      TextureSlot::DIFFUSE),
-                              false);
-            ASSERT_RET_IF_NOT(dirt_normal_map.create_from_file("textures/dirt_normals.jpg",
-                                                               TextureSlot::NORMAL),
-                              false);
+            ASSERT_RET_IF_NOT(dirt_textured_material.create_from_file("textures/dirt.jpg"), false);
+            ASSERT_RET_IF_NOT(dirt_normal_map.create_from_file("textures/dirt_normals.jpg"), false);
         }
 
         LOG("Loading terrain heightmaps\n");

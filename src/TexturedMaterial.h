@@ -15,7 +15,11 @@ namespace Engine
                          const glm::vec3 &_diffuse,
                          const glm::vec3 &_specular,
                          const float _shininess):
-            ambient(_ambient), diffuse(_diffuse), specular(_specular), shininess(_shininess)
+            ambient(_ambient),
+            diffuse(_diffuse),
+            specular(_specular),
+            shininess(_shininess),
+            Texture(TextureSlot::DIFFUSE)
         {}
 
         /**

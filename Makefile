@@ -9,7 +9,7 @@ INCLUDE_DIRS = glfw/include/ glew/include/ glu/include/ glm/ stb/include/ imgui/
 CXXFLAGS += $(addprefix -I,$(INCLUDE_DIRS))
 
 # Object files.
-OBJS = Model.o VertexArray.o PauseMenu.o SettingsMenu.o ConfirmMenu.o MenuManager.o assert_util.o Shader.o Renderer.o Game.o log.o main.o
+OBJS = IndexBuffer.o FramebufferTexture.o CubemapTexture.o Texture.o Model.o VertexArray.o PauseMenu.o SettingsMenu.o ConfirmMenu.o MenuManager.o assert_util.o Shader.o Renderer.o Game.o log.o main.o
 
 PROGRAM_NAME = engine
 

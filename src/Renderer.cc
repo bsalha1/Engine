@@ -121,8 +121,6 @@ namespace Engine
              */
             screen_color_texture.create(window_width,
                                         window_height,
-                                        GL_COLOR_ATTACHMENT0,
-                                        TextureSlot::DIFFUSE /* slot */,
                                         GL_RGBA16F /* internal_format */,
                                         GL_RGBA /* format */,
                                         GL_LINEAR /* min_filter */,
@@ -130,8 +128,6 @@ namespace Engine
                                         GL_REPEAT /* wrap_mode */);
             screen_bloom_texture.create(window_width,
                                         window_height,
-                                        GL_COLOR_ATTACHMENT1,
-                                        TextureSlot::BLOOM /* slot */,
                                         GL_RGBA16F /* internal_format */,
                                         GL_RGBA /* format */,
                                         GL_LINEAR /* min_filter */,
@@ -166,8 +162,6 @@ namespace Engine
 
                 ping_pong_texture[i].create(window_width,
                                             window_height,
-                                            GL_COLOR_ATTACHMENT0,
-                                            TextureSlot::BLOOM /* slot */,
                                             GL_RGBA16F /* internal_format */,
                                             GL_RGBA /* format */,
                                             GL_LINEAR /* min_filter */,
@@ -184,9 +178,7 @@ namespace Engine
 
         LOG("Loading skybox\n");
         {
-            ASSERT_RET_IF_NOT(
-                skybox_texture.create_from_file("textures/skybox/", ".jpg", TextureSlot::DIFFUSE),
-                false);
+            ASSERT_RET_IF_NOT(skybox_texture.create_from_file("textures/skybox/", ".jpg"), false);
 
             static const std::array<Vertex3d, 36> cube_vertices = {
                 /* clang-format off */
@@ -247,15 +239,16 @@ namespace Engine
         {
             glGenFramebuffers(1, &shadow_map_frame_buffer);
             glBindFramebuffer(GL_FRAMEBUFFER, shadow_map_frame_buffer);
-            shadow_map_texture.create(shadow_map_resolution,
-                                      shadow_map_resolution,
-                                      GL_DEPTH_ATTACHMENT,
-                                      TextureSlot::SHADOW /* slot */,
-                                      GL_DEPTH_COMPONENT /* internal_format */,
-                                      GL_DEPTH_COMPONENT /* format */,
-                                      GL_NEAREST /* min_filter */,
-                                      GL_NEAREST /* max_filter */,
-                                      GL_CLAMP_TO_BORDER /* wrap_mode */);
+            const glm::vec4 border_color(1.0f, 1.0f, 1.0f, 1.0f);
+            ASSERT_RET_IF_NOT(shadow_map_texture.create(shadow_map_resolution,
+                                                        shadow_map_resolution,
+                                                        GL_DEPTH_COMPONENT /* internal_format */,
+                                                        GL_DEPTH_COMPONENT /* format */,
+                                                        GL_NEAREST /* min_filter */,
+                                                        GL_NEAREST /* max_filter */,
+                                                        GL_CLAMP_TO_BORDER /* wrap_mode */,
+                                                        &border_color /* border_color */),
+                              false);
             glDrawBuffer(GL_NONE);
             glReadBuffer(GL_NONE);
 

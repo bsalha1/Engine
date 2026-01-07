@@ -145,8 +145,10 @@ namespace Engine
         float sharpness;
         Shader screen_shader;
         GLuint screen_frame_buffer;
-        FramebufferTexture screen_color_texture;
-        FramebufferTexture screen_bloom_texture;
+        FramebufferTexture screen_color_texture =
+            FramebufferTexture(TextureSlot::DIFFUSE, GL_COLOR_ATTACHMENT0);
+        FramebufferTexture screen_bloom_texture =
+            FramebufferTexture(TextureSlot::BLOOM, GL_COLOR_ATTACHMENT1);
         /**
          * @}
          */
@@ -192,7 +194,10 @@ namespace Engine
          */
         Shader gaussian_blur_shader;
         std::array<GLuint, 2> ping_pong_frame_buffer;
-        std::array<FramebufferTexture, 2> ping_pong_texture;
+        std::array<FramebufferTexture, 2> ping_pong_texture = {
+            FramebufferTexture(TextureSlot::BLOOM, GL_COLOR_ATTACHMENT0),
+            FramebufferTexture(TextureSlot::BLOOM, GL_COLOR_ATTACHMENT0),
+        };
         /**
          * @}
          */
@@ -207,7 +212,7 @@ namespace Engine
          * @{
          */
         Shader skybox_shader;
-        CubemapTexture skybox_texture;
+        CubemapTexture skybox_texture = CubemapTexture(TextureSlot::DIFFUSE);
         /**
          * @}
          */
@@ -217,7 +222,8 @@ namespace Engine
          * @{
          */
         Shader depth_shader;
-        FramebufferTexture shadow_map_texture;
+        FramebufferTexture shadow_map_texture =
+            FramebufferTexture(TextureSlot::SHADOW, GL_DEPTH_ATTACHMENT);
         GLuint shadow_map_frame_buffer;
         /**
          * @}

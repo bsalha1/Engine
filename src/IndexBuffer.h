@@ -2,7 +2,6 @@
 
 #include "Drawable.h"
 #include "VertexArray.h"
-#include "log.h"
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -24,37 +23,11 @@ namespace Engine
 
         IndexBuffer() = delete;
 
-        IndexBuffer(const VertexArray &_vertex_array):
-            vertex_array(_vertex_array), index_buffer_obj(0), count(0)
-        {}
+        IndexBuffer(const VertexArray &_vertex_array);
 
-        /**
-         * @brief Create index buffer from given items.
-         *
-         * @param items Pointer to the index items.
-         * @param _count Number of indices.
-         */
-        void create(const void *items, const size_t _count)
-        {
-            count = _count;
+        void create(const void *items, const size_t _count);
 
-            glGenBuffers(1, &index_buffer_obj);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer_obj);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, _count * sizeof(IndexType), items, GL_STATIC_DRAW);
-
-            LOG_DEBUG("Created EBO %u: %zu indices\n", index_buffer_obj, count);
-        }
-
-        /**
-         * @brief Draw the vertices using this buffer together with the vertex buffer.
-         */
-        void draw() const override
-        {
-            LOG_DEBUG("Drawing EBO %u\n", index_buffer_obj);
-
-            vertex_array.bind();
-            glDrawElements(GL_TRIANGLES, count, IndexGLtype, nullptr);
-        }
+        void draw() const override;
 
     private:
         /**

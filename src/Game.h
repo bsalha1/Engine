@@ -9,6 +9,7 @@
 #include "Renderer.h"
 #include "Shader.h"
 #include "Texture.h"
+#include "TextureSlot.h"
 #include "TexturedMaterial.h"
 #include "VertexArray.h"
 
@@ -279,7 +280,7 @@ namespace Engine
         glm::vec3 chaser_position;
         VertexArray chaser_vertex_array;
 
-        Texture chaser_normal_map;
+        Texture chaser_normal_map = Texture(TextureSlot::NORMAL);
         TexturedMaterial chaser_textured_material = TexturedMaterial(glm::vec3(0.2f), /* ambient */
                                                                      glm::vec3(0.2f), /* diffuse */
                                                                      glm::vec3(8.f),  /* specular */
@@ -302,7 +303,7 @@ namespace Engine
         float terrain_height;
         float on_ground_camera_y;
 
-        Texture dirt_normal_map;
+        Texture dirt_normal_map = Texture(TextureSlot::NORMAL);
         TexturedMaterial dirt_textured_material =
             TexturedMaterial(glm::vec3(0.15f, 0.12f, 0.08f), /* ambient */
                              glm::vec3(0.45f, 0.36f, 0.25f), /* diffuse */

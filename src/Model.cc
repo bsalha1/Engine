@@ -170,26 +170,24 @@ namespace Engine
         /*
          * Check if texture was loaded before. If so, grab a reference to it.
          */
-        if (path_to_texture.find(file_path.C_Str()) != path_to_texture.end())
+        const std::string texture_path = (directory + std::string(file_path.C_Str()));
+        const decltype(path_to_texture)::iterator &it = path_to_texture.find(file_path.C_Str());
+        if (it != path_to_texture.end())
         {
-            LOG_DEBUG("Reusing texture %s\n", (directory + std::string(file_path.C_Str())).c_str());
-
-            texture = &path_to_texture[file_path.C_Str()];
+            LOG_DEBUG("Reusing texture %s\n", texture_path.c_str());
+            texture = &it->second;
         }
         /*
          * Otherwise, create a new texture and load it from file.
          */
         else
         {
-            texture = &path_to_texture[file_path.C_Str()];
+            texture = &path_to_texture.emplace(file_path.C_Str(), slot).first->second;
 
             /*
              * Load texture from file.
              */
-            LOG("Loading texture %s\n", (directory + std::string(file_path.C_Str())).c_str());
-
-            ASSERT_RET_IF_NOT(
-                texture->create_from_file(directory + std::string(file_path.C_Str()), slot), false);
+            ASSERT_RET_IF_NOT(texture->create_from_file(texture_path), false);
         }
 
         /*
