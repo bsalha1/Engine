@@ -181,6 +181,15 @@ namespace Engine
         return true;
     }
 
+    /**
+     * @brief Recursive shader loader source which handles includes.
+     *
+     * @param file_path Path to the shader source file.
+     * @param[out] shader_src Output shader source code.
+     * @param is_include Whether this file is being included (not the main file).
+     *
+     * @return True on success, otherwise false.
+     */
     bool Shader::get_shader_src_helper(const std::string &file_path,
                                        std::string &shader_src,
                                        const bool is_include)
@@ -270,7 +279,7 @@ namespace Engine
     /**
      * @brief Compile a shader of given type from source code.
      *
-     * @param shader_id Output OpenGL shader ID.
+     * @param[out] shader_id Output OpenGL shader ID.
      * @param type Shader type (e.g., GL_VERTEX_SHADER, GL_FRAGMENT_SHADER).
      * @param src Shader source code.
      *
@@ -293,7 +302,7 @@ namespace Engine
             glGetShaderiv(shader_id, GL_INFO_LOG_LENGTH, &length);
 
             char message[4096];
-            ASSERT_RET_IF(length > sizeof(message), false);
+            ASSERT_RET_IF(length > static_cast<int>(sizeof(message)), false);
 
             glGetShaderInfoLog(shader_id, length, &length, message);
             LOG_ERROR("Failed to compile shader: %s\n", message);

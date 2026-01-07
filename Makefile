@@ -27,7 +27,7 @@ ifdef DEBUG
 CXXFLAGS += -O0 -g -rdynamic
 LDFLAGS += -g -rdynamic
 else
-CXXFLAGS += -O3 -DNDEBUG
+CXXFLAGS += -O3 -DNDEBUG -Wall -Werror
 LDFLAGS += -s
 endif
 
@@ -36,6 +36,22 @@ ifdef NO_PERF
 CXXFLAGS += -DNPERF
 endif
 
+$(BUILD_DIR):
+	@mkdir -p $(BUILD_DIR)
+
+# A dummy target which always runs.
+FORCE:
+
+# Create flag cache files to know to rebuild when flags change.
+define make_flag_cache
+$1_CACHE := $(BUILD_DIR)/.$1_cache
+
+$$($1_CACHE): FORCE $(BUILD_DIR)
+	@echo '$$($1)' | cmp -s - $$@ || echo '$$($1)' > $$@
+endef
+$(eval $(call make_flag_cache,CXXFLAGS))
+$(eval $(call make_flag_cache,LDFLAGS))
+
 # Disassembled program.
 $(BUILD_DIR)/$(PROGRAM_NAME).s: $(BUILD_DIR)/$(PROGRAM_NAME)
 	@mkdir -p $(dir $@)
@@ -43,13 +59,13 @@ $(BUILD_DIR)/$(PROGRAM_NAME).s: $(BUILD_DIR)/$(PROGRAM_NAME)
 	@objdump -drS $< > $@
 
 # ELF-formatted program.
-$(BUILD_DIR)/$(PROGRAM_NAME): $(BUILD_OBJS)
+$(BUILD_DIR)/$(PROGRAM_NAME): $(BUILD_OBJS) $(CXXFLAGS_CACHE) $(LDFLAGS_CACHE)
 	@mkdir -p $(dir $@)
 	@echo "CXXLD   $@"
-	@g++ $(CXXFLAGS) $^ $(LDFLAGS) -o $@
+	@g++ $(CXXFLAGS) $(BUILD_OBJS) $(LDFLAGS) -o $@
 
 # Make a .o from a .cc
-$(BUILD_DIR)/%.o: src/%.cc
+$(BUILD_DIR)/%.o: src/%.cc $(CXXFLAGS_CACHE)
 	@mkdir -p $(dir $@)
 	@echo "CXX     $@"
 	@g++ $(CXXFLAGS) -MMD -MP -c $< -o $@
@@ -78,4 +94,4 @@ help:
 	@echo "  format   - Format all source files."
 	@echo "  clean    - Remove built artifacts."
 
-.PHONY: all play format clean help
+.PHONY: all play format clean help FORCE

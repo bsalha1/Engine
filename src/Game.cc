@@ -73,41 +73,7 @@ namespace Engine
     /**
      * Constructor.
      */
-    Game::Game():
-        window(nullptr),
-        state(State::RUNNING),
-        state_prev(State::RUNNING),
-        window_center_x(0),
-        window_center_y(0),
-        is_on_ground(true),
-        friction_coeff(friction_coeff_ground),
-        player_movement_state(PlayerMovementState::WALKING),
-        player_move_impulse(move_impulse_walking),
-        player_height(height_standing),
-        user_inputs {},
-        player_position(0.f, player_height, 0.f),
-        player_velocity(0.f, 0.f, 0.f),
-        last_crouch_time(std::chrono::steady_clock::now()),
-        time_since_start(0.0),
-        escape_pressed_prev(false),
-        mouse_prev_set(false),
-        mouse_x_prev(0.0),
-        mouse_y_prev(0.0),
-        horizontal_angle(0.f),
-        vertical_angle(0.f),
-        direction(0.f, 0.f, 0.f),
-        right(0.f, 0.f, 0.f),
-        forwards(0.f, 0.f, 0.f),
-        head(0.f, 0.f, 0.f),
-        chaser_position(0.f, 0.f, 10.f),
-        point_light_position(150.f, 100.f, 120.f),
-        orbital_angle(glm::pi<float>()),
-        stats_dt_buffer {},
-        stats_dt_buffer_idx(0),
-        stats_frames(0),
-        stats_dt_sum(0),
-        stats_dt_sq_sum(0),
-        pause_menu(*this, renderer)
+    Game::Game(): pause_menu(*this, renderer)
     {}
 
     /**
@@ -670,7 +636,7 @@ namespace Engine
 
         ImGui::Text("free vram: %d MB / %d MB", stats_free_vram_MB, stats_total_vram_MB);
 
-        ImGui::Text("ram usage: %d MB", stats_ram_usage_MB);
+        ImGui::Text("ram usage: %lu MB", stats_ram_usage_MB);
 
         ImGui::Text("state: %s", state_to_string(state));
         ImGui::Text("player_movement_state: %s",
@@ -1300,8 +1266,6 @@ namespace Engine
             /*
              * Run gameplay.
              */
-
-            time_since_start += dt;
 
             /*
              * Cache variables used multiple times.

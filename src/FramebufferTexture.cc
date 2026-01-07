@@ -25,6 +25,8 @@ namespace Engine
      * @param max_filter Magnification filter.
      * @param wrap_mode Wrapping mode.
      * @param border_color Border color when using GL_CLAMP_TO_BORDER wrap mode.
+     *
+     * @return True on success, otherwise false.
      */
     bool FramebufferTexture::create(const GLsizei width,
                                     const GLsizei height,

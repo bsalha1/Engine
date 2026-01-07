@@ -118,7 +118,7 @@ namespace Engine
         /**
          * Window handle.
          */
-        GLFWwindow *window;
+        GLFWwindow *window = nullptr;
 
         /**
          * Shader for an object which is textured and reacts to lighting.
@@ -128,91 +128,81 @@ namespace Engine
         /**
          * Game state.
          */
-        State state;
-        State state_prev;
+        State state = State::RUNNING;
+        State state_prev = State::RUNNING;
         static const char *state_to_string(const State state);
         static const char *player_movement_state_to_string(const PlayerMovementState state);
 
         /**
          * Window dimensions in pixels.
          */
-        int window_width;
-        int window_height;
+        int window_width = 0;
+        int window_height = 0;
 
         /**
          * Coordinate of window center on X axis.
          */
-        int window_center_x;
+        int window_center_x = 0;
 
         /**
          * Coordinate of window center on Y axis.
          */
-        int window_center_y;
+        int window_center_y = 0;
 
         /**
          * Player movement.
          */
-        PlayerMovementState player_movement_state;
+        PlayerMovementState player_movement_state = PlayerMovementState::WALKING;
         static constexpr float acceleration_gravity = 10.f;
-        bool is_on_ground;
+        bool is_on_ground = true;
         static constexpr float friction_coeff_ground = 10.f;
         static constexpr float friction_coeff_air = 0.05f;
         static constexpr float friction_coeff_flying = 5.f;
-        float friction_coeff;
+        float friction_coeff = friction_coeff_ground;
         static constexpr float move_impulse_walking = 30.0f;
         static constexpr float move_impulse_sprinting = 100.0f;
         static constexpr float move_impulse_crouching = 15.0f;
         static constexpr float move_impulse_midair = 1.0f;
         static constexpr float move_impulse_flying = 150.0f;
         static constexpr float move_impulse_jump = 4000.0f;
-        float player_move_impulse;
+        float player_move_impulse = move_impulse_walking;
 
         /**
          * Player height.
          */
         static constexpr float height_standing = 2.f;
         static constexpr float height_crouching = 1.f;
-        float player_height;
+        float player_height = height_standing;
 
         /**
          * User inputs from peripherals i.e. mouse and keyboard.
          */
-        UserInputs user_inputs;
+        UserInputs user_inputs = {};
 
         /**
          * Player position.
          */
-        glm::vec3 player_position;
+        glm::vec3 player_position = glm::vec3(0.f, player_height, 0.f);
 
         /**
          * Player velocity.
          */
-        glm::vec3 player_velocity;
+        glm::vec3 player_velocity = glm::vec3(0.f);
 
         /**
          * Player speed.
          */
-        float player_speed;
-
-        /**
-         * Timestamp of last crouch.
-         */
-        std::chrono::steady_clock::time_point last_crouch_time;
+        float player_speed = 0.f;
 
         /**
          * Time since last frame in seconds.
          */
-        double dt;
-
-        /**
-         * Total time passed since the start of the game in seconds.
-         */
-        double time_since_start;
+        double dt = 0.0;
 
         /**
          * Whether the escape key was pressed in the previous frame.
          */
-        bool escape_pressed_prev;
+        bool escape_pressed_prev = false;
 
         /**
          * View state.
@@ -222,14 +212,14 @@ namespace Engine
         /**
          * Whether the mouse position was set in the previous frame.
          */
-        bool mouse_prev_set;
+        bool mouse_prev_set = false;
 
         /**
          * Mouse position in the previous frame.
          *   @{
          */
-        double mouse_x_prev;
-        double mouse_y_prev;
+        double mouse_x_prev = 0.0;
+        double mouse_y_prev = 0.0;
         /**
          *   @}
          */
@@ -238,8 +228,8 @@ namespace Engine
          * Viewing angles.
          *   @{
          */
-        float horizontal_angle;
-        float vertical_angle;
+        float horizontal_angle = 0.f;
+        float vertical_angle = 0.f;
         /**
          *   @}
          */
@@ -247,22 +237,22 @@ namespace Engine
         /**
          * Vector pointing at what player is looking at.
          */
-        glm::vec3 direction;
+        glm::vec3 direction = glm::vec3(0.f);
 
         /**
          * Vector pointing to the right of the player.
          */
-        glm::vec3 right;
+        glm::vec3 right = glm::vec3(0.f);
 
         /**
          * Vector pointing forwards in the X-Z plane.
          */
-        glm::vec3 forwards;
+        glm::vec3 forwards = glm::vec3(0.f);
 
         /**
          * Vector along player's body pointing to their head.
          */
-        glm::vec3 head;
+        glm::vec3 head = glm::vec3(0.f);
 
         /**
          * @}
@@ -277,7 +267,7 @@ namespace Engine
          * Chaser entity.
          * @{
          */
-        glm::vec3 chaser_position;
+        glm::vec3 chaser_position = glm::vec3(0.f, 0.f, 10.f);
         VertexArray chaser_vertex_array;
 
         Texture chaser_normal_map = Texture(TextureSlot::NORMAL);
@@ -295,13 +285,13 @@ namespace Engine
          * @{
          */
         std::vector<float> xz_to_height_map;
-        int terrain_num_cols;
-        int terrain_x_middle;
-        int terrain_z_middle;
+        int terrain_num_cols = 0;
+        int terrain_x_middle = 0;
+        int terrain_z_middle = 0;
         VertexArray terrain_vertex_array;
         IndexBuffer terrain_index_buffer = IndexBuffer(terrain_vertex_array);
-        float terrain_height;
-        float on_ground_camera_y;
+        float terrain_height = 0.f;
+        float on_ground_camera_y = 0.f;
 
         Texture dirt_normal_map = Texture(TextureSlot::NORMAL);
         TexturedMaterial dirt_textured_material =
@@ -328,8 +318,8 @@ namespace Engine
          * Lighting.
          * @{
          */
-        float orbital_angle;
-        glm::vec3 point_light_position;
+        float orbital_angle = glm::pi<float>();
+        glm::vec3 point_light_position = glm::vec3(150.f, 100.f, 120.f);
         /**
          * @}
          */
@@ -339,14 +329,14 @@ namespace Engine
          * @{
          */
         static constexpr size_t num_stats_frames = 1024;
-        std::array<double, num_stats_frames> stats_dt_buffer;
-        size_t stats_dt_buffer_idx;
-        size_t stats_frames;
-        double stats_dt_sum;
-        double stats_dt_sq_sum;
-        GLint stats_free_vram_MB;
-        GLint stats_total_vram_MB;
-        unsigned long stats_ram_usage_MB;
+        std::array<double, num_stats_frames> stats_dt_buffer = {};
+        size_t stats_dt_buffer_idx = 0;
+        size_t stats_frames = 0;
+        double stats_dt_sum = 0.0;
+        double stats_dt_sq_sum = 0.0;
+        GLint stats_free_vram_MB = 0;
+        GLint stats_total_vram_MB = 0;
+        unsigned long stats_ram_usage_MB = 0;
         /**
          * @}
          */
