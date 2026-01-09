@@ -1,43 +1,4 @@
-/**
- * A point light source.
- */
-struct PointLight
-{
-    /**
-     * Position of the light source in world coordinates.
-     */
-    vec3 position;
-
-    vec3 ambient;
-    vec3 diffuse;
-    vec3 specular;
-};
-
-/**
- * A light source assumed infinitely far away.
- */
-struct DirectionalLight
-{
-    /**
-     * Direction of the light.
-     */
-    vec3 direction;
-
-    vec3 ambient;
-    vec3 diffuse;
-    vec3 specular;
-};
-
-/**
- * Material properties of a surface.
- */
-struct Material
-{
-    vec3 ambient;
-    vec3 diffuse;
-    vec3 specular;
-    float shininess;
-};
+#include "include/lighting_types.glsl"
 
 /**
  * Computes the shadow component for a fragment, averaging over a 3x3 grid
@@ -93,25 +54,25 @@ vec3 compute_directional_component(
     vec4 frag_pos_light_space,
     vec3 view_direction)
 {
-    vec3 light_direction = -light.direction;
+    vec3 light_direction = -light.direction.xyz;
     vec3 halfway_direction = normalize(light_direction + view_direction);
 
     /*
      * Compute ambient light component.
      */
-    vec3 ambient_light = light.ambient * material.ambient;
+    vec3 ambient_light = light.ambient.rgb * material.ambient;
 
     /*
      * Compute diffuse light component.
      */
     float diff = max(dot(normal, light_direction), 0.0);
-    vec3 diffuse_light = diff * light.diffuse * material.diffuse;
+    vec3 diffuse_light = diff * light.diffuse.rgb * material.diffuse;
 
     /*
      * Compute specular light component.
      */
     float shine = pow(max(dot(normal, halfway_direction), 0.0), material.shininess);
-    vec3 specular_light = shine * light.specular * material.specular;
+    vec3 specular_light = shine * light.specular.rgb * material.specular;
 
     float shadow = compute_shadow_component(shadow_map_sampler, frag_pos_light_space);
 
@@ -135,30 +96,30 @@ vec3 compute_point_component(
     vec3 frag_pos,
     vec3 view_direction)
 {
-    vec3 light_direction = normalize(light.position - frag_pos);
+    vec3 light_direction = normalize(light.position.xyz - frag_pos);
     vec3 halfway_direction = normalize(light_direction + view_direction);
 
     /*
      * Compute ambient light component.
      */
-    vec3 ambient_light = light.ambient * material.ambient;
+    vec3 ambient_light = light.ambient.rgb * material.ambient;
 
     /*
      * Compute diffuse light component.
      */
     float diff = max(dot(normal, light_direction), 0.0);
-    vec3 diffuse_light = diff * light.diffuse * material.diffuse;
+    vec3 diffuse_light = diff * light.diffuse.rgb * material.diffuse;
 
     /*
      * Compute specular light component.
      */
     float shine = pow(max(dot(normal, halfway_direction), 0.0), material.shininess);
-    vec3 specular_light = shine * light.specular * material.specular;
+    vec3 specular_light = shine * light.specular.rgb * material.specular;
 
     /*
      * Compute attenuation.
      */
-    float distance = length(light.position - frag_pos);
+    float distance = length(light.position.xyz - frag_pos);
     const float constant = 1.0;
     const float linear = 0.007;
     const float quadratic = 0.002;

@@ -192,7 +192,8 @@ namespace Engine
      */
     bool Shader::get_shader_src_helper(const std::string &file_path,
                                        std::string &shader_src,
-                                       const bool is_include)
+                                       const bool is_include,
+                                       std::unordered_set<std::string> &included_files)
     {
         std::ifstream file(file_path);
         ASSERT_RET_IF_NOT(file, false);
@@ -225,6 +226,23 @@ namespace Engine
                  */
                 include_file = include_file.substr(1, include_file.size() - 2);
 
+                /*
+                 * Do not include a file which was already included. Eventually we should
+                 * key off a #pragma once before doing this but yeah.
+                 */
+                if (included_files.find(include_file) != included_files.end())
+                {
+                    LOG_DEBUG("Shader include file %s already included, skipping to avoid "
+                              "circular dependency.\n",
+                              include_file.c_str());
+                    continue;
+                }
+
+                /*
+                 * Update included files set.
+                 */
+                included_files.insert(include_file);
+
                 std::string include_src;
                 const std::string include_path = base_path + include_file;
 
@@ -242,8 +260,9 @@ namespace Engine
                  */
                 else
                 {
-                    ASSERT_RET_IF_NOT(get_shader_src_helper(include_path, include_src, true),
-                                      false);
+                    ASSERT_RET_IF_NOT(
+                        get_shader_src_helper(include_path, include_src, true, included_files),
+                        false);
                     shader_include_cache[include_path] = include_src;
                 }
 
@@ -273,7 +292,8 @@ namespace Engine
      */
     bool Shader::get_shader_src(const std::string &file_path, std::string &shader_src)
     {
-        return get_shader_src_helper(file_path, shader_src, false /* is_include */);
+        std::unordered_set<std::string> included_files;
+        return get_shader_src_helper(file_path, shader_src, false /* is_include */, included_files);
     }
 
     /**

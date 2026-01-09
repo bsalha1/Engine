@@ -11,7 +11,6 @@ namespace Engine
      */
     void VertexArray::bind() const
     {
-        LOG_DEBUG("Binding VAO %u\n", vertex_array_id);
         glBindVertexArray(vertex_array_id);
     }
 
@@ -20,7 +19,6 @@ namespace Engine
      */
     void VertexArray::draw() const
     {
-        LOG_DEBUG("Drawing VAO %u\n", vertex_array_id);
         bind();
         glDrawArrays(GL_TRIANGLES, 0, num_vertices);
     }

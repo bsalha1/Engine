@@ -232,9 +232,6 @@ namespace Engine
             cube = std::move(cube_vertex_array);
         }
 
-        /*
-         * Create shadow map frame buffer.
-         */
         LOG("Creating shadow map frame buffer\n");
         {
             glGenFramebuffers(1, &shadow_map_frame_buffer);
@@ -256,6 +253,18 @@ namespace Engine
                               false);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
         }
+
+        LOG("Creating uniform buffers\n");
+        {
+            glCreateBuffers(1, &per_frame_uniform_buffer_id);
+            glNamedBufferData(per_frame_uniform_buffer_id,
+                              sizeof(PerFrameUniformBuffer),
+                              nullptr,
+                              GL_DYNAMIC_DRAW);
+            glBindBufferBase(GL_UNIFORM_BUFFER, 0 /* binding */, per_frame_uniform_buffer_id);
+        }
+
+        LOG("Initializing shaders\n");
 
         /*
          * Initialize screen shader.
@@ -660,6 +669,39 @@ namespace Engine
         }
 
         /*
+         * Update per-frame uniform buffer.
+         */
+        PerFrameUniformBuffer per_frame_uniform_buffer = {
+            .camera_position = glm::vec4(camera_position, 0.0f),
+            .num_point_lights = static_cast<uint32_t>(point_light_objects.size()),
+            .directional_light =
+                {
+                    .direction = glm::vec4(directional_light_objects[0].direction, 0.0f),
+                    .ambient = glm::vec4(directional_light_objects[0].color, 0.0f),
+                    .diffuse = glm::vec4(directional_light_objects[0].color, 0.0f),
+                    .specular = glm::vec4(directional_light_objects[0].color, 0.0f),
+                },
+            .camera_view = camera_view,
+            .light_view_projection = light_view_projection,
+        };
+
+        for (size_t point_light_idx = 0; point_light_idx < point_light_objects.size();
+             point_light_idx++)
+        {
+            const PointLightObject &point_light_object = point_light_objects[point_light_idx];
+            per_frame_uniform_buffer.point_lights[point_light_idx] = {
+                .position = glm::vec4(point_light_object.transform.position, 1.0f),
+                .ambient = glm::vec4(point_light_object.color, 0.0f),
+                .diffuse = glm::vec4(point_light_object.color, 0.0f),
+                .specular = glm::vec4(point_light_object.color, 0.0f),
+            };
+        }
+        glNamedBufferSubData(per_frame_uniform_buffer_id,
+                             0,
+                             sizeof(PerFrameUniformBuffer),
+                             &per_frame_uniform_buffer);
+
+        /*
          * Render regular objects.
          */
         {
@@ -669,50 +711,7 @@ namespace Engine
             glDrawBuffers(buffers.size(), buffers.data());
         }
         regular_object_shader.use();
-        ASSERT_RET_IF_NOT(regular_object_shader.set_mat4("u_view", camera_view), false);
-        ASSERT_RET_IF_NOT(regular_object_shader.set_vec3("u_camera_position", camera_position),
-                          false);
-        ASSERT_RET_IF_NOT(regular_object_shader.set_mat4("u_light_view_projection",
-                                                         light_view_projection),
-                          false);
 
-        ASSERT_RET_IF_NOT(
-            regular_object_shader.set_int("u_num_point_lights", point_light_objects.size()), false);
-        for (size_t point_light_idx = 0; point_light_idx < point_light_objects.size();
-             point_light_idx++)
-        {
-            const std::string uniform_name =
-                "u_point_lights[" + std::to_string(point_light_idx) + "]";
-            ASSERT_RET_IF_NOT(regular_object_shader.set_vec3(
-                                  uniform_name + ".position",
-                                  point_light_objects[point_light_idx].transform.position),
-                              false);
-            ASSERT_RET_IF_NOT(
-                regular_object_shader.set_vec3(uniform_name + ".ambient",
-                                               point_light_objects[point_light_idx].color),
-                false);
-            ASSERT_RET_IF_NOT(
-                regular_object_shader.set_vec3(uniform_name + ".diffuse",
-                                               point_light_objects[point_light_idx].color),
-                false);
-            ASSERT_RET_IF_NOT(
-                regular_object_shader.set_vec3(uniform_name + ".specular",
-                                               point_light_objects[point_light_idx].color),
-                false);
-        }
-
-        ASSERT_RET_IF_NOT(regular_object_shader.set_vec3("u_directional_light.direction",
-                                                         directional_light_objects[0].direction),
-                          false);
-        ASSERT_RET_IF_NOT(regular_object_shader.set_vec3("u_directional_light.ambient",
-                                                         directional_light_objects[0].color),
-                          false);
-        ASSERT_RET_IF_NOT(regular_object_shader.set_vec3("u_directional_light.diffuse",
-                                                         directional_light_objects[0].color),
-                          false);
-        ASSERT_RET_IF_NOT(regular_object_shader.set_vec3("u_directional_light.specular",
-                                                         directional_light_objects[0].color),
-                          false);
         shadow_map_texture.use();
         for (const RegularObject &object : regular_objects)
         {
@@ -729,49 +728,6 @@ namespace Engine
 
         shadow_map_texture.use();
         model_shader.use();
-        ASSERT_RET_IF_NOT(model_shader.set_mat4("u_view", camera_view), false);
-        ASSERT_RET_IF_NOT(model_shader.set_mat4("u_light_view_projection", light_view_projection),
-                          false);
-        ASSERT_RET_IF_NOT(model_shader.set_vec3("u_camera_position", camera_position), false);
-
-        ASSERT_RET_IF_NOT(model_shader.set_int("u_num_point_lights", point_light_objects.size()),
-                          false);
-        for (size_t point_light_idx = 0; point_light_idx < point_light_objects.size();
-             point_light_idx++)
-        {
-            const std::string uniform_name =
-                "u_point_lights[" + std::to_string(point_light_idx) + "]";
-            ASSERT_RET_IF_NOT(
-                model_shader.set_vec3(uniform_name + ".position",
-                                      point_light_objects[point_light_idx].transform.position),
-                false);
-            ASSERT_RET_IF_NOT(model_shader.set_vec3(uniform_name + ".ambient",
-                                                    point_light_objects[point_light_idx].color),
-                              false);
-            ASSERT_RET_IF_NOT(model_shader.set_vec3(uniform_name + ".diffuse",
-                                                    point_light_objects[point_light_idx].color),
-                              false);
-            ASSERT_RET_IF_NOT(model_shader.set_vec3(uniform_name + ".specular",
-                                                    point_light_objects[point_light_idx].color),
-                              false);
-        }
-
-        ASSERT_RET_IF_NOT(model_shader.set_vec3("u_directional_light.direction",
-                                                directional_light_objects[0].direction),
-                          false);
-        ASSERT_RET_IF_NOT(model_shader.set_vec3("u_directional_light.ambient",
-                                                directional_light_objects[0].color),
-                          false);
-        ASSERT_RET_IF_NOT(model_shader.set_vec3("u_directional_light.diffuse",
-                                                directional_light_objects[0].color),
-                          false);
-        ASSERT_RET_IF_NOT(model_shader.set_vec3("u_directional_light.specular",
-                                                directional_light_objects[0].color),
-                          false);
-
-        ASSERT_RET_IF_NOT(model_shader.set_vec3("u_directional_light.specular",
-                                                directional_light_objects[0].color),
-                          false);
         for (const ModelObject &object : model_objects)
         {
             ASSERT_RET_IF_NOT(model_shader.set_mat4("u_model", object.transform.model()), false);
@@ -792,48 +748,7 @@ namespace Engine
 
             shadow_map_texture.use();
             terrain_shader.use();
-            ASSERT_RET_IF_NOT(terrain_shader.set_mat4("u_view", camera_view), false);
-            ASSERT_RET_IF_NOT(
-                terrain_shader.set_mat4("u_light_view_projection", light_view_projection), false);
-            ASSERT_RET_IF_NOT(terrain_shader.set_vec3("u_camera_position", camera_position), false);
 
-            ASSERT_RET_IF_NOT(
-                terrain_shader.set_int("u_num_point_lights", point_light_objects.size()), false);
-            for (size_t point_light_idx = 0; point_light_idx < point_light_objects.size();
-                 point_light_idx++)
-            {
-                const std::string uniform_name =
-                    "u_point_lights[" + std::to_string(point_light_idx) + "]";
-                ASSERT_RET_IF_NOT(terrain_shader.set_vec3(
-                                      uniform_name + ".position",
-                                      point_light_objects[point_light_idx].transform.position),
-                                  false);
-                ASSERT_RET_IF_NOT(
-                    terrain_shader.set_vec3(uniform_name + ".ambient",
-                                            point_light_objects[point_light_idx].color),
-                    false);
-                ASSERT_RET_IF_NOT(
-                    terrain_shader.set_vec3(uniform_name + ".diffuse",
-                                            point_light_objects[point_light_idx].color),
-                    false);
-                ASSERT_RET_IF_NOT(
-                    terrain_shader.set_vec3(uniform_name + ".specular",
-                                            point_light_objects[point_light_idx].color),
-                    false);
-            }
-
-            ASSERT_RET_IF_NOT(terrain_shader.set_vec3("u_directional_light.direction",
-                                                      directional_light_objects[0].direction),
-                              false);
-            ASSERT_RET_IF_NOT(terrain_shader.set_vec3("u_directional_light.ambient",
-                                                      directional_light_objects[0].color),
-                              false);
-            ASSERT_RET_IF_NOT(terrain_shader.set_vec3("u_directional_light.diffuse",
-                                                      directional_light_objects[0].color),
-                              false);
-            ASSERT_RET_IF_NOT(terrain_shader.set_vec3("u_directional_light.specular",
-                                                      directional_light_objects[0].color),
-                              false);
             terrain->normal_map.use();
             terrain->material.apply(terrain_shader);
             terrain->drawable.draw();
@@ -850,7 +765,6 @@ namespace Engine
             glDrawBuffers(buffers.size(), buffers.data());
         }
         point_light_shader.use();
-        ASSERT_RET_IF_NOT(point_light_shader.set_mat4("u_view", camera_view), false);
         for (const PointLightObject &object : point_light_objects)
         {
             ASSERT_RET_IF_NOT(point_light_shader.set_mat4("u_model", object.transform.model()),

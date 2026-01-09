@@ -1,12 +1,12 @@
 #version 460 core
 
 #include "include/lighting.frag"
+#include "include/per_frame_ubo.glsl"
 
 out vec4 color;
 
 in vec3 v_position_world_coords;
 in vec2 v_texture_coord;
-in vec3 v_view_direction;
 in vec3 v_normal;
 in vec4 v_tangent_handedness;
 in vec4 v_frag_pos_light_space;
@@ -21,12 +21,6 @@ struct ModelMaterial
 
 uniform ModelMaterial u_material;
 uniform sampler2D u_shadow_map_sampler;
-
-#define MAX_POINT_LIGHTS 64
-
-uniform int u_num_point_lights;
-uniform PointLight u_point_lights[MAX_POINT_LIGHTS];
-uniform DirectionalLight u_directional_light;
 
 void main()
 {
@@ -52,22 +46,28 @@ void main()
         u_material.shininess /* shininess */
     );
 
+    /*
+     * Compute unit vector pointing from vertex to camera to pass to fragment
+     * shader to do lighting.
+     */
+    vec3 view_direction = normalize(per_frame_ubo.camera_position - v_position_world_coords);
+
     vec3 result = compute_directional_component(
-        u_directional_light,
+        per_frame_ubo.directional_light,
         material,
         u_shadow_map_sampler,
         normal,
         v_frag_pos_light_space,
-        v_view_direction);
+        view_direction);
 
-    for (int i = 0; i < u_num_point_lights; i++)
+    for (uint i = 0; i < per_frame_ubo.num_point_lights; i++)
     {
         result += compute_point_component(
-            u_point_lights[i],
+            per_frame_ubo.point_lights[i],
             material,
             normal,
             v_position_world_coords,
-            v_view_direction);
+            view_direction);
     }
 
     color = vec4(diffuse_color * result, 1.0);

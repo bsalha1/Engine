@@ -35,8 +35,6 @@ namespace Engine
      */
     void IndexBuffer::draw() const
     {
-        LOG_DEBUG("Drawing EBO %u\n", index_buffer_obj);
-
         vertex_array.bind();
         glDrawElements(GL_TRIANGLES, count, IndexGLtype, nullptr);
     }

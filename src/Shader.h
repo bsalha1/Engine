@@ -8,6 +8,7 @@
 #include <glm/vec3.hpp>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace Engine
 {
@@ -49,7 +50,8 @@ namespace Engine
 
         static bool get_shader_src_helper(const std::string &file_path,
                                           std::string &shader_src,
-                                          const bool is_include);
+                                          const bool is_include,
+                                          std::unordered_set<std::string> &included_files);
 
         static bool get_shader_src(const std::string &file_path, std::string &shader_src);
 

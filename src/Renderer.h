@@ -99,6 +99,77 @@ namespace Engine
             const Transform &transform;
         };
 
+        /**
+         * Uniform buffer objects must be aligned to 16 bytes.
+         */
+        static constexpr uint8_t uniform_buffer_object_alignment = 16;
+
+        /**
+         * @brief Point light uniform structure.
+         */
+        struct alignas(uniform_buffer_object_alignment) PointLightUniform
+        {
+            glm::vec4 position;
+            glm::vec4 ambient;
+            glm::vec4 diffuse;
+            glm::vec4 specular;
+        };
+        static_assert(sizeof(PointLightUniform) == 64);
+
+        /**
+         * @brief Directional light uniform structure.
+         */
+        struct alignas(uniform_buffer_object_alignment) DirectionalLightUniform
+        {
+            glm::vec4 direction;
+            glm::vec4 ambient;
+            glm::vec4 diffuse;
+            glm::vec4 specular;
+        };
+        static_assert(sizeof(DirectionalLightUniform) == 64);
+
+        /**
+         * @brief Per-frame uniform buffer structure.
+         */
+        struct alignas(uniform_buffer_object_alignment) PerFrameUniformBuffer
+        {
+            /**
+             * Camera position in world space (stored here so point_lights is aligned on a 16-byte
+             * boundary).
+             */
+            glm::vec3 camera_position;
+
+            /**
+             * Number of points lights in point_per_frame_ubo.
+             */
+            uint32_t num_point_lights;
+
+            /**
+             * Maximum number of point lights supported.
+             */
+            static constexpr uint8_t max_point_lights = 64;
+
+            /**
+             * Point lights array.
+             */
+            std::array<PointLightUniform, max_point_lights> point_lights;
+
+            /**
+             * Directional light.
+             */
+            DirectionalLightUniform directional_light;
+
+            /**
+             * Camera view matrix.
+             */
+            glm::mat4 camera_view;
+
+            /**
+             * Light view-projection matrix.
+             */
+            glm::mat4 light_view_projection;
+        };
+
         bool init(const int _window_width, const int _window_height);
 
         bool set_terrain(const Terrain &_terrain);
@@ -174,19 +245,19 @@ namespace Engine
          */
 
         /**
-         * Point light objects.
+         * Lighting.
          * @{
          */
         Shader point_light_shader;
+
         std::vector<PointLightObject> point_light_objects;
+
+        std::vector<DirectionalLightObject> directional_light_objects;
+
+        GLuint per_frame_uniform_buffer_id;
         /**
          * @}
          */
-
-        /**
-         * Directional light objects.
-         */
-        std::vector<DirectionalLightObject> directional_light_objects;
 
         /**
          * Gaussian blur.
