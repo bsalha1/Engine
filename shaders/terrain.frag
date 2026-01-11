@@ -148,5 +148,15 @@ void main()
             view_direction);
     }
 
+    for (uint i = 0; i < per_frame_ubo.num_spot_lights; i++)
+    {
+        result += compute_spot_component(
+            per_frame_ubo.spot_lights[i],
+            u_material,
+            normal_world_space,
+            v_position_world_coords,
+            view_direction);
+    }
+
     color = vec4(result * texture_color, 1.0);
 }

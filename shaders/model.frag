@@ -29,12 +29,12 @@ void main()
 
     vec3 normal_from_texture = texture(u_material.normal_texture_sampler, v_texture_coord).rgb * 2.0 - 1.0;
 
-    vec3 normal = normalize(v_normal);
+    vec3 normal_world_space = normalize(v_normal);
     vec3 tangent = normalize(v_tangent_handedness.xyz);
-    vec3 bitangent = v_tangent_handedness.w * normalize(cross(normal, tangent));
-    mat3 tangent_bitangent_norm = mat3(tangent, bitangent, normal);
+    vec3 bitangent = v_tangent_handedness.w * normalize(cross(normal_world_space, tangent));
+    mat3 tangent_bitangent_norm = mat3(tangent, bitangent, normal_world_space);
 
-    normal = normalize(tangent_bitangent_norm * normal_from_texture);
+    normal_world_space = normalize(tangent_bitangent_norm * normal_from_texture);
 
     /*
      * Translate model textures into a material.
@@ -56,7 +56,7 @@ void main()
         per_frame_ubo.directional_light,
         material,
         u_shadow_map_sampler,
-        normal,
+        normal_world_space,
         v_frag_pos_light_space,
         view_direction);
 
@@ -65,7 +65,17 @@ void main()
         result += compute_point_component(
             per_frame_ubo.point_lights[i],
             material,
-            normal,
+            normal_world_space,
+            v_position_world_coords,
+            view_direction);
+    }
+
+    for (uint i = 0; i < per_frame_ubo.num_spot_lights; i++)
+    {
+        result += compute_spot_component(
+            per_frame_ubo.spot_lights[i],
+            material,
+            normal_world_space,
             v_position_world_coords,
             view_direction);
     }

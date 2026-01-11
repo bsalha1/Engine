@@ -20,7 +20,7 @@ namespace Engine
             bool vsync_enabled;
         };
 
-        SettingsMenu(Renderer &renderer);
+        SettingsMenu(Renderer &_renderer);
 
         bool render(Menu *& /* unused */, bool & /* unused */) override;
 

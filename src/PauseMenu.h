@@ -1,5 +1,6 @@
 #pragma once
 
+#include "DebugMenu.h"
 #include "Menu.h"
 #include "Renderer.h"
 #include "SettingsMenu.h"
@@ -15,8 +16,6 @@ namespace Engine
 
         bool render(Menu *&next_menu, bool & /* unused */) override;
 
-        void on_exit(Menu *& /* unused */) override;
-
     private:
         /**
          * Reference to the Game instance to apply game-wide changes to.
@@ -27,5 +26,10 @@ namespace Engine
          * Settings menu.
          */
         SettingsMenu settings_menu;
+
+        /**
+         * Debug menu.
+         */
+        DebugMenu debug_menu;
     };
 }

@@ -304,7 +304,6 @@ namespace Engine
                           }),
                           false);
         skybox_shader.use();
-        ASSERT_RET_IF_NOT(skybox_shader.set_mat4("u_projection", projection), false);
         ASSERT_RET_IF_NOT(skybox_shader.set_float("u_sun_angular_radius", sun_angular_radius),
                           false);
         ASSERT_RET_IF_NOT(skybox_shader.set_vec3("u_sun_position", sun_position_skybox_model_space),
@@ -320,7 +319,6 @@ namespace Engine
                           }),
                           false);
         regular_object_shader.use();
-        ASSERT_RET_IF_NOT(regular_object_shader.set_mat4("u_projection", projection), false);
         ASSERT_RET_IF_NOT(regular_object_shader.set_int("u_texture_sampler", TextureSlot::DIFFUSE),
                           false);
         ASSERT_RET_IF_NOT(
@@ -337,7 +335,6 @@ namespace Engine
                           }),
                           false);
         point_light_shader.use();
-        ASSERT_RET_IF_NOT(point_light_shader.set_mat4("u_projection", projection), false);
 
         /*
          * Initialize depth shader.
@@ -357,7 +354,6 @@ namespace Engine
                           }),
                           false);
         debug_shader.use();
-        ASSERT_RET_IF_NOT(debug_shader.set_mat4("u_projection", projection), false);
 
         /*
          * Initialize terrain shader.
@@ -368,7 +364,6 @@ namespace Engine
                           }),
                           false);
         terrain_shader.use();
-        ASSERT_RET_IF_NOT(terrain_shader.set_mat4("u_projection", projection), false);
         ASSERT_RET_IF_NOT(terrain_shader.set_mat4("u_model", glm::mat4(1)), false);
 
         /*
@@ -396,7 +391,6 @@ namespace Engine
                           }),
                           false);
         model_shader.use();
-        ASSERT_RET_IF_NOT(model_shader.set_mat4("u_projection", projection), false);
         ASSERT_RET_IF_NOT(model_shader.set_int("u_shadow_map_sampler", TextureSlot::SHADOW), false);
         ASSERT_RET_IF_NOT(model_shader.set_int("u_material.diffuse_texture_sampler",
                                                TextureSlot::DIFFUSE),
@@ -460,6 +454,16 @@ namespace Engine
     void Renderer::add_directional_light_object(const DirectionalLightObject &object)
     {
         directional_light_objects.push_back(object);
+    }
+
+    /**
+     * @brief Add a spot light object to be rendered.
+     *
+     * @param object Spot light object to add.
+     */
+    void Renderer::add_spot_light_object(const SpotLightObject &object)
+    {
+        spot_light_objects.push_back(object);
     }
 
     /**
@@ -555,8 +559,8 @@ namespace Engine
              */
             static constexpr float shadow_frustrum_start = 0.f;
             static constexpr float shadow_frustrum_end = 150.f;
-            static constexpr float shadow_frustrum_width = shadow_frustrum_end / 2.f;
-            static constexpr float shadow_render_distance_from_camera = shadow_frustrum_end / 2.f;
+            static constexpr float shadow_frustrum_width = shadow_frustrum_end / 4.f;
+            static constexpr float shadow_render_distance_from_camera = shadow_frustrum_end / 4.f;
             const float shadow_render_distance_from_light = shadow_frustrum_end / 2.f;
 
             const glm::vec3 light_target =
@@ -658,7 +662,6 @@ namespace Engine
                 glDrawBuffers(buffers.size(), buffers.data());
             }
             debug_shader.use();
-            ASSERT_RET_IF_NOT(debug_shader.set_mat4("u_view", camera_view), false);
             for (const DebugObject &object : debug_objects)
             {
                 ASSERT_RET_IF_NOT(debug_shader.set_mat4("u_model", object.transform.model()),
@@ -674,6 +677,7 @@ namespace Engine
         PerFrameUniformBuffer per_frame_uniform_buffer = {
             .camera_position = glm::vec4(camera_position, 0.0f),
             .num_point_lights = static_cast<uint32_t>(point_light_objects.size()),
+            .num_spot_lights = static_cast<uint32_t>(spot_light_objects.size()),
             .directional_light =
                 {
                     .direction = glm::vec4(directional_light_objects[0].direction, 0.0f),
@@ -682,20 +686,41 @@ namespace Engine
                     .specular = glm::vec4(directional_light_objects[0].color, 0.0f),
                 },
             .camera_view = camera_view,
+            .camera_projection = projection,
             .light_view_projection = light_view_projection,
         };
+
+        ASSERT_RET_IF(point_light_objects.size() > PerFrameUniformBuffer::max_point_lights, false);
 
         for (size_t point_light_idx = 0; point_light_idx < point_light_objects.size();
              point_light_idx++)
         {
             const PointLightObject &point_light_object = point_light_objects[point_light_idx];
             per_frame_uniform_buffer.point_lights[point_light_idx] = {
-                .position = glm::vec4(point_light_object.transform.position, 1.0f),
-                .ambient = glm::vec4(point_light_object.color, 0.0f),
+                .position = glm::vec4(point_light_object.transform.position, 0.0f),
+                .ambient = glm::vec4(0.f),
                 .diffuse = glm::vec4(point_light_object.color, 0.0f),
                 .specular = glm::vec4(point_light_object.color, 0.0f),
             };
         }
+
+        ASSERT_RET_IF(spot_light_objects.size() > PerFrameUniformBuffer::max_spot_lights, false);
+
+        for (size_t spot_light_idx = 0; spot_light_idx < spot_light_objects.size();
+             spot_light_idx++)
+        {
+            const SpotLightObject &spot_light_object = spot_light_objects[spot_light_idx];
+            per_frame_uniform_buffer.spot_lights[spot_light_idx] = {
+                .position = glm::vec4(spot_light_object.position, 0.0f),
+                .direction = glm::vec4(spot_light_object.direction, 0.0f),
+                .ambient = glm::vec4(0.0f),
+                .diffuse = glm::vec4(spot_light_object.color, 0.0f),
+                .specular = glm::vec4(spot_light_object.color, 0.0f),
+                .inner_cut_off = spot_light_object.inner_cut_off,
+                .outer_cut_off = spot_light_object.outer_cut_off,
+            };
+        }
+
         glNamedBufferSubData(per_frame_uniform_buffer_id,
                              0,
                              sizeof(PerFrameUniformBuffer),
@@ -840,6 +865,7 @@ namespace Engine
         regular_objects.clear();
         point_light_objects.clear();
         directional_light_objects.clear();
+        spot_light_objects.clear();
         debug_objects.clear();
         model_objects.clear();
 

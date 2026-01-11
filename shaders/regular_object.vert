@@ -17,13 +17,12 @@ out vec2 v_texture_coord;
 out vec4 v_frag_pos_light_space;
 
 uniform mat4 u_model;
-uniform mat4 u_projection;
 
 void main()
 {
     const vec4 position_four_vector = vec4(l_position, 1.0);
 
-    gl_Position = u_projection * per_frame_ubo.camera_view * u_model * position_four_vector;
+    gl_Position = per_frame_ubo.camera_projection * per_frame_ubo.camera_view * u_model * position_four_vector;
 
     v_texture_coord = l_texture_coord;
 

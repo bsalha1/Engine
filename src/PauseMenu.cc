@@ -9,7 +9,8 @@ namespace Engine
     /**
      * @brief Constructor.
      */
-    PauseMenu::PauseMenu(Game &_game, Renderer &renderer): game(_game), settings_menu(renderer)
+    PauseMenu::PauseMenu(Game &_game, Renderer &renderer):
+        game(_game), settings_menu(renderer), debug_menu(game)
     {}
 
     /**
@@ -42,6 +43,16 @@ namespace Engine
         }
 
         /*
+         * Add debug button.
+         */
+        ImGui::Separator();
+        if (ImGui::Button("Debug"))
+        {
+            next_menu = &debug_menu;
+            LOG_DEBUG("Pause Menu: Debug\n");
+        }
+
+        /*
          * Add quit button.
          */
         ImGui::Separator();
@@ -54,10 +65,4 @@ namespace Engine
 
         return true;
     }
-
-    /**
-     * @brief Called when exiting the menu - does nothing for the Pause Menu.
-     */
-    void PauseMenu::on_exit(Menu *& /* unused */)
-    {}
 }

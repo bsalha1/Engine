@@ -73,6 +73,9 @@ namespace Engine
 
             bool left_click;
             bool left_click_rising_edge;
+
+            bool right_click;
+            bool right_click_rising_edge;
         };
 
         /**
@@ -200,6 +203,11 @@ namespace Engine
         double dt = 0.0;
 
         /**
+         * Time rate in game seconds per real-time second.
+         */
+        double game_time_per_real_time = 1.0;
+
+        /**
          * Whether the escape key was pressed in the previous frame.
          */
         bool escape_pressed_prev = false;
@@ -320,6 +328,7 @@ namespace Engine
          */
         float orbital_angle = glm::pi<float>();
         glm::vec3 point_light_position = glm::vec3(150.f, 100.f, 120.f);
+        bool is_flash_light_on = false;
         /**
          * @}
          */
@@ -368,5 +377,7 @@ namespace Engine
         /**
          * @}
          */
+
+        friend class DebugMenu;
     };
 }

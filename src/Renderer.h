@@ -81,6 +81,18 @@ namespace Engine
         };
 
         /**
+         * @brief A spot light object has a position, direction, and color.
+         */
+        struct SpotLightObject
+        {
+            const glm::vec3 &position;
+            const glm::vec3 &direction;
+            const glm::vec3 &color;
+            const float inner_cut_off;
+            const float outer_cut_off;
+        };
+
+        /**
          * @brief A debug object has a position and color.
          */
         struct DebugObject
@@ -117,6 +129,22 @@ namespace Engine
         static_assert(sizeof(PointLightUniform) == 64);
 
         /**
+         * @brief Point light uniform structure.
+         */
+        struct alignas(uniform_buffer_object_alignment) SpotLightUniform
+        {
+            glm::vec4 position;
+            glm::vec4 direction;
+            glm::vec4 ambient;
+            glm::vec4 diffuse;
+            glm::vec4 specular;
+            glm::vec2 pad0;
+            float inner_cut_off;
+            float outer_cut_off;
+        };
+        static_assert(sizeof(SpotLightUniform) == 96);
+
+        /**
          * @brief Directional light uniform structure.
          */
         struct alignas(uniform_buffer_object_alignment) DirectionalLightUniform
@@ -140,7 +168,7 @@ namespace Engine
             glm::vec3 camera_position;
 
             /**
-             * Number of points lights in point_per_frame_ubo.
+             * Number of points lights in point_lights.
              */
             uint32_t num_point_lights;
 
@@ -155,6 +183,23 @@ namespace Engine
             std::array<PointLightUniform, max_point_lights> point_lights;
 
             /**
+             * Maximum number of spot lights supported.
+             */
+            static constexpr uint8_t max_spot_lights = 64;
+
+            glm::vec3 pad0;
+
+            /**
+             * Number of spot lights in spot_lights.
+             */
+            uint32_t num_spot_lights;
+
+            /**
+             * Spot lights array.
+             */
+            std::array<SpotLightUniform, max_spot_lights> spot_lights;
+
+            /**
              * Directional light.
              */
             DirectionalLightUniform directional_light;
@@ -163,6 +208,11 @@ namespace Engine
              * Camera view matrix.
              */
             glm::mat4 camera_view;
+
+            /**
+             * Camera projection matrix.
+             */
+            glm::mat4 camera_projection;
 
             /**
              * Light view-projection matrix.
@@ -179,6 +229,8 @@ namespace Engine
         void add_point_light_object(const PointLightObject &object);
 
         void add_directional_light_object(const DirectionalLightObject &object);
+
+        void add_spot_light_object(const SpotLightObject &object);
 
         void add_debug_object(const DebugObject &object);
 
@@ -253,6 +305,8 @@ namespace Engine
         std::vector<PointLightObject> point_light_objects;
 
         std::vector<DirectionalLightObject> directional_light_objects;
+
+        std::vector<SpotLightObject> spot_light_objects;
 
         GLuint per_frame_uniform_buffer_id;
         /**

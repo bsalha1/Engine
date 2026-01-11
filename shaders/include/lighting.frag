@@ -9,13 +9,13 @@
  *
  * @return The shadow factor.
  */
-float compute_shadow_component(sampler2D shadow_map_sampler, vec4 frag_pos_light_space)
+float compute_shadow_component(sampler2D shadow_map_sampler, vec4 frag_pos_light_space, vec3 normal, vec3 light_direction)
 {
     vec3 proj_coords = frag_pos_light_space.xyz / frag_pos_light_space.w * 0.5 + 0.5;
     float closest_depth = texture(shadow_map_sampler, proj_coords.xy).r;
     float current_depth = proj_coords.z;
 
-    const float bias = 0.005;
+    float bias = max(0.05 * (1.0 - dot(normal, light_direction)), 0.005);  
     float shadow = 0.0;
     if (proj_coords.z <= 1.0)
     {
@@ -74,7 +74,11 @@ vec3 compute_directional_component(
     float shine = pow(max(dot(normal, halfway_direction), 0.0), material.shininess);
     vec3 specular_light = shine * light.specular.rgb * material.specular;
 
-    float shadow = compute_shadow_component(shadow_map_sampler, frag_pos_light_space);
+    float shadow = compute_shadow_component(
+        shadow_map_sampler,
+        frag_pos_light_space,
+        normal,
+        light_direction);
 
     return (ambient_light + (1.0 - shadow) * (diffuse_light + specular_light));
 }
@@ -115,6 +119,62 @@ vec3 compute_point_component(
      */
     float shine = pow(max(dot(normal, halfway_direction), 0.0), material.shininess);
     vec3 specular_light = shine * light.specular.rgb * material.specular;
+
+    /*
+     * Compute attenuation.
+     */
+    float distance = length(light.position.xyz - frag_pos);
+    const float constant = 1.0;
+    const float linear = 0.007;
+    const float quadratic = 0.002;
+    float attenuation = 1.0 / (constant + linear * distance + quadratic * (distance * distance));
+
+    return attenuation * (ambient_light + diffuse_light + specular_light);
+}
+
+
+/**
+ * Computes the component of light contributed by a spot light source.
+ *
+ * @param light The spot light source.
+ * @param normal The normal vector at the fragment.
+ * @param frag_pos The position of the fragment in world coordinates.
+ * @param view_direction The view direction vector.
+ *
+ * @return The computed light component.
+ */
+vec3 compute_spot_component(
+    SpotLight light,
+    Material material,
+    vec3 normal,
+    vec3 frag_pos,
+    vec3 view_direction)
+{
+    /*
+     * Compute ambient light component.
+     */
+    vec3 ambient_light = light.ambient.rgb * material.ambient;
+
+    /*
+     * Compute intensity based on spot light cone angles.
+     */
+    vec3 light_direction = normalize(light.position.xyz - frag_pos);
+    float theta = dot(light_direction, normalize(-light.direction.xyz));
+    float epsilon = light.outer_cut_off - light.inner_cut_off;
+    float intensity = clamp((theta - light.inner_cut_off) / epsilon, 0.0, 1.0);
+
+    /*
+     * Compute diffuse light component.
+     */
+    float diff = max(dot(normal, light_direction), 0.0);
+    vec3 diffuse_light = intensity * diff * light.diffuse.rgb * material.diffuse;
+
+    /*
+     * Compute specular light component.
+     */
+    vec3 halfway_direction = normalize(light_direction + view_direction);
+    float shine = pow(max(dot(normal, halfway_direction), 0.0), material.shininess);
+    vec3 specular_light = intensity * shine * light.specular.rgb * material.specular;
 
     /*
      * Compute attenuation.

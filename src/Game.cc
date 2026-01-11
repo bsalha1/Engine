@@ -866,6 +866,10 @@ namespace Engine
         const bool left_click = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
         user_inputs.left_click_rising_edge = left_click && !user_inputs.left_click;
         user_inputs.left_click = left_click;
+
+        const bool right_click = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT);
+        user_inputs.right_click_rising_edge = right_click && !user_inputs.right_click;
+        user_inputs.right_click = right_click;
     }
 
     /**
@@ -1121,7 +1125,7 @@ namespace Engine
         if (user_inputs.left_click_rising_edge)
         {
             static constexpr glm::vec3 weapon_projectile_color =
-                2.f * glm::vec3(0xFF, 0x00, 0xFF) / 255.f;
+                5.f * glm::vec3(0xFF, 0x00, 0xFF) / 255.f;
 
             const glm::vec3 player_right_hand_position =
                 player_position + glm::vec3(0.f, -0.5f, 0.f) + right * 0.5f + direction * 0.5f;
@@ -1161,6 +1165,17 @@ namespace Engine
                 .angular_velocity = glm::radians<float>(720.f),
                 .time_to_live = 2.f,
             });
+        }
+
+        /*
+         * Toggle flash light on right click.
+         */
+        if (user_inputs.right_click_rising_edge)
+        {
+            /*
+             * Toggle flashlight.
+             */
+            is_flash_light_on ^= 1;
         }
     }
 
@@ -1223,7 +1238,7 @@ namespace Engine
         /*
          * Set day length and compute the rotational speed.
          */
-        static constexpr float day_length_s = 10.f;
+        static constexpr float day_length_s = 120.f;
         static constexpr float rotational_angular_speed = 2 * glm::pi<float>() / day_length_s;
 
         /*
@@ -1241,15 +1256,16 @@ namespace Engine
          * Loop until the user closes the window or state gets set to QUIT by the
          * program.
          */
-        std::chrono::steady_clock::time_point start_time = std::chrono::steady_clock::now();
-        std::chrono::steady_clock::time_point frame_start_time = start_time;
+        std::chrono::steady_clock::time_point frame_start_time = std::chrono::steady_clock::now();
         while (state != State::QUIT && !glfwWindowShouldClose(window))
         {
             /*
              * Compute how much time has passed since the last frame.
              */
-            const uint64_t dt_ns = (std::chrono::steady_clock::now() - frame_start_time).count();
-            dt = dt_ns / 1e9;
+            const double dt_ns = (std::chrono::steady_clock::now() - frame_start_time).count() *
+                                 game_time_per_real_time;
+            static constexpr double s_per_ns = 1e-9;
+            dt = dt_ns * s_per_ns;
 
             frame_start_time = std::chrono::steady_clock::now();
 
@@ -1505,6 +1521,26 @@ namespace Engine
                 .transform = point_light_transform,
                 .drawable = chaser_vertex_array,
             });
+
+            /*
+             * Submit spot light to renderer.
+             */
+            if (is_flash_light_on)
+            {
+                const glm::vec3 player_left_hand_position =
+                    player_position + glm::vec3(0.f, -0.2f, 0.f) - right * 0.2f + direction * 0.2f;
+                const glm::vec3 flash_light_position = player_left_hand_position;
+
+                const glm::vec3 flash_light_direction = direction;
+
+                renderer.add_spot_light_object({
+                    .position = flash_light_position,
+                    .direction = flash_light_direction,
+                    .color = 5.f * glm::vec3(1.f, 1.f, 1.f),
+                    .inner_cut_off = glm::cos(glm::radians(30.0f)),
+                    .outer_cut_off = glm::cos(glm::radians(22.5f)),
+                });
+            }
 
             /*
              * Submit sun to renderer.

@@ -22,12 +22,12 @@ void main()
     vec3 texture_color = texture(u_texture_sampler, v_texture_coord).rgb;
     vec3 normal_from_texture = texture(u_normal_map_sampler, v_texture_coord).rgb * 2.0 - 1.0;
 
-    vec3 normal = normalize(v_normal);
+    vec3 normal_world_space = normalize(v_normal);
     vec3 tangent = normalize(v_tangent_handedness.xyz);
-    vec3 bitangent = v_tangent_handedness.w * normalize(cross(normal, tangent));
+    vec3 bitangent = v_tangent_handedness.w * normalize(cross(normal_world_space, tangent));
 
-    mat3 tangent_bitangent_norm = mat3(tangent, bitangent, normal);
-    normal = normalize(tangent_bitangent_norm * normal_from_texture);
+    mat3 tangent_bitangent_norm = mat3(tangent, bitangent, normal_world_space);
+    normal_world_space = normalize(tangent_bitangent_norm * normal_from_texture);
 
     /*
      * Compute unit vector pointing from vertex to camera to pass to fragment
@@ -39,7 +39,7 @@ void main()
         per_frame_ubo.directional_light,
         u_material,
         u_shadow_map_sampler,
-        normal,
+        normal_world_space,
         v_frag_pos_light_space,
         view_direction);
 
@@ -48,7 +48,17 @@ void main()
         result += compute_point_component(
             per_frame_ubo.point_lights[i],
             u_material,
-            normal,
+            normal_world_space,
+            v_position_world_coords,
+            view_direction);
+    }
+
+    for (uint i = 0; i < per_frame_ubo.num_spot_lights; i++)
+    {
+        result += compute_spot_component(
+            per_frame_ubo.spot_lights[i],
+            u_material,
+            normal_world_space,
             v_position_world_coords,
             view_direction);
     }

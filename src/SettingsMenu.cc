@@ -7,8 +7,8 @@ namespace Engine
     /**
      * @brief Constructor.
      */
-    SettingsMenu::SettingsMenu(Renderer &renderer):
-        renderer(renderer),
+    SettingsMenu::SettingsMenu(Renderer &_renderer):
+        renderer(_renderer),
         apply_confirm(
             this, /* parent_menu */
             [this](const bool apply) { on_apply_confirm(apply); } /* on_choice_callback */,
