@@ -11,7 +11,9 @@ CXXFLAGS += $(addprefix -I,$(INCLUDE_DIRS))
 # Object files.
 OBJS = IndexBuffer.o FramebufferTexture.o CubemapTexture.o Texture.o Model.o VertexArray.o \
 	DebugMenu.o PauseMenu.o SettingsMenu.o ConfirmMenu.o MenuManager.o \
-	assert_util.o Shader.o Renderer.o Game.o log.o main.o
+	assert_util.o \
+	ShaderLoader.o Shader.o \
+	Renderer.o Game.o log.o main.o
 
 PROGRAM_NAME = engine
 

@@ -6,10 +6,9 @@
 out vec4 color;
 
 in vec3 v_position_world_coords;
-in vec3 v_normal;
-in vec4 v_tangent_handedness;
-in vec2 v_texture_coord;
+in mat3 v_tangent_bitangent_normal;
 in vec4 v_frag_pos_light_space;
+in vec2 v_texture_coord;
 
 uniform sampler2D u_texture_sampler;
 uniform sampler2D u_normal_map_sampler;
@@ -22,12 +21,7 @@ void main()
     vec3 texture_color = texture(u_texture_sampler, v_texture_coord).rgb;
     vec3 normal_from_texture = texture(u_normal_map_sampler, v_texture_coord).rgb * 2.0 - 1.0;
 
-    vec3 normal_world_space = normalize(v_normal);
-    vec3 tangent = normalize(v_tangent_handedness.xyz);
-    vec3 bitangent = v_tangent_handedness.w * normalize(cross(normal_world_space, tangent));
-
-    mat3 tangent_bitangent_norm = mat3(tangent, bitangent, normal_world_space);
-    normal_world_space = normalize(tangent_bitangent_norm * normal_from_texture);
+    vec3 normal_world_space = normalize(v_tangent_bitangent_normal * normal_from_texture);
 
     /*
      * Compute unit vector pointing from vertex to camera to pass to fragment

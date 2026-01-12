@@ -15,7 +15,7 @@ float compute_shadow_component(sampler2D shadow_map_sampler, vec4 frag_pos_light
     float closest_depth = texture(shadow_map_sampler, proj_coords.xy).r;
     float current_depth = proj_coords.z;
 
-    float bias = max(0.05 * (1.0 - dot(normal, light_direction)), 0.005);  
+    float bias = max(0.05 * (1.0 - dot(normal, light_direction)), 0.005);
     float shadow = 0.0;
     if (proj_coords.z <= 1.0)
     {
@@ -24,7 +24,7 @@ float compute_shadow_component(sampler2D shadow_map_sampler, vec4 frag_pos_light
         {
             for(int y = -1; y <= 1; ++y)
             {
-                float pcf_depth = texture(shadow_map_sampler, proj_coords.xy + vec2(x, y) * texel_size).r; 
+                float pcf_depth = texture(shadow_map_sampler, proj_coords.xy + vec2(x, y) * texel_size).r;
                 shadow += current_depth - bias > pcf_depth ? 1.0 : 0.0;
             }
         }

@@ -10,7 +10,7 @@ namespace Engine
      * @brief Constructor.
      */
     PauseMenu::PauseMenu(Game &_game, Renderer &renderer):
-        game(_game), settings_menu(renderer), debug_menu(game)
+        game(_game), settings_menu(renderer), debug_menu(game, renderer)
     {}
 
     /**

@@ -360,6 +360,20 @@ namespace Engine
          */
         Shader debug_shader;
         std::vector<DebugObject> debug_objects;
+
+        Shader regular_object_tbn_visualizer_shader;
+        Shader terrain_tbn_visualizer_shader;
+
+        /**
+         * Flag to render tangent, bitangent, and normal vectors for debugging.
+         */
+        bool visualize_tbn = false;
+
+        /**
+         * Flag to only render normals when visualizing TBNs.
+         */
+        bool visualize_tbn_only_show_normals = false;
+
         /**
          * @}
          */
@@ -382,5 +396,7 @@ namespace Engine
         /**
          * @}
          */
+
+        friend class DebugMenu;
     };
 }

@@ -6,10 +6,9 @@
 out vec4 color;
 
 in vec3 v_position_world_coords;
-in vec2 v_texture_coord;
-in vec3 v_normal;
-in vec4 v_tangent_handedness;
+in mat3 v_tangent_bitangent_normal;
 in vec4 v_frag_pos_light_space;
+in vec2 v_texture_coord;
 
 struct ModelMaterial
 {
@@ -28,13 +27,7 @@ void main()
     vec3 specular_color = texture(u_material.specular_texture_sampler, v_texture_coord).rgb;
 
     vec3 normal_from_texture = texture(u_material.normal_texture_sampler, v_texture_coord).rgb * 2.0 - 1.0;
-
-    vec3 normal_world_space = normalize(v_normal);
-    vec3 tangent = normalize(v_tangent_handedness.xyz);
-    vec3 bitangent = v_tangent_handedness.w * normalize(cross(normal_world_space, tangent));
-    mat3 tangent_bitangent_norm = mat3(tangent, bitangent, normal_world_space);
-
-    normal_world_space = normalize(tangent_bitangent_norm * normal_from_texture);
+    vec3 normal_world_space = normalize(v_tangent_bitangent_normal * normal_from_texture);
 
     /*
      * Translate model textures into a material.

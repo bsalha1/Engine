@@ -6,7 +6,7 @@
 out vec4 color;
 
 in vec3 v_position_world_coords;
-in vec3 v_normal;
+in mat3 v_tangent_bitangent_normal;
 in vec4 v_frag_pos_light_space;
 
 uniform sampler2D u_texture_sampler;
@@ -108,11 +108,6 @@ void main()
 {
     vec2 texture_coord = v_position_world_coords.xz / 2.0;
 
-    vec3 vertex_normal = normalize(v_normal);
-    vec3 tangent = normalize(vec3(1.0, 0.0, 0.0) - vertex_normal * dot(vertex_normal, vec3(1.0, 0.0, 0.0)));
-    vec3 bitangent = cross(vertex_normal, tangent);
-    mat3 tangent_bitangent_normal = mat3(tangent, bitangent, vertex_normal);
-
     /*
      * Sample texture stochastically.
      */
@@ -122,7 +117,7 @@ void main()
         texture_coord);
     vec3 texture_color = samp.diffuse.rgb;
     vec3 normal_texture_space = samp.normal.rgb * 2.0 - 1.0;
-    vec3 normal_world_space = normalize(tangent_bitangent_normal * normal_texture_space);
+    vec3 normal_world_space = normalize(v_tangent_bitangent_normal * normal_texture_space);
 
     /*
      * Compute unit vector pointing from vertex to camera to pass to fragment

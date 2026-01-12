@@ -3,20 +3,26 @@
 #include "include/per_frame_ubo.glsl"
 
 layout(location = 0) in vec3 l_position;
-layout(location = 1) in vec3 l_norm;
+layout(location = 1) in vec3 l_normal;
 layout(location = 2) in vec2 l_texture_coord;
 layout(location = 3) in vec4 l_tangent_handedness;
 
-/**
- * Variables going to fragment shader.
- */
 out vec3 v_position_world_coords;
-out vec3 v_normal;
-out vec4 v_tangent_handedness;
-out vec2 v_texture_coord;
+out mat3 v_tangent_bitangent_normal;
 out vec4 v_frag_pos_light_space;
+out vec2 v_texture_coord;
 
 uniform mat4 u_model;
+
+mat3 compute_tbn_matrix(mat4 model, vec3 vertex_normal, vec4 tangent_handedness)
+{
+    mat3 normal_matrix = mat3(transpose(inverse(model)));
+    vec3 normal = normalize(normal_matrix * vertex_normal);
+    vec3 tangent = normalize(normal_matrix * tangent_handedness.xyz);
+    vec3 bitangent = tangent_handedness.w * normalize(cross(normal, tangent));
+
+    return mat3(tangent, bitangent, normal);
+}
 
 void main()
 {
@@ -32,14 +38,12 @@ void main()
     v_position_world_coords = vec3(u_model * position_four_vector);
 
     /*
-     * Transform normal and tangent to world space.
+     * Compute TBN matrix in world space.
      */
-    mat3 normal_mat = transpose(inverse(mat3(u_model)));
-    v_normal = normalize(normal_mat * l_norm);
-    v_tangent_handedness = vec4(normalize(normal_mat * l_tangent_handedness.xyz), l_tangent_handedness.w);
+    v_tangent_bitangent_normal = compute_tbn_matrix(u_model, l_normal, l_tangent_handedness);
 
     /*
      * Compute position of vertex in light space for shadow mapping.
      */
-    v_frag_pos_light_space = per_frame_ubo.light_view_projection * position_four_vector;
+    v_frag_pos_light_space = per_frame_ubo.light_view_projection * u_model * position_four_vector;
 }

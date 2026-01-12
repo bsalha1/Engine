@@ -9,7 +9,7 @@ namespace Engine
     /**
      * @brief Constructor.
      */
-    DebugMenu::DebugMenu(Game &_game): game(_game)
+    DebugMenu::DebugMenu(Game &_game, Renderer &_renderer): game(_game), renderer(_renderer)
     {}
 
     /**
@@ -31,6 +31,13 @@ namespace Engine
         float game_time_per_real_time = static_cast<float>(game.game_time_per_real_time);
         ImGui::SliderFloat("Game Time per Real Time", &game_time_per_real_time, 0.1f, 10.f);
         game.game_time_per_real_time = static_cast<double>(game_time_per_real_time);
+
+        ImGui::Checkbox("Visualize TBNs", &renderer.visualize_tbn);
+        if (renderer.visualize_tbn)
+        {
+            ImGui::SameLine();
+            ImGui::Checkbox("Only Show Normals", &renderer.visualize_tbn_only_show_normals);
+        }
 
         ImGui::End();
 

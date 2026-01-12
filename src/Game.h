@@ -124,11 +124,6 @@ namespace Engine
         GLFWwindow *window = nullptr;
 
         /**
-         * Shader for an object which is textured and reacts to lighting.
-         */
-        Shader lit_textured_shader;
-
-        /**
          * Game state.
          */
         State state = State::RUNNING;

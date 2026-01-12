@@ -1,6 +1,7 @@
 #include "Renderer.h"
 
 #include "FramebufferTexture.h"
+#include "ShaderLoader.h"
 #include "TextureSlot.h"
 #include "TexturedMaterial.h"
 #include "Vertex.h"
@@ -267,13 +268,20 @@ namespace Engine
         LOG("Initializing shaders\n");
 
         /*
+         * Create a temporary shader loader to load all shaders.
+         */
+        ShaderLoader shader_loader;
+
+        /*
          * Initialize screen shader.
          */
-        ASSERT_RET_IF_NOT(screen_shader.compile({
-                              {"screen.vert", GL_VERTEX_SHADER},
-                              {"screen.frag", GL_FRAGMENT_SHADER},
-                          }),
+        ASSERT_RET_IF_NOT(shader_loader.load_shader(screen_shader,
+                                                    {
+                                                        {"screen.vert", GL_VERTEX_SHADER},
+                                                        {"screen.frag", GL_FRAGMENT_SHADER},
+                                                    }),
                           false);
+
         screen_shader.use();
         ASSERT_RET_IF_NOT(screen_shader.set_int("u_color_texture_sampler", TextureSlot::DIFFUSE),
                           false);
@@ -286,22 +294,24 @@ namespace Engine
         /*
          * Initialize gaussian blur shader.
          */
-        ASSERT_RET_IF_NOT(gaussian_blur_shader.compile({
-                              {"gaussian_blur.vert", GL_VERTEX_SHADER},
-                              {"gaussian_blur.frag", GL_FRAGMENT_SHADER},
-                          }),
+        ASSERT_RET_IF_NOT(shader_loader.load_shader(gaussian_blur_shader,
+                                                    {
+                                                        {"gaussian_blur.vert", GL_VERTEX_SHADER},
+                                                        {"gaussian_blur.frag", GL_FRAGMENT_SHADER},
+                                                    }),
                           false);
         gaussian_blur_shader.use();
         ASSERT_RET_IF_NOT(gaussian_blur_shader.set_int("u_texture_sampler", TextureSlot::BLOOM),
                           false);
 
         /*
-         * Initialize cube shader.
+         * Initialize skybox shader.
          */
-        ASSERT_RET_IF_NOT(skybox_shader.compile({
-                              {"skybox.vert", GL_VERTEX_SHADER},
-                              {"skybox.frag", GL_FRAGMENT_SHADER},
-                          }),
+        ASSERT_RET_IF_NOT(shader_loader.load_shader(skybox_shader,
+                                                    {
+                                                        {"skybox.vert", GL_VERTEX_SHADER},
+                                                        {"skybox.frag", GL_FRAGMENT_SHADER},
+                                                    }),
                           false);
         skybox_shader.use();
         ASSERT_RET_IF_NOT(skybox_shader.set_float("u_sun_angular_radius", sun_angular_radius),
@@ -313,10 +323,11 @@ namespace Engine
         /*
          * Initialize regular object shader.
          */
-        ASSERT_RET_IF_NOT(regular_object_shader.compile({
-                              {"regular_object.vert", GL_VERTEX_SHADER},
-                              {"regular_object.frag", GL_FRAGMENT_SHADER},
-                          }),
+        ASSERT_RET_IF_NOT(shader_loader.load_shader(regular_object_shader,
+                                                    {
+                                                        {"regular_object.vert", GL_VERTEX_SHADER},
+                                                        {"regular_object.frag", GL_FRAGMENT_SHADER},
+                                                    }),
                           false);
         regular_object_shader.use();
         ASSERT_RET_IF_NOT(regular_object_shader.set_int("u_texture_sampler", TextureSlot::DIFFUSE),
@@ -327,52 +338,80 @@ namespace Engine
             regular_object_shader.set_int("u_shadow_map_sampler", TextureSlot::SHADOW), false);
 
         /*
+         * Initialize regular object TBN visualizer shader.
+         */
+        ASSERT_RET_IF_NOT(shader_loader.load_shader(regular_object_tbn_visualizer_shader,
+                                                    {
+                                                        {"regular_object.vert", GL_VERTEX_SHADER},
+                                                        {"tbn_visualizer.geom", GL_GEOMETRY_SHADER},
+                                                        {"tbn_visualizer.frag", GL_FRAGMENT_SHADER},
+                                                    }),
+                          false);
+        regular_object_tbn_visualizer_shader.use();
+
+        /*
          * Initialize point light shader.
          */
-        ASSERT_RET_IF_NOT(point_light_shader.compile({
-                              {"point_light.vert", GL_VERTEX_SHADER},
-                              {"point_light.frag", GL_FRAGMENT_SHADER},
-                          }),
+        ASSERT_RET_IF_NOT(shader_loader.load_shader(point_light_shader,
+                                                    {
+                                                        {"point_light.vert", GL_VERTEX_SHADER},
+                                                        {"point_light.frag", GL_FRAGMENT_SHADER},
+                                                    }),
                           false);
-        point_light_shader.use();
 
         /*
          * Initialize depth shader.
          */
-        ASSERT_RET_IF_NOT(depth_shader.compile({
-                              {"depth.vert", GL_VERTEX_SHADER},
-                              {"depth.frag", GL_FRAGMENT_SHADER},
-                          }),
+        ASSERT_RET_IF_NOT(shader_loader.load_shader(depth_shader,
+                                                    {
+                                                        {"depth.vert", GL_VERTEX_SHADER},
+                                                        {"depth.frag", GL_FRAGMENT_SHADER},
+                                                    }),
                           false);
 
         /*
          * Initialize debug shader.
          */
-        ASSERT_RET_IF_NOT(debug_shader.compile({
-                              {"debug.vert", GL_VERTEX_SHADER},
-                              {"debug.frag", GL_FRAGMENT_SHADER},
-                          }),
+        ASSERT_RET_IF_NOT(shader_loader.load_shader(debug_shader,
+                                                    {
+                                                        {"debug.vert", GL_VERTEX_SHADER},
+                                                        {"debug.frag", GL_FRAGMENT_SHADER},
+                                                    }),
                           false);
-        debug_shader.use();
+
+        /*
+         * Initialize terrain TBN visualizer shader.
+         */
+        ASSERT_RET_IF_NOT(shader_loader.load_shader(terrain_tbn_visualizer_shader,
+                                                    {
+                                                        {"terrain.vert", GL_VERTEX_SHADER},
+                                                        {"tbn_visualizer.geom", GL_GEOMETRY_SHADER},
+                                                        {"tbn_visualizer.frag", GL_FRAGMENT_SHADER},
+                                                    }),
+                          false);
+        terrain_tbn_visualizer_shader.use();
+        ASSERT_RET_IF_NOT(terrain_tbn_visualizer_shader.set_mat4("u_model", glm::mat4(1.f)), false);
 
         /*
          * Initialize terrain shader.
          */
-        ASSERT_RET_IF_NOT(terrain_shader.compile({
-                              {"terrain.vert", GL_VERTEX_SHADER},
-                              {"terrain.frag", GL_FRAGMENT_SHADER},
-                          }),
+        ASSERT_RET_IF_NOT(shader_loader.load_shader(terrain_shader,
+                                                    {
+                                                        {"terrain.vert", GL_VERTEX_SHADER},
+                                                        {"terrain.frag", GL_FRAGMENT_SHADER},
+                                                    }),
                           false);
         terrain_shader.use();
-        ASSERT_RET_IF_NOT(terrain_shader.set_mat4("u_model", glm::mat4(1)), false);
+        ASSERT_RET_IF_NOT(terrain_shader.set_mat4("u_model", glm::mat4(1.f)), false);
 
         /*
          * Initialize crosshair shader.
          */
-        ASSERT_RET_IF_NOT(crosshair_shader.compile({
-                              {"crosshair.vert", GL_VERTEX_SHADER},
-                              {"crosshair.frag", GL_FRAGMENT_SHADER},
-                          }),
+        ASSERT_RET_IF_NOT(shader_loader.load_shader(crosshair_shader,
+                                                    {
+                                                        {"crosshair.vert", GL_VERTEX_SHADER},
+                                                        {"crosshair.frag", GL_FRAGMENT_SHADER},
+                                                    }),
                           false);
         crosshair_shader.use();
         ASSERT_RET_IF_NOT(crosshair_shader.set_vec2("u_window_size",
@@ -385,10 +424,11 @@ namespace Engine
         /*
          * Initialize model shader.
          */
-        ASSERT_RET_IF_NOT(model_shader.compile({
-                              {"regular_object.vert", GL_VERTEX_SHADER},
-                              {"model.frag", GL_FRAGMENT_SHADER},
-                          }),
+        ASSERT_RET_IF_NOT(shader_loader.load_shader(model_shader,
+                                                    {
+                                                        {"regular_object.vert", GL_VERTEX_SHADER},
+                                                        {"model.frag", GL_FRAGMENT_SHADER},
+                                                    }),
                           false);
         model_shader.use();
         ASSERT_RET_IF_NOT(model_shader.set_int("u_shadow_map_sampler", TextureSlot::SHADOW), false);
@@ -795,6 +835,54 @@ namespace Engine
             ASSERT_RET_IF_NOT(point_light_shader.set_mat4("u_model", object.transform.model()),
                               false);
             object.drawable.draw();
+        }
+
+        /*
+         * Render tangent bitangent normal debug visualization.
+         */
+        if (unlikely(visualize_tbn))
+        {
+            const std::array<GLenum, 1> buffers = {
+                screen_color_texture.get_attachment(),
+            };
+            glDrawBuffers(buffers.size(), buffers.data());
+
+            /*
+             * Note: This shader also works for the model objects since they use the same vertex
+             * shader.
+             */
+            regular_object_tbn_visualizer_shader.use();
+
+            ASSERT_RET_IF_NOT(regular_object_tbn_visualizer_shader.set_bool(
+                                  "u_only_show_normals", visualize_tbn_only_show_normals),
+                              false);
+
+            for (const RegularObject &object : regular_objects)
+            {
+                ASSERT_RET_IF_NOT(regular_object_tbn_visualizer_shader.set_mat4(
+                                      "u_model", object.transform.model()),
+                                  false);
+                object.drawable.draw();
+            }
+
+            for (const ModelObject &object : model_objects)
+            {
+                ASSERT_RET_IF_NOT(regular_object_tbn_visualizer_shader.set_mat4(
+                                      "u_model", object.transform.model()),
+                                  false);
+                object.model.draw();
+            }
+
+            if (likely(terrain))
+            {
+                terrain_tbn_visualizer_shader.use();
+                ASSERT_RET_IF_NOT(terrain_tbn_visualizer_shader.set_bool(
+                                      "u_only_show_normals", visualize_tbn_only_show_normals),
+                                  false);
+                ASSERT_RET_IF_NOT(terrain_tbn_visualizer_shader.set_mat4("u_model", glm::mat4(1.f)),
+                                  false);
+                terrain->drawable.draw();
+            }
         }
 
         /*
