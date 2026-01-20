@@ -197,8 +197,8 @@ namespace Engine
         /*
          * Get total VRAM.
          */
-        glGetIntegerv(GL_GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX, &stats_total_vram_MB);
-        stats_total_vram_MB /= 1024;
+        // glGetIntegerv(GL_GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX, &stats_total_vram_MB);
+        // stats_total_vram_MB /= 1024;
 
         /*
          * Create screen frame buffer.
@@ -695,8 +695,8 @@ namespace Engine
          */
         if (stats_dt_buffer_idx % 60 == 0)
         {
-            glGetIntegerv(GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, &stats_free_vram_MB);
-            stats_free_vram_MB /= 1024;
+            // glGetIntegerv(GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, &stats_free_vram_MB);
+            // stats_free_vram_MB /= 1024;
 
             unsigned long rss_pages = 0;
             std::ifstream statm("/proc/self/statm");
