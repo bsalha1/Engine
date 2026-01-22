@@ -8,6 +8,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <filesystem>
 
 namespace Engine
 {
@@ -35,7 +36,7 @@ namespace Engine
         /**
          * Base path for shader files, relative to execution cwd.
          */
-        const std::string base_path = "shaders/";
+        const std::filesystem::path base_path = std::filesystem::path("shaders");
 
         bool get_shader_src_helper(const std::string &file_path,
                                    std::string &shader_src,

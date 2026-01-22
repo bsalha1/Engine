@@ -84,7 +84,8 @@ namespace Engine
                 included_files.insert(include_file);
 
                 std::string include_src;
-                const std::string include_path = base_path + include_file;
+                const std::filesystem::path _include_path = base_path / include_file;
+                const std::string include_path =_include_path.string();
 
                 LOG("Adding include: %s\n", include_path.c_str());
 
@@ -132,7 +133,8 @@ namespace Engine
      */
     bool ShaderLoader::get_shader_src(const std::string &file_name, std::string &shader_src)
     {
-        const std::string file_path = base_path + file_name;
+        const std::filesystem::path _file_path = base_path / file_name;
+        const std::string file_path = std::filesystem::path(base_path / file_name).string();
 
         LOG("Getting source code for shader %s\n", file_path.c_str());
 

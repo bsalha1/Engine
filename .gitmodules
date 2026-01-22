@@ -18,3 +18,7 @@
 [submodule "assimp"]
 	path = assimp
 	url = git@github.com:assimp/assimp.git
+[submodule "zlib"]
+	path = zlib
+	url = https://github.com/madler/zlib.git
+	ignore = dirty

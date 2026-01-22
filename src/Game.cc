@@ -5,12 +5,19 @@
 #include "assert_util.h"
 #include "log.h"
 #include "perf.h"
+#include "math_util.h"
 
 #include <GLFW/glfw3.h>
 #include <array>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_opengl3.h>
-#include <execinfo.h>
+
+#ifndef _WIN32
+#   include <execinfo.h>
+#   include <sys/param.h>
+#   include <unistd.h>
+#endif
+
 #include <fstream>
 #include <glm/ext/quaternion_trigonometric.hpp>
 #include <glm/ext/scalar_constants.hpp>
@@ -19,8 +26,6 @@
 #include <sstream>
 #include <stb/stb_image.h>
 #include <string>
-#include <sys/param.h>
-#include <unistd.h>
 
 using namespace std::chrono_literals;
 
@@ -37,6 +42,8 @@ namespace Engine
         if (type == GL_DEBUG_TYPE_ERROR)
         {
             LOG_ERROR("OpenGL error: %s\n", message);
+
+#ifndef _WIN32
 
             /*
              * Dump stack trace so we can trace back where the error occurred.
@@ -58,6 +65,7 @@ namespace Engine
 
                 free(bt_syms);
             }
+#endif
 
             _exit(EXIT_FAILURE);
         }
@@ -84,6 +92,7 @@ namespace Engine
     std::unique_ptr<Game> Game::create()
     {
         std::unique_ptr<Game> new_game(new Game());
+
         ASSERT_RET_IF_NOT(new_game->init(), nullptr);
         return new_game;
     }
@@ -703,7 +712,9 @@ namespace Engine
             statm >> rss_pages >> rss_pages;
             statm.close();
 
+#ifndef _WIN32
             stats_ram_usage_MB = rss_pages * sysconf(_SC_PAGESIZE) / 1024 / 1024;
+#endif
         }
     }
 
