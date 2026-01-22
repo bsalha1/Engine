@@ -15,7 +15,7 @@ float compute_shadow_component(sampler2D shadow_map_sampler, vec4 frag_pos_light
     float closest_depth = texture(shadow_map_sampler, proj_coords.xy).r;
     float current_depth = proj_coords.z;
 
-    float bias = max(0.05 * (1.0 - dot(normal, light_direction)), 0.005);
+    float bias = max(0.005 * (1.0 - dot(normal, light_direction)), 0.005);
     float shadow = 0.0;
     if (proj_coords.z <= 1.0)
     {

@@ -3,41 +3,87 @@ NTHREADS = $(shell nproc)
 export CMAKE_BUILD_PARALLEL_LEVEL = $(NTHREADS)
 export MAKEFLAGS = -j$(NTHREADS)
 
-# Libraries.
-LIBGLFW = glfw/build/src/libglfw3.a
-LIBGLEW = glew/lib/libGLEW.a
-LIBGLM = glm/build/glm/libglm.a
-STB_IMAGE = stb/build/stb_image.a
-LIBIMGUI = imgui/libimgui.a
-LIBASSIMP = assimp/lib/libassimp.a
+# Set platform-specific variables.
+ifeq ($(PLATFORM),windows)
 
+CMAKE_TOOLCHAIN_FILE = $(shell realpath toolchains/mingw64.cmake)
+CC = /usr/bin/x86_64-w64-mingw32-gcc
+CXX = /usr/bin/x86_64-w64-mingw32-g++
+AR = /usr/bin/x86_64-w64-mingw32-ar
+LD = /usr/bin/x86_64-w64-mingw32-ld
+INCLUDE_DIRS = /usr/x86_64-w64-mingw32/include
+
+# Statically link libgcc and libstdc++ since there's no chance in hell the host
+# has the same MinGW toolchain as the Docker container. This is apparently
+# standard practice for Windows.
+LDFLAGS = -lopengl32 -lgdi32 -static-libgcc -static-libstdc++
+
+LIBASSIMP_CXXFLAGS = -Wno-error=maybe-uninitialized -Wno-error=array-bounds
+LIBGLEW = glew/lib/libglew32.a
+LIBGLEW_MAKE_FLAGS = SYSTEM=mingw
+LIBZ = zlib/build/libzs.a
+EXECUTABLE_EXTENSION = .exe
+DEBUG_CXXFLAGS =
+DEBUG_LDFLAGS =
+
+else
+
+CMAKE_TOOLCHAIN_FILE = 
+CC = /usr/bin/gcc
+CXX = /usr/bin/g++
+AR = /usr/bin/ar
+LD = /usr/bin/ld
+INCLUDE_DIRS =
+LDFLAGS = -lGL -lGLX -static-libgcc -static-libstdc++
+LIBASSIMP_CXXFLAGS =
+LIBGLEW = glew/lib/libGLEW.a
+LIBGLEW_MAKE_FLAGS =
+LIBZ = zlib/build/libz.a
+EXECUTABLE_EXTENSION =
+DEBUG_CXXFLAGS = -rdynamic
+DEBUG_LDFLAGS = -rdynamic
+
+endif
+
+LIBGLFW = glfw/build/src/libglfw3.a
 $(LIBGLFW):
 	cd glfw && \
-		cmake -S . -B build -D GLFW_BUILD_WAYLAND=OFF && \
+		cmake \
+			-S . \
+			-B build \
+			-DCMAKE_TOOLCHAIN_FILE=$(CMAKE_TOOLCHAIN_FILE) \
+			-DGLFW_BUILD_WAYLAND=OFF \
+			-DGLFW_BUILD_EXAMPLES=OFF \
+			-DGLFW_BUILD_TESTS=OFF && \
 		cd build && \
 		make
 
 $(LIBGLEW):
 	cd glew/auto && \
-		make && \
+		make $(LIBGLEW_MAKE_FLAGS) CC=$(CC) LD=$(LD) AR=$(AR) && \
 		cd .. && \
-		make
+		make $(LIBGLEW_MAKE_FLAGS) CC=$(CC) LD=$(LD) AR=$(AR) glew.lib.static
+CXXFLAGS += -DGLEW_STATIC
 
+LIBGLM = glm/build/glm/libglm.a
 $(LIBGLM):
 	cd glm && \
-		cmake \
+		cmake . \
+			-B build \
+			-DCMAKE_TOOLCHAIN_FILE=$(CMAKE_TOOLCHAIN_FILE) \
 			-DGLM_BUILD_TESTS=OFF \
-			-DBUILD_SHARED_LIBS=OFF \
-			-B build . && \
+			-DBUILD_SHARED_LIBS=OFF \ && \
 		cmake --build build -- all
 
+STB_IMAGE = stb/build/stb_image.a
 $(STB_IMAGE):
 	cd stb && \
-		make
+		make CC=$(CC) AR=$(AR)
 
+LIBIMGUI = imgui/libimgui.a
 $(LIBIMGUI): 
 	cd imgui && \
-		g++ \
+		$(CXX) \
 			-c \
 			-I. \
 			-I../glfw/include \
@@ -48,20 +94,36 @@ $(LIBIMGUI):
 			imgui_widgets.cpp \
 			imgui.cpp \
 			imgui_demo.cpp && \
-		ar rcs libimgui.a *.o
+		$(AR) rcs libimgui.a *.o
 
+LIBASSIMP = assimp/lib/libassimp.a
 $(LIBASSIMP):
 	cd assimp && \
-		cmake CMakeLists.txt -DBUILD_SHARED_LIBS=OFF -DASSIMP_BUILD_TESTS=OFF && \
+		cmake \
+			-DCMAKE_TOOLCHAIN_FILE=$(CMAKE_TOOLCHAIN_FILE) \
+			-DBUILD_SHARED_LIBS=OFF \
+			-DASSIMP_BUILD_TESTS=OFF \
+			-DASSIMP_BUILD_ASSIMP_TOOLS=OFF \
+			-DASSIMP_BUILD_SAMPLES=OFF \
+			-DASSIMP_BUILD_ZLIB=ON \
+			-DCMAKE_CXX_FLAGS="$(LIBASSIMP_CXXFLAGS)" \
+			CMakeLists.txt && \
 		cmake --build .
 
-STATIC_LIBS = $(LIBGLFW) $(LIBGLEW) $(LIBGLM) $(STB_IMAGE) $(LIBIMGUI) $(LIBASSIMP)
-LDFLAGS += $(STATIC_LIBS)
-LDFLAGS += -lGL -lGLX -lz -lminizip
-CXXFLAGS += -DGLEW_STATIC
+$(LIBZ):
+	cd zlib && \
+		cmake . \
+			-B build \
+			-DCMAKE_TOOLCHAIN_FILE=$(CMAKE_TOOLCHAIN_FILE) \
+			-DBUILD_SHARED_LIBS=OFF && \
+		cmake --build build
+
+# Add static libraries to linker flags.
+STATIC_LIBS = $(LIBGLFW) $(LIBGLEW) $(LIBGLM) $(STB_IMAGE) $(LIBIMGUI) $(LIBASSIMP) $(LIBZ)
+LDFLAGS := $(STATIC_LIBS) $(LDFLAGS)
 
 # Include directories.
-INCLUDE_DIRS = glfw/include/ glew/include/ glu/include/ glm/ stb/include/ imgui/ assimp/include/
+INCLUDE_DIRS += glfw/include/ glew/include/ glu/include/ glm/ stb/include/ imgui/ assimp/include/
 CXXFLAGS += $(addprefix -I,$(INCLUDE_DIRS))
 
 # Object files.
@@ -88,15 +150,13 @@ $(DISASSEMBLED_FILE): $(BUILD_DIR)/$(PROGRAM_NAME)
 	@echo "OBJDUMP $@"
 	@objdump -drS $< > $@
 
-# Debug flag disables optimizations, enables debug info and adds some debug targets.
+# Debug flag disables optimizations and enables debug info.
 ifdef DEBUG
-CXXFLAGS += -O0 -g -rdynamic
-LDFLAGS += -g -rdynamic
-DEBUG_TARGETS = $(DISASSEMBLED_FILE)
+CXXFLAGS += -O0 -g $(DEBUG_CXXFLAGS)
+LDFLAGS += -g $(DEBUG_LDFLAGS)  
 else
 CXXFLAGS += -O3 -DNDEBUG -Wall -Werror
 LDFLAGS += -s
-DEBUG_TARGETS =
 endif
 
 # No performance flag disables certain performance optimizations.
@@ -121,20 +181,21 @@ endef
 $(eval $(call make_flag_cache,CXXFLAGS))
 $(eval $(call make_flag_cache,LDFLAGS))
 
-# ELF-formatted program.
-$(BUILD_DIR)/$(PROGRAM_NAME): $(BUILD_OBJS) $(CXXFLAGS_CACHE) $(LDFLAGS_CACHE) $(STATIC_LIBS)
+# Executable.
+EXECUTABLE = $(BUILD_DIR)/$(PROGRAM_NAME)$(EXECUTABLE_EXTENSION)
+$(EXECUTABLE): $(BUILD_OBJS) $(CXXFLAGS_CACHE) $(LDFLAGS_CACHE) $(STATIC_LIBS)
 	@mkdir -p $(dir $@)
 	@echo "CXXLD   $@"
-	@g++ $(CXXFLAGS) $(BUILD_OBJS) $(LDFLAGS) -o $@
+	@$(CXX) $(CXXFLAGS) $(BUILD_OBJS) $(LDFLAGS) -o $@
 
 # Make a .o from a .cc
 $(BUILD_DIR)/%.o: src/%.cc $(CXXFLAGS_CACHE) $(LIBGLEW) $(LIBASSIMP)
 	@mkdir -p $(dir $@)
 	@echo "CXX     $@"
-	@g++ $(CXXFLAGS) -MMD -MP -c $< -o $@
+	@$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $@
 
-# Default target - build the program and debug targets, if any.
-all: $(BUILD_DIR)/$(PROGRAM_NAME) $(DEBUG_TARGETS)
+# Default target - build the executable.
+all: $(EXECUTABLE)
 
 # Format all .cpp and .h files in the src directory.
 format:
@@ -146,36 +207,14 @@ clean:
 	rm -rf $(BUILD_DIR)
 
 # Remove built artifacts including those of third party libraries.
-clean_all: clean_local
-	cd glfw && rm -rf build
-
-	cd glew && make clean && rm -rf \
-		auto/core/gl/EGL_VERSION_1_0 \
-		auto/core/gl/EGL_VERSION_1_1 \
-		auto/core/gl/EGL_VERSION_1_2 \
-		auto/core/gl/EGL_VERSION_1_3 \
-		auto/core/gl/EGL_VERSION_1_4 \
-		auto/core/gl/EGL_VERSION_1_5 \
-		auto/extensions \
-		build/glew.rc \
-		build/glewinfo.rc \
-		build/visualinfo.rc \
-		include \
-		src/glew.c \
-		src/glewinfo.c
-
-	cd glm && rm -rf build
-
+clean_all: clean
+	cd assimp && git clean -fxd
+	cd imgui && git clean -fxd
+	cd glew && git clean -fxd
+	cd glfw && git clean -fxd
+	cd glm && git clean -fxd
 	cd stb && make clean
-
-	cd imgui && rm -f *.o libimgui.a
-
-	cd assimp && make clean ; rm -rf \
-		CMakeCache.txt CMakeFiles Makefile assimp.pc cmake_install.cmake cmake_uninstall.cmake \
-		code/CMakeFiles code/Makefile code/cmake_install.cmake \
-		generated \
-		include/assimp/config.h include/assimp/revision.h \
-		lib
+	cd zlib && git clean -fxd
 
 # List targets.
 help:

@@ -2,12 +2,13 @@
 
 #include <cstdarg>
 #include <cstdio>
+#include <cstring>
 
 /**
  * __FILE__ is the full path to the file - we really only care about the file's name,
  * and this macro does that at compile time.
  */
-#ifdef __WINDOWS__
+#ifdef _WIN32
 #define __BASE_FILENAME__ \
     (std::strrchr(__FILE__, '\\') ? std::strrchr(__FILE__, '\\') + 1 : __FILE__)
 #else

@@ -1,48 +1,49 @@
+# Table of Contents
+- [Table of Contents](#table-of-contents)
+- [Overview](#overview)
+- [Build](#build)
+  - [Principle](#principle)
+  - [Procedure](#procedure)
+- [Project Structure](#project-structure)
+
 # Overview
 
 This repository contains the source code for a game / graphics engine that serves to help me learn how to do graphics and game programming. For now, it will be rendered with OpenGL.
 
 # Build
 
-Currently, the engine only builds for Linux.
+## Principle
 
-The build takes place inside a Docker container so the build is reproducible. However, the engine is executed outside of the container, so one must still install some system-level dependencies that are linked to in runtime. It is also possible to not use Docker to build by invoking `make` outside of the container, but you are responsible for making your build work.
+The build system is aimed at reproducibility and sandboxing. As such, the build takes place inside a Docker container with all the necessary dependencies installed, see [Dockerfile](Dockerfile). The container is only capable of building for Linux and Windows for now - don't have any plans for Mac since I don't have a Mac.
+
+There are a few thin wrappers around commands executed in the container for convenience:
+- [build.py](build.py): Build the engine demo
+- [play.py](play.py): Build and execute the engine demo
+- [format.py](format.py): Format the source code
+
+## Procedure
 
 **1.** Install system-level dependencies and initialize the repository:
 ```
-./setup.sh
+python setup.py
 ```
 <br>
 
-**2.** Build Docker container:
+**2.** Play demo:
 ```
-./build_container.sh
-```
-<br>
-
-**3.** Build inside Docker container:
-```
-./build_in_docker.sh
-```
-or equivalently:
-```
-./execute_in_container.sh make all
+python play.py
 ```
 <br>
 
-**4.** A binary called `engine` will be produced in the `build/` directory. To play the demo, execute:
+One can execute arbitrary commands in the container via:
 ```
-./build/engine
+python run_in_container.py <commands>
 ```
-<br>
+i.e.
+```
+python run_in_container.py make clean
+```
 
-To view other targets:
-```
-./execute_in_container.sh make help
-```
-<br>
+# Project Structure
 
-To build and play from the current terminal (helpful for quick iteration):
-```
-./play.sh
-```
+- Entry point: [src/main.cc](src/main.cc)

@@ -1,13 +1,17 @@
 #include "log.h"
 
-#ifdef __WINDOWS__
-#include <Windows.h>
+#ifdef _WIN32
+
+#include <sysinfoapi.h>
+
 #else
+
 #include <ctime>
 #include <sys/time.h>
+
 #endif
 
-#ifdef __WINDOWS__
+#ifdef _WIN32
 
 /**
  * Windows implementation of printing time prefix.
@@ -16,7 +20,7 @@ void print_time_prefix()
 {
     SYSTEMTIME system_time;
     GetSystemTime(&system_time);
-    printf("[%04d-%02d-%02d %02d:%02d:%02d.%03lu] ",
+    printf("[%04d-%02d-%02d %02d:%02d:%02d.%03u] ",
            system_time.wYear,
            system_time.wMonth,
            system_time.wDay,
