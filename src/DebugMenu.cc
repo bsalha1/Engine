@@ -36,7 +36,9 @@ namespace Engine
         if (renderer.visualize_tbn)
         {
             ImGui::SameLine();
-            ImGui::Checkbox("Only Show Normals", &renderer.visualize_tbn_only_show_normals);
+            ImGui::Checkbox("Only Normals", &renderer.visualize_tbn_only_show_normals);
+            ImGui::SameLine();
+            ImGui::SliderFloat("Magnitude", &renderer.visualize_tbn_magnitude, 0.1f, 1.f);
         }
 
         ImGui::End();

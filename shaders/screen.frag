@@ -1,11 +1,13 @@
 #version 460 core
 
+#include "include/texture_slots.glsl"
+
 out vec4 o_color;
 
 in vec2 v_texture_coord;
 
-uniform sampler2D u_color_texture_sampler;
-uniform sampler2D u_bloom_texture_sampler;
+layout(binding = TEXTURE_SLOT_DIFFUSE) uniform sampler2D u_color_texture_sampler;
+layout(binding = TEXTURE_SLOT_BLOOM) uniform sampler2D u_bloom_texture_sampler;
 
 uniform float u_sharpness;
 uniform float u_exposure;

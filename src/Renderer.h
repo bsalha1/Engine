@@ -157,20 +157,59 @@ namespace Engine
         static_assert(sizeof(DirectionalLightUniform) == 64);
 
         /**
+         * Number of shadow maps.
+         */
+        static constexpr size_t num_shadow_maps = 3;
+
+        /**
          * @brief Per-frame uniform buffer structure.
          */
         struct alignas(uniform_buffer_object_alignment) PerFrameUniformBuffer
         {
             /**
-             * Camera position in world space (stored here so point_lights is aligned on a 16-byte
-             * boundary).
+             * Camera view matrix.
              */
-            glm::vec3 camera_position;
+            glm::mat4 camera_view;
+
+            /**
+             * Camera projection matrix.
+             */
+            glm::mat4 camera_projection;
+
+            /**
+             * Camera position in world space. Note that the W coordinate is unused padding.
+             */
+            glm::vec4 camera_position;
+
+            /**
+             * Shadow depths. Note that the W coordinate is unused padding.
+             */
+            glm::vec4 shadow_map_ranges;
 
             /**
              * Number of points lights in point_lights.
              */
             uint32_t num_point_lights;
+
+            /**
+             * Number of spot lights in spot_lights.
+             */
+            uint32_t num_spot_lights;
+
+            /**
+             * Near plane distance for the camera.
+             */
+            float camera_near_clip;
+
+            /**
+             * Far plane distance for the camera.
+             */
+            float camera_far_clip;
+
+            /**
+             * Light view-projection matrices for each shadow map.
+             */
+            std::array<glm::mat4, num_shadow_maps> light_view_projections;
 
             /**
              * Maximum number of point lights supported.
@@ -187,13 +226,6 @@ namespace Engine
              */
             static constexpr uint8_t max_spot_lights = 64;
 
-            glm::vec3 pad0;
-
-            /**
-             * Number of spot lights in spot_lights.
-             */
-            uint32_t num_spot_lights;
-
             /**
              * Spot lights array.
              */
@@ -203,21 +235,6 @@ namespace Engine
              * Directional light.
              */
             DirectionalLightUniform directional_light;
-
-            /**
-             * Camera view matrix.
-             */
-            glm::mat4 camera_view;
-
-            /**
-             * Camera projection matrix.
-             */
-            glm::mat4 camera_projection;
-
-            /**
-             * Light view-projection matrix.
-             */
-            glm::mat4 light_view_projection;
         };
 
         bool init(const int _window_width, const int _window_height);
@@ -235,6 +252,11 @@ namespace Engine
         void add_debug_object(const DebugObject &object);
 
         void add_model_object(const ModelObject &object);
+
+        bool render_shadow_map(const glm::mat4 &camera_view,
+                               const glm::mat4 &light_view,
+                               const size_t shadow_map_idx,
+                               glm::mat4 &light_view_projection);
 
         bool render(const glm::mat4 &camera_view,
                     const glm::mat4 &skybox_view,
@@ -256,7 +278,19 @@ namespace Engine
     private:
         int window_width;
         int window_height;
+
+        /**
+         * Camera.
+         * @{
+         */
+        float aspect_ratio;
+        static constexpr float camera_far_clip = 5000.f;
+        static constexpr float camera_near_clip = 0.001f;
+        static constexpr float fov_rads = glm::radians(75.f);
         glm::mat4 projection;
+        /**
+         * @}
+         */
 
         /**
          * Screen quad.
@@ -347,9 +381,15 @@ namespace Engine
          * @{
          */
         Shader depth_shader;
-        FramebufferTexture shadow_map_texture =
-            FramebufferTexture(TextureSlot::SHADOW, GL_DEPTH_ATTACHMENT);
-        GLuint shadow_map_frame_buffer;
+        std::array<FramebufferTexture, num_shadow_maps> shadow_map_textures = {
+            FramebufferTexture(TextureSlot::SHADOW_NEAR, GL_DEPTH_ATTACHMENT),
+            FramebufferTexture(TextureSlot::SHADOW_MID, GL_DEPTH_ATTACHMENT),
+            FramebufferTexture(TextureSlot::SHADOW_FAR, GL_DEPTH_ATTACHMENT),
+        };
+        std::array<GLuint, num_shadow_maps> shadow_map_frame_buffers;
+        static constexpr std::array<float, num_shadow_maps> shadow_map_ranges = {20.f,
+                                                                                 100.f,
+                                                                                 500.f};
         /**
          * @}
          */
@@ -373,6 +413,11 @@ namespace Engine
          * Flag to only render normals when visualizing TBNs.
          */
         bool visualize_tbn_only_show_normals = false;
+
+        /**
+         * Magnitude of TBN vectors when visualizing.
+         */
+        float visualize_tbn_magnitude = 0.5f;
 
         /**
          * @}

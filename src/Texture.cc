@@ -65,7 +65,7 @@ namespace Engine
 
         glGenerateMipmap(GL_TEXTURE_2D);
 
-        LOG("Created texture %s id: %u, slot: %u\n", file_name.c_str(), texture_id, slot);
+        LOG_DEBUG("Created texture %s id: %u, slot: %u\n", file_name.c_str(), texture_id, slot);
 
         return true;
     }

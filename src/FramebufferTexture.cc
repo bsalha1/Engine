@@ -55,10 +55,10 @@ namespace Engine
 
         glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, texture_id, 0);
 
-        LOG("Created framebuffer texture id: %u, slot: %u, attachment: %u\n",
-            texture_id,
-            slot,
-            attachment - GL_COLOR_ATTACHMENT0);
+        LOG_DEBUG("Created framebuffer texture id: %u, slot: %u, attachment: %u\n",
+                  texture_id,
+                  slot,
+                  attachment - GL_COLOR_ATTACHMENT0);
 
         return true;
     }

@@ -9,9 +9,13 @@ def run(cmd):
 
 def run_in_container(cmd):
     git_commit = subprocess.check_output(["git", "describe", "--dirty", "--always"]).decode().strip()
+    uid = subprocess.check_output(["id", "-u"]).decode().strip()
+    gid = subprocess.check_output(["id", "-g"]).decode().strip()
     run(["docker", "run",
         "-it",
+        "--rm",
         "-v", ".:/mnt/host",
+        "--user", f"{uid}:{gid}",
         "-e", f"GIT_COMMIT={git_commit}",
         "build-container:latest"] + cmd)
 

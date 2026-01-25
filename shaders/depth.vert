@@ -1,6 +1,6 @@
 #version 460 core
 
-layout (location = 0) in vec3 l_position;
+layout(location = 0) in vec3 l_position;
 
 uniform mat4 u_light_view_projection;
 uniform mat4 u_model;

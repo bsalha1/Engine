@@ -6,6 +6,7 @@
 #include "TexturedMaterial.h"
 #include "Vertex.h"
 #include "VertexArray.h"
+#include "math_util.h"
 
 #include <GL/glew.h>
 #include <glm/ext/matrix_clip_space.hpp>
@@ -15,6 +16,8 @@
 namespace Engine
 {
     static constexpr GLsizei shadow_map_resolution = 2048;
+    static constexpr float one_over_shadow_map_resolution =
+        1.0f / static_cast<float>(shadow_map_resolution);
 
     /**
      * Relative to the terrain, the skybox spins around it. We draw a sun
@@ -88,11 +91,8 @@ namespace Engine
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LESS);
 
-        static constexpr float fov_deg = 75.f;
-        static constexpr const float far_clip = 5000.f;
-        const float aspect = static_cast<float>(window_width) / window_height;
-        const float near_clip = 0.001f;
-        projection = glm::perspective(glm::radians(fov_deg), aspect, near_clip, far_clip);
+        aspect_ratio = static_cast<float>(window_width) / window_height;
+        projection = glm::perspective(fov_rads, aspect_ratio, camera_near_clip, camera_far_clip);
 
         LOG("Creating screen quad...\n");
         {
@@ -233,26 +233,32 @@ namespace Engine
             cube = std::move(cube_vertex_array);
         }
 
-        LOG("Creating shadow map frame buffer\n");
+        LOG("Creating shadow map frame buffers\n");
         {
-            glGenFramebuffers(1, &shadow_map_frame_buffer);
-            glBindFramebuffer(GL_FRAMEBUFFER, shadow_map_frame_buffer);
-            const glm::vec4 border_color(1.0f, 1.0f, 1.0f, 1.0f);
-            ASSERT_RET_IF_NOT(shadow_map_texture.create(shadow_map_resolution,
-                                                        shadow_map_resolution,
-                                                        GL_DEPTH_COMPONENT /* internal_format */,
-                                                        GL_DEPTH_COMPONENT /* format */,
-                                                        GL_NEAREST /* min_filter */,
-                                                        GL_NEAREST /* max_filter */,
-                                                        GL_CLAMP_TO_BORDER /* wrap_mode */,
-                                                        &border_color /* border_color */),
-                              false);
-            glDrawBuffer(GL_NONE);
-            glReadBuffer(GL_NONE);
+            glGenFramebuffers(shadow_map_frame_buffers.size(), shadow_map_frame_buffers.data());
+            for (size_t shadow_map_idx = 0; shadow_map_idx < shadow_map_frame_buffers.size();
+                 shadow_map_idx++)
+            {
+                glBindFramebuffer(GL_FRAMEBUFFER, shadow_map_frame_buffers[shadow_map_idx]);
+                const glm::vec4 border_color(1.0f, 1.0f, 1.0f, 1.0f);
+                ASSERT_RET_IF_NOT(shadow_map_textures[shadow_map_idx].create(
+                                      shadow_map_resolution,
+                                      shadow_map_resolution,
+                                      GL_DEPTH_COMPONENT /* internal_format */,
+                                      GL_DEPTH_COMPONENT /* format */,
+                                      GL_NEAREST /* min_filter */,
+                                      GL_NEAREST /* max_filter */,
+                                      GL_CLAMP_TO_BORDER /* wrap_mode */,
+                                      &border_color /* border_color */),
+                                  false);
+                glDrawBuffer(GL_NONE);
+                glReadBuffer(GL_NONE);
 
-            ASSERT_RET_IF_NOT(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE,
-                              false);
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+                ASSERT_RET_IF_NOT(glCheckFramebufferStatus(GL_FRAMEBUFFER) ==
+                                      GL_FRAMEBUFFER_COMPLETE,
+                                  false);
+                glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            }
         }
 
         LOG("Creating uniform buffers\n");
@@ -283,10 +289,6 @@ namespace Engine
                           false);
 
         screen_shader.use();
-        ASSERT_RET_IF_NOT(screen_shader.set_int("u_color_texture_sampler", TextureSlot::DIFFUSE),
-                          false);
-        ASSERT_RET_IF_NOT(screen_shader.set_int("u_bloom_texture_sampler", TextureSlot::BLOOM),
-                          false);
         ASSERT_RET_IF_NOT(screen_shader.set_float("u_exposure", exposure), false);
         ASSERT_RET_IF_NOT(screen_shader.set_float("u_gamma", gamma), false);
         ASSERT_RET_IF_NOT(screen_shader.set_float("u_sharpness", sharpness), false);
@@ -301,8 +303,6 @@ namespace Engine
                                                     }),
                           false);
         gaussian_blur_shader.use();
-        ASSERT_RET_IF_NOT(gaussian_blur_shader.set_int("u_texture_sampler", TextureSlot::BLOOM),
-                          false);
 
         /*
          * Initialize skybox shader.
@@ -318,7 +318,6 @@ namespace Engine
                           false);
         ASSERT_RET_IF_NOT(skybox_shader.set_vec3("u_sun_position", sun_position_skybox_model_space),
                           false);
-        ASSERT_RET_IF_NOT(skybox_shader.set_int("u_texture_sampler", TextureSlot::DIFFUSE), false);
 
         /*
          * Initialize regular object shader.
@@ -330,12 +329,6 @@ namespace Engine
                                                     }),
                           false);
         regular_object_shader.use();
-        ASSERT_RET_IF_NOT(regular_object_shader.set_int("u_texture_sampler", TextureSlot::DIFFUSE),
-                          false);
-        ASSERT_RET_IF_NOT(
-            regular_object_shader.set_int("u_normal_map_sampler", TextureSlot::NORMAL), false);
-        ASSERT_RET_IF_NOT(
-            regular_object_shader.set_int("u_shadow_map_sampler", TextureSlot::SHADOW), false);
 
         /*
          * Initialize regular object TBN visualizer shader.
@@ -431,16 +424,7 @@ namespace Engine
                                                     }),
                           false);
         model_shader.use();
-        ASSERT_RET_IF_NOT(model_shader.set_int("u_shadow_map_sampler", TextureSlot::SHADOW), false);
-        ASSERT_RET_IF_NOT(model_shader.set_int("u_material.diffuse_texture_sampler",
-                                               TextureSlot::DIFFUSE),
-                          false);
-        ASSERT_RET_IF_NOT(model_shader.set_int("u_material.specular_texture_sampler",
-                                               TextureSlot::SPECULAR),
-                          false);
-        ASSERT_RET_IF_NOT(
-            model_shader.set_int("u_material.normal_texture_sampler", TextureSlot::NORMAL), false);
-        ASSERT_RET_IF_NOT(model_shader.set_float("u_material.shininess", 4.f), false);
+        ASSERT_RET_IF_NOT(model_shader.set_float("u_material_shininess", 4.f), false);
 
         return true;
     }
@@ -456,10 +440,6 @@ namespace Engine
     {
         terrain_shader.use();
         ASSERT_RET_IF_NOT(_terrain.material.apply(terrain_shader), false);
-        ASSERT_RET_IF_NOT(terrain_shader.set_int("u_normal_map_sampler", TextureSlot::NORMAL),
-                          false);
-        ASSERT_RET_IF_NOT(terrain_shader.set_int("u_shadow_map_sampler", TextureSlot::SHADOW),
-                          false);
 
         terrain = std::make_unique<Terrain>(_terrain);
 
@@ -527,6 +507,155 @@ namespace Engine
     }
 
     /**
+     * @brief Render the shadow map.
+     *
+     * @param camera_view Camera view matrix.
+     * @param light_view Light view matrix.
+     * @param shadow_map_idx Index of the shadow map to render.
+     * @param[out] light_view_projection Light view projection matrix.
+     *
+     * @return True on success, otherwise false.
+     */
+    bool Renderer::render_shadow_map(const glm::mat4 &camera_view,
+                                     const glm::mat4 &light_view,
+                                     const size_t shadow_map_idx,
+                                     glm::mat4 &light_view_projection)
+    {
+        const float far_clip = shadow_map_ranges[shadow_map_idx];
+        const float tan_fov = tan(fov_rads * 0.5f);
+
+        /*
+         * Obtain the 8 corners of the frustrum in view space.
+         */
+        const float near_clip = 0.001f;
+        const float h0 = tan_fov * near_clip;
+        const float w0 = h0 * aspect_ratio;
+        const float h1 = tan_fov * far_clip;
+        const float w1 = h1 * aspect_ratio;
+        const std::array<glm::vec3, 8> corners = {
+            /* clang-format off */
+            /* Near plane. */
+            glm::vec3(-w0, -h0, -near_clip),
+            glm::vec3(w0, -h0, -near_clip),
+            glm::vec3(w0, h0, -near_clip),
+            glm::vec3(-w0, h0, -near_clip),
+
+            /* Far plane. */
+            glm::vec3(-w1, -h1, -far_clip),
+            glm::vec3(w1, -h1, -far_clip),
+            glm::vec3(w1, h1, -far_clip),
+            glm::vec3(-w1, h1, -far_clip),
+            /* clang-format on */
+        };
+
+        /*
+         * Transform view space corners to light space.
+         */
+        float left = std::numeric_limits<float>::max();
+        float right = std::numeric_limits<float>::min();
+        float bottom = std::numeric_limits<float>::max();
+        float top = std::numeric_limits<float>::min();
+        float near = std::numeric_limits<float>::max();
+        float far = std::numeric_limits<float>::min();
+        const glm::mat4 inverse_camera_view = glm::inverse(camera_view);
+        for (size_t i = 0; i < corners.size(); i++)
+        {
+            const glm::vec4 world_space_corner_four_vector =
+                inverse_camera_view * glm::vec4(corners[i], 1.f);
+            const glm::vec3 world_space_corner =
+                glm::vec3(world_space_corner_four_vector) / world_space_corner_four_vector.w;
+
+            const glm::vec4 light_space_corner_four_vector =
+                light_view * glm::vec4(world_space_corner, 1.0);
+            const glm::vec3 light_space_corner =
+                glm::vec3(light_space_corner_four_vector) / light_space_corner_four_vector.w;
+
+            left = MIN(left, light_space_corner.x);
+            right = MAX(right, light_space_corner.x);
+            bottom = MIN(bottom, light_space_corner.y);
+            top = MAX(top, light_space_corner.y);
+            near = MIN(near, -light_space_corner.z);
+            far = MAX(far, -light_space_corner.z);
+        }
+
+        /*
+         * We still want to render shadows for stuff that is just outside of the view, so add a bit
+         * of padding in every direction.
+         */
+        static constexpr float padding = 30.f;
+        left -= padding;
+        right += padding;
+        bottom -= padding;
+        top += padding;
+        near -= padding;
+        far += padding;
+
+        /*
+         * Snap the orthographic projection to texel sized increments to prevent
+         * shimmering when the camera or light moves.
+         */
+        const float light_frustrum_width = right - left;
+        const float light_frustrum_height = top - bottom;
+        const float texel_size_x = light_frustrum_width * one_over_shadow_map_resolution;
+        const float texel_size_y = light_frustrum_height * one_over_shadow_map_resolution;
+        left = std::floor(left / texel_size_x) * texel_size_x;
+        right = std::floor(right / texel_size_x) * texel_size_x;
+        bottom = std::floor(bottom / texel_size_y) * texel_size_y;
+        top = std::floor(top / texel_size_y) * texel_size_y;
+
+        const glm::mat4 light_projection = glm::ortho(left, right, bottom, top, near, far);
+
+        /*
+         * Get the light's view projection matrix which models can be multiplied by
+         * to transform from world space to light space. This rotates the
+         * orthographic projection box to emit from the light's point of view.
+         */
+        light_view_projection = light_projection * light_view;
+
+        glViewport(0, 0, shadow_map_resolution, shadow_map_resolution);
+        glBindFramebuffer(GL_FRAMEBUFFER, shadow_map_frame_buffers[shadow_map_idx]);
+        glClear(GL_DEPTH_BUFFER_BIT);
+
+        depth_shader.use();
+        ASSERT_RET_IF_NOT(depth_shader.set_mat4("u_light_view_projection", light_view_projection),
+                          false);
+
+        glCullFace(GL_FRONT);
+
+        /*
+         * Draw regular objects into shadow map.
+         */
+        for (const RegularObject &object : regular_objects)
+        {
+            ASSERT_RET_IF_NOT(depth_shader.set_mat4("u_model", object.transform.model()), false);
+            object.drawable.draw();
+        }
+
+        /*
+         * Draw models into shadow map.
+         */
+        for (const ModelObject &object : model_objects)
+        {
+            ASSERT_RET_IF_NOT(depth_shader.set_mat4("u_model", object.transform.model()), false);
+            object.model.draw_no_textures();
+        }
+
+        /*
+         * Draw terrain into shadow map.
+         */
+        if (likely(terrain))
+        {
+            ASSERT_RET_IF_NOT(depth_shader.set_mat4("u_model", glm::mat4(1)), false);
+            terrain->drawable.draw();
+        }
+
+        glCullFace(GL_BACK);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        return true;
+    }
+
+    /**
      * @brief Render the scene.
      *
      * @param camera_view Camera view matrix.
@@ -545,8 +674,6 @@ namespace Engine
          */
         ASSERT_RET_IF_NOT(directional_light_objects.size() == 1, false);
 
-        glm::mat4 light_view_projection;
-
         /*
          * If the directional light is shining, render the depth map. It is a bit more
          * sensicle to make this a function of the light's position above the horizon,
@@ -555,125 +682,34 @@ namespace Engine
          * We place `likely` here since the shadow rendering code is the heaviest part
          * so it saves cycles when the light is shining.
          */
+        std::array<glm::mat4, num_shadow_maps> light_view_projections = {};
         if (likely(directional_light_objects[0].color != glm::vec3(0.0f)))
         {
             /*
-             * The directional light is infinitely far away, but we cannot afford
-             * to render an infinite area for the shadow map. Instead, we want to only
-             * render what the camera can see. We can accomplish this by picking a point
-             * in front of the camera, `light_target` and compute the `light_position`
-             * by moving back along the light's direction and draw an orthographic
-             * projection frustrum from the light, pointed at the `light_target`.
-             *
-             * There are a few settings that we must decide on:
-             * - `shadow_frustrum_start`: How close to the light the frustrum starts.
-             *   This should just start at the `light_position`, so 0.
-             *
-             * - `shadow_frustrum_end`: How far from the light the frustrum ends. This
-             *   should be long enough to reach the ground from the `light_position`. We
-             *   should eventually set this programmatically, but for now we just have a
-             *   large fixed value.
-             *
-             * - `shadow_frustrum_width`: How wide the frustrum is in each direction
-             *   from the center. This sets how much field of view resides in the
-             *   frustrum. We should also set this programmatically, but for now we just
-             *   make it the same as the `shadow_frustrum_end` (it is divided by 2
-             *   because it extends in both left and right directions).
-             *
-             * - `shadow_render_distance_from_camera`: How far in front of the camera we
-             *   should place the `light_target`. This should be set so that objects
-             *   near the camera are rendered with shadows. We set it to be half the
-             *   length of the frustrum so that it resides in the center of the
-             *   frustrum.
-             *
-             * - `shadow_render_distance_from_light`: How far back from the
-             *   `light_target` we place the `light_position`. To make it so
-             *   `light_target` is in the center of the frustrum we set it to be half
-             *   the length of the frustrum.
-             *
-             * Also important to note is that a big frustrum means more area will have
-             * shadows rendered, but the resolution of the shadow map will be spread
-             * thinner, leading to blocky shadows. A smaller frustrum means less area
-             * will have shadows rendered, but the resolution of the shadow map will be
-             * more dense, leading to sharper shadows.
-             */
-            static constexpr float shadow_frustrum_start = 0.f;
-            static constexpr float shadow_frustrum_end = 150.f;
-            static constexpr float shadow_frustrum_width = shadow_frustrum_end / 4.f;
-            static constexpr float shadow_render_distance_from_camera = shadow_frustrum_end / 4.f;
-            const float shadow_render_distance_from_light = shadow_frustrum_end / 2.f;
-
-            const glm::vec3 light_target =
-                camera_position + camera_direction * shadow_render_distance_from_camera;
-
-            const glm::vec3 light_position = light_target - directional_light_objects[0].direction *
-                                                                shadow_render_distance_from_light;
-
-            const glm::mat4 light_projection = glm::ortho(-shadow_frustrum_width,
-                                                          shadow_frustrum_width,
-                                                          -shadow_frustrum_width,
-                                                          shadow_frustrum_width,
-                                                          shadow_frustrum_start,
-                                                          shadow_frustrum_end);
-
-            /*
-             * Get the light's view, starting at its position, looking at the target,
-             * with "up" being the y axis.
+             * Create a view matrix casting from the light to the camera center.
              */
             const glm::mat4 light_view =
-                glm::lookAt(light_position, light_target, glm::vec3(0.0f, 1.0f, 0.0f));
+                glm::lookAt(camera_position -
+                                directional_light_objects[0].direction * 1000.f, /* eye */
+                            camera_position,                                     /* center */
+                            glm::vec3(0.0f, 1.0f, 0.0f) /* up */);
 
             /*
-             * Get the light's view projection matrix which models can be multiplied by
-             * to transform from world space to light space. This rotates the
-             * orthographic projection box to emit from the light's point of view.
+             * Rendering a wide shadow map reduces the resolution of the shadows, but rendering
+             * a tight shadow map prevents shadows from being rendered for objects a bit far away.
+             * To wrangle these constraints, we render 3 different shadow maps. One tight, high
+             * resolution shadow map for nearby objects, one medium range and one far range with
+             * poor resolution.
              */
-            light_view_projection = light_projection * light_view;
-
-            glViewport(0, 0, shadow_map_resolution, shadow_map_resolution);
-            glBindFramebuffer(GL_FRAMEBUFFER, shadow_map_frame_buffer);
-            glClear(GL_DEPTH_BUFFER_BIT);
-
-            depth_shader.use();
-            ASSERT_RET_IF_NOT(
-                depth_shader.set_mat4("u_light_view_projection", light_view_projection), false);
-
-            glCullFace(GL_FRONT);
-
-            /*
-             * Draw regular objects into shadow map.
-             */
-            for (const RegularObject &object : regular_objects)
+            for (size_t shadow_map_idx = 0; shadow_map_idx < shadow_map_frame_buffers.size();
+                 shadow_map_idx++)
             {
-                ASSERT_RET_IF_NOT(depth_shader.set_mat4("u_model", object.transform.model()),
+                ASSERT_RET_IF_NOT(render_shadow_map(camera_view,
+                                                    light_view,
+                                                    shadow_map_idx,
+                                                    light_view_projections[shadow_map_idx]),
                                   false);
-                object.drawable.draw();
             }
-
-            /*
-             * Draw models into shadow map.
-             */
-            for (const ModelObject &object : model_objects)
-            {
-                ASSERT_RET_IF_NOT(depth_shader.set_mat4("u_model", object.transform.model()),
-                                  false);
-                object.model.draw_no_textures();
-            }
-
-            /*
-             * Draw terrain into shadow map.
-             */
-            if (likely(terrain))
-            {
-                ASSERT_RET_IF_NOT(depth_shader.set_mat4("u_model", glm::mat4(1)), false);
-                terrain->drawable.draw();
-            }
-
-            glCullFace(GL_BACK);
-        }
-        else
-        {
-            light_view_projection = glm::mat4(1.0f);
         }
 
         /*
@@ -715,9 +751,16 @@ namespace Engine
          * Update per-frame uniform buffer.
          */
         PerFrameUniformBuffer per_frame_uniform_buffer = {
+            .camera_view = camera_view,
+            .camera_projection = projection,
             .camera_position = glm::vec4(camera_position, 0.0f),
+            .shadow_map_ranges =
+                glm::vec4(shadow_map_ranges[0], shadow_map_ranges[1], shadow_map_ranges[2], 0.f),
             .num_point_lights = static_cast<uint32_t>(point_light_objects.size()),
             .num_spot_lights = static_cast<uint32_t>(spot_light_objects.size()),
+            .camera_near_clip = camera_near_clip,
+            .camera_far_clip = camera_far_clip,
+            .light_view_projections = light_view_projections,
             .directional_light =
                 {
                     .direction = glm::vec4(directional_light_objects[0].direction, 0.0f),
@@ -725,9 +768,6 @@ namespace Engine
                     .diffuse = glm::vec4(directional_light_objects[0].color, 0.0f),
                     .specular = glm::vec4(directional_light_objects[0].color, 0.0f),
                 },
-            .camera_view = camera_view,
-            .camera_projection = projection,
-            .light_view_projection = light_view_projection,
         };
 
         ASSERT_RET_IF(point_light_objects.size() > PerFrameUniformBuffer::max_point_lights, false);
@@ -777,7 +817,9 @@ namespace Engine
         }
         regular_object_shader.use();
 
-        shadow_map_texture.use();
+        shadow_map_textures[0].use();
+        shadow_map_textures[1].use();
+        shadow_map_textures[2].use();
         for (const RegularObject &object : regular_objects)
         {
             ASSERT_RET_IF_NOT(regular_object_shader.set_mat4("u_model", object.transform.model()),
@@ -791,7 +833,9 @@ namespace Engine
          * Render model objects.
          */
 
-        shadow_map_texture.use();
+        shadow_map_textures[0].use();
+        shadow_map_textures[1].use();
+        shadow_map_textures[2].use();
         model_shader.use();
         for (const ModelObject &object : model_objects)
         {
@@ -811,7 +855,9 @@ namespace Engine
                 glDrawBuffers(buffers.size(), buffers.data());
             }
 
-            shadow_map_texture.use();
+            shadow_map_textures[0].use();
+            shadow_map_textures[1].use();
+            shadow_map_textures[2].use();
             terrain_shader.use();
 
             terrain->normal_map.use();
@@ -856,6 +902,9 @@ namespace Engine
             ASSERT_RET_IF_NOT(regular_object_tbn_visualizer_shader.set_bool(
                                   "u_only_show_normals", visualize_tbn_only_show_normals),
                               false);
+            ASSERT_RET_IF_NOT(regular_object_tbn_visualizer_shader.set_float(
+                                  "u_magnitude", visualize_tbn_magnitude),
+                              false);
 
             for (const RegularObject &object : regular_objects)
             {
@@ -878,6 +927,9 @@ namespace Engine
                 terrain_tbn_visualizer_shader.use();
                 ASSERT_RET_IF_NOT(terrain_tbn_visualizer_shader.set_bool(
                                       "u_only_show_normals", visualize_tbn_only_show_normals),
+                                  false);
+                ASSERT_RET_IF_NOT(terrain_tbn_visualizer_shader.set_float("u_magnitude",
+                                                                          visualize_tbn_magnitude),
                                   false);
                 ASSERT_RET_IF_NOT(terrain_tbn_visualizer_shader.set_mat4("u_model", glm::mat4(1.f)),
                                   false);

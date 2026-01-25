@@ -10,6 +10,8 @@ namespace Engine
      * To prevent setting shader uniforms every time a texture is used, we fix the texture slots for
      * different types of textures and set the uniforms once on initialization. This enum defines
      * those slots.
+     *
+     * Keep in sync with texture_slots.glsl.
      */
     enum TextureSlot : uint8_t
     {
@@ -25,7 +27,9 @@ namespace Engine
          * @}
          */
 
-        SHADOW = NUM_MODEL_TEXTURE_TYPES,
+        SHADOW_NEAR = NUM_MODEL_TEXTURE_TYPES,
+        SHADOW_MID,
+        SHADOW_FAR,
         BLOOM,
         NUM_TEXTURE_SLOTS,
     };

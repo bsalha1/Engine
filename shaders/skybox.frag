@@ -1,14 +1,16 @@
 #version 460 core
 
-layout (location = 0) out vec4 o_color;
-layout (location = 1) out vec4 o_bloom;
+#include "include/texture_slots.glsl"
+
+layout(location = 0) out vec4 o_color;
+layout(location = 1) out vec4 o_bloom;
 
 /**
  * Variables from vertex shader.
  */
 in vec3 v_position_model;
 
-uniform samplerCube u_texture_sampler;
+layout(binding = TEXTURE_SLOT_DIFFUSE) uniform samplerCube u_texture_sampler;
 uniform float u_sun_angular_radius;
 
 /**

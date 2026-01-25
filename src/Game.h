@@ -153,16 +153,18 @@ namespace Engine
         PlayerMovementState player_movement_state = PlayerMovementState::WALKING;
         static constexpr float acceleration_gravity = 10.f;
         bool is_on_ground = true;
+
         static constexpr float friction_coeff_ground = 10.f;
         static constexpr float friction_coeff_air = 0.05f;
         static constexpr float friction_coeff_flying = 5.f;
         float friction_coeff = friction_coeff_ground;
-        static constexpr float move_impulse_walking = 30.0f;
-        static constexpr float move_impulse_sprinting = 100.0f;
-        static constexpr float move_impulse_crouching = 15.0f;
-        static constexpr float move_impulse_midair = 1.0f;
-        static constexpr float move_impulse_flying = 150.0f;
-        static constexpr float move_impulse_jump = 4000.0f;
+
+        static constexpr float move_impulse_walking = 0.2f;
+        static constexpr float move_impulse_sprinting = 2.f * move_impulse_walking;
+        static constexpr float move_impulse_crouching = 0.5f * move_impulse_walking;
+        static constexpr float move_impulse_midair = 0.01f;
+        static constexpr float move_impulse_flying = 1.0f;
+        static constexpr float move_impulse_jump = 10.0f;
         float player_move_impulse = move_impulse_walking;
 
         /**

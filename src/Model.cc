@@ -71,7 +71,7 @@ namespace Engine
      */
     bool Model::load(const std::string &path)
     {
-        LOG("Loading model %s\n", path.c_str());
+        LOG_DEBUG("Loading model %s\n", path.c_str());
 
         Assimp::Importer importer;
         const aiScene *scene = importer.ReadFile(path,
@@ -87,7 +87,7 @@ namespace Engine
          * and so dynamic resizing of the meshes vector would invalidate those references.
          */
         const size_t num_meshes = get_num_meshes(scene->mRootNode);
-        LOG("Contains %zu meshes\n", num_meshes);
+        LOG_DEBUG("Contains %zu meshes\n", num_meshes);
 
         meshes.reserve(num_meshes);
 

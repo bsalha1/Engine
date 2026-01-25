@@ -1,10 +1,12 @@
 #version 460 core
 
+#include "include/texture_slots.glsl"
+
 out vec4 o_color;
 
 in vec2 v_texture_coord;
 
-uniform sampler2D u_texture_sampler;
+layout(binding = TEXTURE_SLOT_BLOOM) uniform sampler2D u_texture_sampler;
 
 uniform bool u_horizontal;
 uniform float u_weight[5] = float[] (0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);

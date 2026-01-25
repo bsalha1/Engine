@@ -2,6 +2,6 @@
 
 from run_in_container import run_in_container
 
-print(">>> Building engine demo")
+print(">>> Cleaning")
 
-run_in_container(["make", "all"])
+run_in_container(["make", "clean"])

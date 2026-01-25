@@ -83,7 +83,7 @@ namespace Engine
 #ifndef NDEBUG
         else
         {
-            LOG("OpenGL debug: %s\n", message);
+            // LOG("OpenGL debug: %s\n", message);
         }
 #endif
     }
@@ -469,6 +469,16 @@ namespace Engine
             terrain_vertex_array.create(vertices.data(), vertices.size());
             Vertex3dNormal::setup_vertex_array_attribs(terrain_vertex_array);
             terrain_index_buffer.create(indices.data(), indices.size());
+
+            /*
+             * Register the terrain with the renderer.
+             */
+            ASSERT_RET_IF_NOT(renderer.set_terrain({
+                                  .material = dirt_textured_material,
+                                  .normal_map = dirt_normal_map,
+                                  .drawable = terrain_index_buffer,
+                              }),
+                              false);
         }
 
         LOG("Initializing GUI\n");
@@ -491,6 +501,9 @@ namespace Engine
      */
     bool Game::init()
     {
+        const std::chrono::steady_clock::time_point init_start_time =
+            std::chrono::steady_clock::now();
+
         LOG("Initializing GLFW\n");
         ASSERT_RET_IF_NOT(glfwInit(), false);
 
@@ -499,6 +512,12 @@ namespace Engine
             glfwTerminate();
             return false;
         }
+
+        const std::chrono::milliseconds init_time_ms =
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() -
+                                                                  init_start_time);
+
+        LOG("Initialization took %lu ms\n", init_time_ms.count());
 
         return true;
     }
@@ -817,7 +836,7 @@ namespace Engine
         const bool can_jump = player_position.y - on_ground_camera_y <= 0.2f;
         if (can_jump && user_inputs.jump_rising_edge)
         {
-            player_velocity.y += move_impulse_jump * dt;
+            player_velocity.y += move_impulse_jump;
 
             /*
              * If the player jumps from a crouch, stand them up.
@@ -1066,7 +1085,7 @@ namespace Engine
              */
             if (user_inputs.jump)
             {
-                player_velocity.y += player_move_impulse * dt;
+                player_velocity.y += player_move_impulse;
             }
 
             /*
@@ -1074,7 +1093,7 @@ namespace Engine
              */
             if (user_inputs.crouch)
             {
-                player_velocity.y -= player_move_impulse * dt;
+                player_velocity.y -= player_move_impulse;
             }
 
             break;
@@ -1088,8 +1107,7 @@ namespace Engine
          */
         if (move_direction.x != 0.f || move_direction.y != 0.f || move_direction.z != 0.f)
         {
-            player_velocity +=
-                glm::normalize(move_direction) * player_move_impulse * static_cast<float>(dt);
+            player_velocity += glm::normalize(move_direction) * player_move_impulse;
         }
 
         /*
@@ -1247,13 +1265,6 @@ namespace Engine
     bool Game::run()
     {
         LOG("Entering main loop\n");
-
-        ASSERT_RET_IF_NOT(renderer.set_terrain({
-                              .material = dirt_textured_material,
-                              .normal_map = dirt_normal_map,
-                              .drawable = terrain_index_buffer,
-                          }),
-                          false);
 
         /*
          * Set day length and compute the rotational speed.

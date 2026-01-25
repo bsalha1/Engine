@@ -2,17 +2,17 @@
 
 #include "include/lighting.frag"
 #include "include/per_frame_ubo.glsl"
+#include "include/texture_slots.glsl"
 
 out vec4 color;
 
 in vec3 v_position_world_coords;
 in mat3 v_tangent_bitangent_normal;
-in vec4 v_frag_pos_light_space;
 in vec2 v_texture_coord;
 
-uniform sampler2D u_texture_sampler;
-uniform sampler2D u_normal_map_sampler;
-uniform sampler2D u_shadow_map_sampler;
+layout(binding = TEXTURE_SLOT_DIFFUSE) uniform sampler2D u_texture_sampler;
+layout(binding = TEXTURE_SLOT_NORMAL) uniform sampler2D u_normal_map_sampler;
+layout(binding = TEXTURE_SLOT_SHADOW_NEAR) uniform sampler2D u_shadow_map_samplers[NUM_SHADOW_MAPS];
 
 uniform Material u_material;
 
@@ -27,15 +27,19 @@ void main()
      * Compute unit vector pointing from vertex to camera to pass to fragment
      * shader to do lighting.
      */
-    vec3 view_direction = normalize(per_frame_ubo.camera_position - v_position_world_coords);
+    vec3 view_direction = normalize(vec3(per_frame_ubo.camera_position) - v_position_world_coords);
 
     vec3 result = compute_directional_component(
         per_frame_ubo.directional_light,
         u_material,
-        u_shadow_map_sampler,
+        u_shadow_map_samplers,
+        per_frame_ubo.light_view_projections,
         normal_world_space,
-        v_frag_pos_light_space,
-        view_direction);
+        v_position_world_coords,
+        view_direction,
+        per_frame_ubo.camera_near_clip,
+        per_frame_ubo.camera_far_clip,
+        vec2(per_frame_ubo.shadow_map_ranges));
 
     for (uint i = 0; i < per_frame_ubo.num_point_lights; i++)
     {

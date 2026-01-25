@@ -7,7 +7,6 @@ layout(location = 1) in vec3 l_normal;
 
 out vec3 v_position_world_coords;
 out mat3 v_tangent_bitangent_normal;
-out vec4 v_frag_pos_light_space;
 
 uniform mat4 u_model;
 
@@ -34,9 +33,4 @@ void main()
      * Position of vertex in world space.
      */
     v_position_world_coords = vec3(u_model * position_four_vector);
-
-    /*
-     * Compute position of vertex in light space for shadow mapping.
-     */
-    v_frag_pos_light_space = per_frame_ubo.light_view_projection * u_model * position_four_vector;
 }

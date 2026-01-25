@@ -22,12 +22,12 @@ namespace Engine
      * @param file_name_suffix File name suffix.
      *
      * The six faces should be named as:
-     * file_name_prefix + "px" + file_name_suffix
-     * file_name_prefix + "nx" + file_name_suffix
-     * file_name_prefix + "py" + file_name_suffix
-     * file_name_prefix + "ny" + file_name_suffix
-     * file_name_prefix + "pz" + file_name_suffix
-     * file_name_prefix + "nz" + file_name_suffix
+     * - file_name_prefix + "px" + file_name_suffix
+     * - file_name_prefix + "nx" + file_name_suffix
+     * - file_name_prefix + "py" + file_name_suffix
+     * - file_name_prefix + "ny" + file_name_suffix
+     * - file_name_prefix + "pz" + file_name_suffix
+     * - file_name_prefix + "nz" + file_name_suffix
      *
      * Where p = positive, n = negative, x/y/z = face axial direction.
      *
@@ -53,11 +53,11 @@ namespace Engine
         {
             uint8_t *face = stbi_load(faces[i].c_str(), &width, &height, &channels, 0);
             ASSERT_RET_IF_NOT(face, false);
-            LOG("Loading cubemap face %s (%d x %d x %d)\n",
-                faces[i].c_str(),
-                width,
-                height,
-                channels);
+            LOG_DEBUG("Loading cubemap face %s (%d x %d x %d)\n",
+                      faces[i].c_str(),
+                      width,
+                      height,
+                      channels);
             const GLenum internal_format = (channels == 4) ? GL_RGBA8 : GL_RGB8;
             const GLenum format = (channels == 4) ? GL_RGBA : GL_RGB;
             glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,

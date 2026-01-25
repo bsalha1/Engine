@@ -86,7 +86,7 @@ namespace Engine
                 std::string include_src;
                 const std::string include_path = base_path + include_file;
 
-                LOG("Adding include: %s\n", include_path.c_str());
+                LOG_DEBUG("Adding include: %s\n", include_path.c_str());
 
                 /*
                  * If we have already loaded this include, use the cached version.
@@ -134,7 +134,7 @@ namespace Engine
     {
         const std::string file_path = base_path + file_name;
 
-        LOG("Getting source code for shader %s\n", file_path.c_str());
+        LOG_DEBUG("Getting source code for shader %s\n", file_path.c_str());
 
         /*
          * If we have already read this shader file, use the cached version.
